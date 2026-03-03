@@ -29,7 +29,7 @@ public class TypingResult {
     private Long textId;
 
     @Column(name = "finished_at", nullable = false)
-    private Date finishedAt;
+    private LocalDateTime finishedAt;
 
     @Column(name = "duration_ms", nullable = false)
     private Long durationMs;
@@ -37,8 +37,10 @@ public class TypingResult {
     @Column(name = "time_constraint_ms", nullable = false)
     private Long timeConstraintMs;
 
+    @Column(precision = 5, scale = 2)
     private Double wpm;
 
+    @Column(precision = 5, scale = 2)
     private Double accuracy;
 
     @CreationTimestamp

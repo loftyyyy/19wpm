@@ -19,13 +19,13 @@ public class UserStat {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "average_speed", nullable = false)
+    @Column(name = "average_speed", nullable = false, precision = 5, scale = 2)
     private Double averageSpeed;
 
-    @Column(name = "best_speed", nullable = false)
+    @Column(name = "best_speed", nullable = false, precision = 5, scale = 2)
     private Double bestSpeed;
 
-    @Column(name = "last_speed", nullable = false)
+    @Column(name = "last_speed", nullable = false, precision = 5, scale = 2)
     private Double lastSpeed;
 
     @Column(name = "text_completed", nullable = false)
