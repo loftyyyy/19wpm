@@ -27,6 +27,10 @@ public class User {
     @Column(name = "user_id")
     private Long userId;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id", nullable = false)
+    private Role role;
+
     @Column(name = "username", nullable = false, length = 50)
     private String username;
 
