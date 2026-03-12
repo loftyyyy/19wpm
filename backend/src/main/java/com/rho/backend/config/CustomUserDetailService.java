@@ -1,5 +1,6 @@
 package com.rho.backend.config;
 
+import com.rho.backend.exception.user.UserException;
 import com.rho.backend.model.User;
 import com.rho.backend.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,7 +20,7 @@ public class CustomUserDetailService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username);
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new UserException("User not found!"));
         return new CustomUserDetails(user);
     }
 

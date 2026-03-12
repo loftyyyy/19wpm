@@ -1,5 +1,8 @@
 package com.rho.backend.service;
 
+import com.rho.backend.dto.user.request.UserRegisterRequest;
+import com.rho.backend.exception.user.DuplicateCredentialException;
+import com.rho.backend.model.Role;
 import com.rho.backend.model.User;
 import com.rho.backend.repository.RoleRepository;
 import com.rho.backend.repository.UserRepository;
@@ -20,16 +23,27 @@ public class UserService {
         this.roleRepository = roleRepository;
     }
 
-    public User signUpUser(){
-        return null;
-    }
+    public User saveUser(UserRegisterRequest userRegisterRequest){
+        if(userRepository.existsByUsername(userRegisterRequest.getUsername())){
+            throw new DuplicateCredentialException("Username already exists");
+        }
 
-    public User updateUser(){
-        return null;
-    }
+        if(userRepository.existsByEmail(userRegisterRequest.getEmail())){
+            throw new DuplicateCredentialException("Email already exists");
+        }
 
-    public User signInUser(){
-        return null;
+        User user = new User();
+        user.setUsername(userRegisterRequest.getUsername());
+        user.setFirstName(userRegisterRequest.getFirstName());
+        user.setLastName(userRegisterRequest.getLastName());
+        user.setEmail(userRegisterRequest.getEmail());
+        user.setPassword(passwordEncoder.encode(userRegisterRequest.getPassword()));
+        user.setCountry(userRegisterRequest.getCountry());
+
+        Role role = roleRepository.getRoleByName("USER");
+        user.setRole(role);
+
+        return userRepository.save(user);
     }
 
 }
