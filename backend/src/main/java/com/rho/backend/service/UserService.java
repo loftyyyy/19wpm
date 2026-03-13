@@ -2,6 +2,7 @@ package com.rho.backend.service;
 
 import com.rho.backend.dto.user.request.UserRegisterRequest;
 import com.rho.backend.exception.user.DuplicateCredentialException;
+import com.rho.backend.exception.user.UserException;
 import com.rho.backend.model.Role;
 import com.rho.backend.model.User;
 import com.rho.backend.repository.RoleRepository;
@@ -44,6 +45,18 @@ public class UserService {
         user.setRole(role);
 
         return userRepository.save(user);
+    }
+
+    public User findUserById(Long id){
+        return userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
+    }
+
+    public User updateUser(UserUpdateRequest userUpdateRequest){
+        if(!userRepository.existsById(userUpdateRequest.getUserId())){
+
+
+        }
+
     }
 
 }
