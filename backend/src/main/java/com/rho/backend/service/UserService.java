@@ -53,9 +53,9 @@ public class UserService {
 
     public User updateUser(UserUpdateRequest userUpdateRequest){
         if(!userRepository.existsById(userUpdateRequest.getUserId())){
-
-
+            throw new UserException("User not found");
         }
+
 
     }
 
