@@ -17,6 +17,10 @@ public class CustomUserDetails implements UserDetails {
         this.user = user;
     }
 
+    public Long getUserId(){
+        return user.getUserId();
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         String roleName = "ROLE_" + user.getRole().getName().toUpperCase();
@@ -25,12 +29,12 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public @Nullable String getPassword() {
-        return "";
+        return user.getPassword();
     }
 
     @Override
     public String getUsername() {
-        return "";
+        return user.getUsername();
     }
 
     @Override

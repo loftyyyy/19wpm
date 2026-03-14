@@ -15,8 +15,10 @@ public class UserResponseDTO {
     private String lastName;
     private String email;
     private String country;
+    private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime deactivatedAt;
 
     public UserResponseDTO(User user){
         this.userId = user.getUserId();
@@ -25,8 +27,10 @@ public class UserResponseDTO {
         this.lastName = user.getLastName();
         this.email = user.getEmail();
         this.country = user.getCountry();
+        this.isActive = user.getIsActive();
         this.createdAt = user.getCreatedAt();
         this.updatedAt = user.getUpdatedAt();
+        this.deactivatedAt = user.getDeactivatedAt();
     }
 
 }

@@ -49,6 +49,9 @@ public class User {
     @Column(name = "country", length = 100)
     private String country;
 
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -56,4 +59,7 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "deactivated_at")
+    private LocalDateTime deactivatedAt;
 }
