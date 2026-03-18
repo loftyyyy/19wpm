@@ -25,6 +25,7 @@ public class AuthController {
 
     }
 
+    @RequestMapping("/logout")
     public ResponseEntity<?> logout(){
 
     }
