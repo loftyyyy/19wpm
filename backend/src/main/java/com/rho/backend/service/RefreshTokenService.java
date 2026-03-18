@@ -6,6 +6,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -32,7 +33,33 @@ public class RefreshTokenService {
     }
 
     public boolean isRefreshTokenValid(String refreshToken){
+        Optional<RefreshToken> tokenEntity = refreshTokenRepository.findByToken(refreshToken);
 
+        if(tokenEntity.isEmpty()){
+            return false;
+        }
+
+        RefreshToken token = tokenEntity.get();
+
+        if(token.getExpiresAt().isBefore(LocalDateTime.now())){
+            refreshTokenRepository.delete(token);
+            return false;
+        }
+
+        return true;
+    }
+
+    public String getUsernameFromRefreshToken(String refreshToken) {
+        Optional<RefreshToken> tokenEntity = refreshTokenRepository.findByToken(refreshToken);
+        return tokenEntity.map(RefreshToken::getUsername).orElse(null);
+    }
+
+    public void deleteRefreshToken(String refreshToken) {
+        refreshTokenRepository.deleteByToken(refreshToken);
+    }
+
+    public void deleteAllUserRefreshTokens(String username) {
+        refreshTokenRepository.deleteByUsername(username);
     }
 
 }
