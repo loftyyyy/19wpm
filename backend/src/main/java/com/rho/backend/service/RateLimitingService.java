@@ -120,9 +120,11 @@ public class RateLimitingService {
         }
 
         return request.getRemoteAddr();
+
     }
 
     public String getConfiguration() {
+
         return String.format("Login: %d/%ds, Refresh: %d/%ds, Cleanup: %s, MaxBuckets: %d",
                 loginAttempts, loginWindowSeconds,
                 refreshAttempts, refreshWindowSeconds,
