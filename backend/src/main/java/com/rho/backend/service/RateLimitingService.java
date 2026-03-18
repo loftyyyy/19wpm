@@ -111,15 +111,14 @@ public class RateLimitingService {
     }
 
      public String extractClientIp(HttpServletRequest request) {
-        // X-Forwarded-For can contain a comma-separated chain: "client, proxy1, proxy2"
-        // The leftmost value is the original client IP
+
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
             String clientIp = xForwardedFor.split(",")[0].trim();
             logger.debug("Resolved client IP from X-Forwarded-For: {}", clientIp);
             return clientIp;
         }
-        // Fallback for non-proxied environments or direct connections
+
         return request.getRemoteAddr();
     }
 
