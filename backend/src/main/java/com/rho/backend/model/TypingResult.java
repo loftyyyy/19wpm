@@ -46,4 +46,5 @@ public class TypingResult {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
 }
