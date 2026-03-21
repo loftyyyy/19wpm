@@ -2,6 +2,7 @@ package com.rho.backend.controller;
 
 import com.rho.backend.dto.auth.request.AuthRequestDTO;
 import com.rho.backend.dto.auth.response.AuthResponseDTO;
+import com.rho.backend.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-    private final 
+    private final UserService userService;
+
+    public AuthController(UserService userService){
+        this.userService = userService;
+    }
 
     @RequestMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody AuthRequestDTO authRequestDTO, HttpServletRequest request){
