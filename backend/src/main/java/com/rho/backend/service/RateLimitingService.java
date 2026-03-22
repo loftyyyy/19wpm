@@ -110,17 +110,15 @@ public class RateLimitingService {
         logger.info("Rate limit cleared for IP: {}", clientIp);
     }
 
-     public String extractClientIp(HttpServletRequest request) {
-
+    public String extractClientIp(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            String clientIp = xForwardedFor.split(",")[0].trim();
+            String[] ips = xForwardedFor.split(",");
+            String clientIp = ips[ips.length - 1].trim();
             logger.debug("Resolved client IP from X-Forwarded-For: {}", clientIp);
             return clientIp;
         }
-
         return request.getRemoteAddr();
-
     }
 
     public String getConfiguration() {

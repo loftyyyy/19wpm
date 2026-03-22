@@ -21,7 +21,7 @@ public class AuthController {
 
     @RequestMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody AuthRequestDTO authRequestDTO, HttpServletRequest request){
-        String clientIp = clientIpResolver
+//        String clientIp = clientIpResolver
 
     }
 
