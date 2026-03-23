@@ -1,10 +1,8 @@
 package com.rho.backend.dto.user.request;
 
 
-import com.rho.backend.enums.AuthProvider;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,7 +20,8 @@ public class UserRegisterRequest {
     @NotBlank(message = "Last name is required")
     private String lastName;
 
-    @Email(message = "Email is required")
+    @Email(message = "Invalid email format")
+    @NotBlank(message = "Email is required")
     private String email;
 
     @NotBlank(message = "Password is required")
@@ -32,6 +31,4 @@ public class UserRegisterRequest {
     @NotBlank(message = "Country is required")
     private String country;
 
-    @NotNull(message = "Provider is required")
-    private AuthProvider provider;
 }

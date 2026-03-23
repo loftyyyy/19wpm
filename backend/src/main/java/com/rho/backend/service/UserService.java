@@ -4,6 +4,7 @@ import com.rho.backend.dto.user.request.UserDeactivateRequest;
 import com.rho.backend.dto.user.request.UserRegisterRequest;
 import com.rho.backend.dto.user.request.UserUpdateRequest;
 import com.rho.backend.dto.user.response.UserResponseDTO;
+import com.rho.backend.enums.AuthProvider;
 import com.rho.backend.exception.credential.PasswordException;
 import com.rho.backend.exception.user.DuplicateCredentialException;
 import com.rho.backend.exception.user.UserException;
@@ -47,6 +48,7 @@ public class UserService {
         user.setEmail(userRegisterRequest.getEmail());
         user.setPassword(passwordEncoder.encode(userRegisterRequest.getPassword()));
         user.setCountry(userRegisterRequest.getCountry());
+        user.setProvider(AuthProvider.LOCAL);
 
         Role role = roleRepository.getRoleByName("USER");
         user.setRole(role);
