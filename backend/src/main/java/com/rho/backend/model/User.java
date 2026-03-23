@@ -1,5 +1,6 @@
 package com.rho.backend.model;
 
+import com.rho.backend.enums.AuthProvider;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -48,6 +49,10 @@ public class User {
 
     @Column(name = "country", length = 100)
     private String country;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AuthProvider provider;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
