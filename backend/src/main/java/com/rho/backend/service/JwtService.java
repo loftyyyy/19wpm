@@ -1,11 +1,14 @@
 package com.rho.backend.service;
 
 import com.rho.backend.model.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import io.jsonwebtoken.Jwts;
 
@@ -57,6 +60,86 @@ public class JwtService {
         return builder.compact();
     }
 
+    public boolean isAccessTokenValid(String token, UserDetails userDetails){
+        try{
+            Claims claims = extractAllClaims(token);
+            return subjectMatches(claims, userDetails.getUsername()) && isNotExpired(claims) && isNotBeforeValid(claims) && TYPE_ACCESS.equals(claims.get(CLAIM_TOKEN_TYPE, String.class));
 
+        }catch(JwtException | IllegalArgumentException e){
+            logger.warn("Access token validation failed: {}", e.getMessage());
+            return false;
+
+        }
+
+
+    }
+
+    public boolean isRefreshTokenValid(String token, String expectedEmail){
+        try{
+            Claims claims = extractAllClaims(token);
+            return subjectMatches(claims, expectedEmail) && isNotExpired(claims) && isNotBeforeValid(claims) && TYPE_REFRESH.equals(claims.get(CLAIM_TOKEN_TYPE, String.class));
+
+
+        }catch(JwtException | IllegalArgumentException e){
+            logger.warn("Access token validation failed: {}", e.getMessage());
+            return false;
+        }
+
+    }
+
+
+    /**
+     * Claim Extraction
+     */
+
+    public String extractSubject(String token){
+        return extractAllClaims(token).getSubject();
+    }
+
+    public boolean isAccessToken(String token){
+        try{
+            return TYPE_ACCESS.equals(extractAllClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
+
+        }catch (JwtException e){
+            return false;
+        }
+
+    }
+
+    public boolean isRefreshToken(String token){
+        try{
+            return TYPE_REFRESH.equals(extractAllClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
+
+        }catch (JwtException e){
+            return false;
+        }
+
+    }
+
+
+    /**
+     *Internal Helpers
+     */
+
+    public Claims extractAllClaims(String token){
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    private boolean subjectMatches(Claims claims, String expected){
+        return expected != null  && expected.equals(claims.getSubject());
+    }
+
+    private boolean isNotExpired(Claims claims){
+        return claims.getExpiration() != null && claims.getExpiration().after(new Date());
+    }
+
+    private boolean isNotBeforeValid(Claims claims){
+        Date notBefore = claims.getNotBefore();
+        return notBefore == null || !notBefore.after(new Date());
+    }
 
 }
