@@ -1,6 +1,6 @@
 package com.rho.backend.service;
 
-import com.rho.backend.record.UserDTO;
+import com.rho.backend.dto.user.request.UserDTO;
 import com.rho.backend.dto.auth.request.RegisterRequestDTO;
 import com.rho.backend.dto.auth.response.AuthResponseDTO;
 import com.rho.backend.model.User;
