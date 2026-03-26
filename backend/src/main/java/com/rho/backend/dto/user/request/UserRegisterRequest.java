@@ -4,31 +4,27 @@ package com.rho.backend.dto.user.request;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
-public class UserRegisterRequest {
+public record UserRegisterRequest (
 
     @NotBlank(message = "Username is required")
-    private String username;
+    String username,
 
     @NotBlank(message = "First name is required")
-    private String firstName;
+    String firstName,
 
     @NotBlank(message = "Last name is required")
-    private String lastName;
+    String lastName,
 
     @Email(message = "Invalid email format")
     @NotBlank(message = "Email is required")
-    private String email;
+     String email,
 
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
-    private String password;
+    String password,
 
     @NotBlank(message = "Country is required")
-    private String country;
+    String country
 
-}
+){}
