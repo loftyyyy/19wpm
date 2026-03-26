@@ -42,7 +42,7 @@ public class JwtService {
         return buildToken(user.getEmail(), accessTokenExpirationMs, TYPE_ACCESS, Map.of(CLAIM_ROLE, user.getRole(), CLAIM_PROVIDER, user.getProvider().name()));
     }
 
-    public String refreshAccessToken(User user){
+    public String generateRefreshToken(User user){
         logger.debug("Generating refresh token for {}", user.getEmail());
         return buildToken(user.getEmail(), accessTokenExpirationMs, TYPE_REFRESH, Map.of());
     }
