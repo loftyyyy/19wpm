@@ -1,14 +1,11 @@
 package com.rho.backend.dto.auth.response;
 
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-@NoArgsConstructor
-@Setter
-@Getter
-public class AuthResponseDTO {
+import com.rho.backend.dto.user.request.UserDTO;
 
-
-
-}
+public record AuthResponseDTO(
+        String tokenType,
+        String accessToken,
+        String refreshToken,
+        UserDTO userDTO
+){}
