@@ -2,16 +2,12 @@ package com.rho.backend.controller;
 
 import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.user.request.UserDeactivateRequest;
-import com.rho.backend.dto.user.request.UserRegisterRequest;
+import com.rho.backend.dto.auth.request.RegisterRequestDTO;
 import com.rho.backend.dto.user.request.UserUpdateRequest;
 import com.rho.backend.dto.user.response.UserResponseDTO;
-import com.rho.backend.exception.user.UserException;
-import com.rho.backend.model.User;
-import com.rho.backend.repository.UserRepository;
 import com.rho.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,8 +27,8 @@ public class UserController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<?> createUser(@Valid @RequestBody UserRegisterRequest userRegisterRequest){
-        userService.saveUser(userRegisterRequest);
+    public ResponseEntity<?> createUser(@Valid @RequestBody RegisterRequestDTO registerRequestDTO){
+        userService.saveUser(registerRequestDTO);
         return ResponseEntity.ok("User registered successfully");
     }
 
