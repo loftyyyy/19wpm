@@ -33,21 +33,21 @@ public class UserService {
     }
 
     public UserResponseDTO saveUser(UserRegisterRequest userRegisterRequest){
-        if(userRepository.existsByUsername(userRegisterRequest.getUsername())){
+        if(userRepository.existsByUsername(userRegisterRequest.username())){
             throw new DuplicateCredentialException("Username already exists");
         }
 
-        if(userRepository.existsByEmail(userRegisterRequest.getEmail())){
+        if(userRepository.existsByEmail(userRegisterRequest.email())){
             throw new DuplicateCredentialException("Email already exists");
         }
 
         User user = new User();
-        user.setUsername(userRegisterRequest.getUsername());
-        user.setFirstName(userRegisterRequest.getFirstName());
-        user.setLastName(userRegisterRequest.getLastName());
-        user.setEmail(userRegisterRequest.getEmail());
-        user.setPassword(passwordEncoder.encode(userRegisterRequest.getPassword()));
-        user.setCountry(userRegisterRequest.getCountry());
+        user.setUsername(userRegisterRequest.username());
+        user.setFirstName(userRegisterRequest.firstName());
+        user.setLastName(userRegisterRequest.lastName());
+        user.setEmail(userRegisterRequest.email());
+        user.setPassword(passwordEncoder.encode(userRegisterRequest.password()));
+        user.setCountry(userRegisterRequest.country());
         user.setProvider(AuthProvider.LOCAL);
 
         Role role = roleRepository.getRoleByName("USER");
@@ -75,7 +75,7 @@ public class UserService {
 
     public void deactivateUser(UserDeactivateRequest userDeactivateRequest, Long id){
         User user = userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
-        if(!passwordEncoder.matches(userDeactivateRequest.getCurrentPassword(), user.getPassword())){
+        if(!passwordEncoder.matches(userDeactivateRequest.currentPassword(), user.getPassword())){
             throw new PasswordException("Credentials doesn't match. Try again");
         }
 

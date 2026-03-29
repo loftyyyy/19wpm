@@ -27,6 +27,9 @@ public class AuthService {
 
     }
 
+    public AuthResponseDTO authenticate({
+
+    })
 
     /**
      * Internal Helper

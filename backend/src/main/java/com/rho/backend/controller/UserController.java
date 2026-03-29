@@ -36,7 +36,7 @@ public class UserController {
         return ResponseEntity.ok("User registered successfully");
     }
 
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     public ResponseEntity<?> updateUser(@Valid @RequestBody UserUpdateRequest userUpdateRequest, @PathVariable Long id){
         userService.modifyUser(userUpdateRequest, id);
         return ResponseEntity.ok("User updated successfully");
