@@ -1,5 +1,6 @@
 package com.rho.backend.service;
 
+import com.rho.backend.dto.auth.request.AuthRequestDTO;
 import com.rho.backend.dto.user.request.UserDTO;
 import com.rho.backend.dto.auth.request.RegisterRequestDTO;
 import com.rho.backend.dto.auth.response.AuthResponseDTO;
@@ -23,13 +24,12 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
     }
 
-    public AuthResponseDTO register(RegisterRequestDTO registerRequestDTO){
+
+    public AuthResponseDTO login(AuthRequestDTO authRequestDTO){
+        
 
     }
 
-    public AuthResponseDTO authenticate({
-
-    })
 
     /**
      * Internal Helper
