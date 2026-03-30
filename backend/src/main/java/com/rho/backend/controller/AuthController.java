@@ -1,8 +1,11 @@
 package com.rho.backend.controller;
 
+import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.auth.request.AuthRequestDTO;
 import com.rho.backend.dto.auth.request.RegisterRequestDTO;
 import com.rho.backend.dto.auth.response.AuthResponseDTO;
+import com.rho.backend.dto.auth.token.request.TokenRefreshRequestDTO;
+import com.rho.backend.dto.user.response.UserResponseDTO;
 import com.rho.backend.service.AuthService;
 import com.rho.backend.service.RateLimitingService;
 import com.rho.backend.service.UserService;
@@ -10,12 +13,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 public class AuthController {
     private final UserService userService;
     private final AuthService authService;
@@ -28,7 +30,7 @@ public class AuthController {
         this.rateLimitingService = rateLimitingService;
     }
 
-    @RequestMapping("/login")
+    @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody AuthRequestDTO authRequestDTO, HttpServletRequest request){
         String clientIp = rateLimitingService.extractClientIp(request);
 
@@ -41,7 +43,7 @@ public class AuthController {
 
     }
 
-    @RequestMapping("/signup")
+    @PostMapping("/signup")
     public ResponseEntity<AuthResponseDTO> signup(@Valid @RequestBody RegisterRequestDTO registerRequestDTO){
         return ResponseEntity.ok(authService.saveUser(registerRequestDTO));
     }
@@ -51,6 +53,22 @@ public class AuthController {
 //
 //    }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserResponseDTO> me(@AuthenticationPrincipal CustomUserDetails customUserDetails){
+        return ResponseEntity.ok(userService.getMe(customUserDetails.getUserId()));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody TokenRefreshRequestDTO tokenRefreshRequestDTO, HttpServletRequest request){
+        String clientIp = rateLimitingService.extractClientIp(request);
+
+        if(!rateLimitingService.isLoginAllowed(clientIp)){
+            long remaining = rateLimitingService.getRemainingLoginAttempts(clientIp);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header("X-RateLimit-Remaining", String.valueOf(remaining)).body("Too many login attempts. Please try again later.");
+        }
+
+        return ResponseEntity.ok(authService.refresh(tokenRefreshRequestDTO.refreshToken()));
+    }
 }
 
 

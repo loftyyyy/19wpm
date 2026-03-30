@@ -21,17 +21,6 @@ public class UserController {
         this.userService = userService;
     }
 
-    @GetMapping("/me")
-    public ResponseEntity<UserResponseDTO> me(@AuthenticationPrincipal CustomUserDetails customUserDetails){
-        return ResponseEntity.ok(userService.getMe(customUserDetails.getUserId()));
-    }
-
-    @PostMapping("/signup")
-    public ResponseEntity<?> createUser(@Valid @RequestBody RegisterRequestDTO registerRequestDTO){
-        userService.saveUser(registerRequestDTO);
-        return ResponseEntity.ok("User registered successfully");
-    }
-
     @PatchMapping("/{id}")
     public ResponseEntity<?> updateUser(@Valid @RequestBody UserUpdateRequest userUpdateRequest, @PathVariable Long id){
         userService.modifyUser(userUpdateRequest, id);
