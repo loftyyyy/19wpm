@@ -3,22 +3,19 @@ package com.rho.backend.service;
 import com.rho.backend.dto.auth.request.AuthRequestDTO;
 import com.rho.backend.dto.auth.request.RegisterRequestDTO;
 import com.rho.backend.dto.auth.token.response.TokenRefreshResponseDTO;
-import com.rho.backend.dto.role.RoleResponseDTO;
 import com.rho.backend.dto.user.request.UserResponseDTO;
 import com.rho.backend.dto.auth.response.AuthResponseDTO;
 import com.rho.backend.enums.AuthProvider;
 import com.rho.backend.exception.InvalidResourceException;
 import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
-import com.rho.backend.model.Role;
 import com.rho.backend.model.User;
 import com.rho.backend.repository.RoleRepository;
 import com.rho.backend.repository.UserRepository;
-import jakarta.validation.Valid;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
 
 @Service
 public class AuthService {
@@ -29,25 +26,19 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository, RoleRepository roleRepository, JwtService jwtService1, AuthenticationManager authenticationManager, PasswordEncoder passwordEncoder){
+    public AuthService(UserRepository userRepository, RoleRepository roleRepository, JwtService jwtService, AuthenticationManager authenticationManager, PasswordEncoder passwordEncoder){
         this.userRepository = userRepository;
-        this.jwtService = jwtService1;
+        this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
         this.passwordEncoder = passwordEncoder;
         this.roleRepository = roleRepository;
     }
 
 
-    public AuthResponseDTO login(@Valid @RequestBody AuthRequestDTO authRequestDTO){
-        if(!userRepository.existsByEmail(authRequestDTO.email())){
-            throw new ResourceNotFoundException("User not found");
-        }
-
-        if(){
-
-        }
-
-
+    public AuthResponseDTO login(AuthRequestDTO authRequestDTO){
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(authRequestDTO.email(), authRequestDTO.password()));
+        User user = userRepository.findByEmail(authRequestDTO.email()).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        return buildResponse(user);
     }
 
     public AuthResponseDTO saveUser(RegisterRequestDTO registerRequestDTO){
@@ -59,24 +50,22 @@ public class AuthService {
             throw new DuplicateResourceException("Email already exists");
         }
 
-        User user = new User();
-        user.setUsername(registerRequestDTO.username());
-        user.setFirstName(registerRequestDTO.firstName());
-        user.setLastName(registerRequestDTO.lastName());
-        user.setEmail(registerRequestDTO.email());
-        user.setPassword(passwordEncoder.encode(registerRequestDTO.password()));
-        user.setCountry(registerRequestDTO.country());
-        user.setProvider(AuthProvider.LOCAL);
-
-        Role role = roleRepository.getRoleByName("USER");
-        user.setRole(role);
+        User user = User.builder()
+                        .username(registerRequestDTO.username())
+                        .firstName(registerRequestDTO.firstName())
+                        .lastName(registerRequestDTO.lastName())
+                        .email(registerRequestDTO.email())
+                        .password(passwordEncoder.encode(registerRequestDTO.password()))
+                        .country(registerRequestDTO.country())
+                        .provider(AuthProvider.LOCAL)
+                        .role(roleRepository.getRoleByName("USER")).build();
 
         return buildResponse(userRepository.save(user));
     }
 
     /**
      * Validates the refresh token and issues a fresh access token.
-     * The refresh token itself is NOT rotated here — add rotation if you
+     * The refresh token itself is NOT rotated here — add rotation later if I
      * want extra security (invalidate old refresh token, issue a new one).
      */
     public TokenRefreshResponseDTO refresh(String refreshToken){
@@ -94,9 +83,9 @@ public class AuthService {
 
         User user = userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
-        String newRefreshToken = jwtService.generateAccessToken(user);
+        String newAccessToken = jwtService.generateAccessToken(user);
 
-        return new TokenRefreshResponseDTO(newRefreshToken, "Bearer");
+        return new TokenRefreshResponseDTO(newAccessToken, "Bearer");
     }
 
     /**
@@ -105,7 +94,7 @@ public class AuthService {
      * is safer than localStorage for the refresh token).
      */
     private AuthResponseDTO buildResponse(User user){
-        return new AuthResponseDTO(jwtService.generateAccessToken(user), jwtService.generateRefreshToken(user), "Bearer", new UserResponseDTO(user.getUserId(), user.getEmail(), user.getUsername(), user.getProvider().toString()));
+        return new AuthResponseDTO(jwtService.generateAccessToken(user), jwtService.generateRefreshToken(user), "Bearer", UserResponseDTO.from(user));
     }
 
 

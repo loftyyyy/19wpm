@@ -2,18 +2,18 @@ package com.rho.backend.model;
 
 import com.rho.backend.enums.AuthProvider;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+@Entity
 @Getter
 @Setter
-@NoArgsConstructor
-@Entity
+@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Table(
         name = "users",
         uniqueConstraints = {
