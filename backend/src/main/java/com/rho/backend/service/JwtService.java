@@ -44,7 +44,7 @@ public class JwtService {
 
     public String generateRefreshToken(User user){
         logger.debug("Generating refresh token for {}", user.getEmail());
-        return buildToken(user.getEmail(), accessTokenExpirationMs, TYPE_REFRESH, Map.of());
+        return buildToken(user.getEmail(), refreshTokenExpirationMs, TYPE_REFRESH, Map.of());
     }
 
     public String buildToken(String subject, long expirationMs, String tokenType, Map<String, Object> extraClaims){

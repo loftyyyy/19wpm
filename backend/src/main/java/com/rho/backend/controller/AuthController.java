@@ -62,9 +62,9 @@ public class AuthController {
     public ResponseEntity<?> refresh(@RequestBody TokenRefreshRequestDTO tokenRefreshRequestDTO, HttpServletRequest request){
         String clientIp = rateLimitingService.extractClientIp(request);
 
-        if(!rateLimitingService.isLoginAllowed(clientIp)){
-            long remaining = rateLimitingService.getRemainingLoginAttempts(clientIp);
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header("X-RateLimit-Remaining", String.valueOf(remaining)).body("Too many login attempts. Please try again later.");
+        if(!rateLimitingService.isRefreshAllowed(clientIp)){
+            long remaining = rateLimitingService.getRemainingRefreshAttempts(clientIp);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header("X-RateLimit-Remaining", String.valueOf(remaining)).body("Too many refresh attempts. Please try again later.");
         }
 
         return ResponseEntity.ok(authService.refresh(tokenRefreshRequestDTO.refreshToken()));
