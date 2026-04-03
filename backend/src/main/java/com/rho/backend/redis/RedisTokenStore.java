@@ -4,11 +4,15 @@ package com.rho.backend.redis;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Owns all token state in Redis.
@@ -103,15 +107,27 @@ public class RedisTokenStore {
 
     /**
      * Revokes ALL refresh tokens for a user (logout from all devices).
-     * Uses SCAN to find keys matching refresh:{userId}:* — safe for production
+     * Uses SCAN to iterate through keys matching refresh:{userId}:* — safe for production
      * unlike KEYS which blocks the Redis event loop.
      */
     public void revokeAllRefreshTokens(Long userId) {
         String pattern = RedisKeys.refreshToken(userId, "*");
-        var keys = redisTemplate.keys(pattern); // acceptable for low-volume admin ops
-        if (keys != null && !keys.isEmpty()) {
-            redisTemplate.delete(keys);
-            logger.info("All {} refresh tokens revoked for userId={}", keys.size(), userId);
+        List<String> keysToDelete = new ArrayList<>();
+        
+        ScanOptions scanOptions = ScanOptions.scanOptions()
+                .match(pattern)
+                .count(100)
+                .build();
+        
+        try (Cursor<String> cursor = redisTemplate.scan(scanOptions)) {
+            while (cursor.hasNext()) {
+                keysToDelete.add(cursor.next());
+            }
+        }
+        
+        if (!keysToDelete.isEmpty()) {
+            redisTemplate.delete(keysToDelete);
+            logger.info("All {} refresh tokens revoked for userId={}", keysToDelete.size(), userId);
         }
     }
 }
