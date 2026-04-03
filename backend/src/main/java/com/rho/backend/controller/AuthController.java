@@ -48,10 +48,11 @@ public class AuthController {
         return ResponseEntity.ok(authService.saveUser(registerRequestDTO));
     }
 
-//    @RequestMapping("/logout")
-//    public ResponseEntity<?> logout(){
-//
-//    }
+    @RequestMapping("/logout")
+    public ResponseEntity<?> logout(){
+
+
+    }
 
     @GetMapping("/me")
     public ResponseEntity<UserResponseDTO> me(@AuthenticationPrincipal CustomUserDetails customUserDetails){
