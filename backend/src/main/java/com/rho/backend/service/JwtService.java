@@ -142,4 +142,7 @@ public class JwtService {
         return notBefore == null || !notBefore.after(new Date());
     }
 
+    public Date extractExpiration(String token) {
+        return extractAllClaims(token).getExpiration();
+    }
 }
