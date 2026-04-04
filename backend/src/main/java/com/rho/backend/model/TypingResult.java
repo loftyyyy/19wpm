@@ -27,23 +27,23 @@ public class TypingResult {
     @Column(name = "text_id", nullable = false)
     private Long textId;
 
-    @Column(name = "finished_at", nullable = false)
+    @Column(name = "finished_at")
     private LocalDateTime finishedAt;
 
     @Column(name = "duration_ms", nullable = false)
-    private Long durationMs;
+    private Integer durationMs;
 
-    @Column(name = "time_constraint_ms", nullable = false)
-    private Long timeConstraintMs;
+    @Column(name = "time_constraint_ms")
+    private Integer timeConstraintMs;
 
-    @Column(precision = 5, scale = 2)
+    @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal wpm;
 
-    @Column(precision = 5, scale = 2)
+    @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal accuracy;
 
     @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
 }
