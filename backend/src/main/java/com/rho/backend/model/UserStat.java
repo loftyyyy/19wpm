@@ -5,6 +5,8 @@ import lombok.Generated;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
 @Entity
@@ -20,13 +22,13 @@ public class UserStat {
     private Long userId;
 
     @Column(name = "average_speed", nullable = false, precision = 5, scale = 2)
-    private Double averageSpeed;
+    private BigDecimal averageSpeed;
 
     @Column(name = "best_speed", nullable = false, precision = 5, scale = 2)
-    private Double bestSpeed;
+    private BigDecimal bestSpeed;
 
     @Column(name = "last_speed", nullable = false, precision = 5, scale = 2)
-    private Double lastSpeed;
+    private BigDecimal lastSpeed;
 
     @Column(name = "text_completed", nullable = false)
     private Long textCompleted;

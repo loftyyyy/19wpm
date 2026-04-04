@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -36,10 +37,10 @@ public class TypingResult {
     private Long timeConstraintMs;
 
     @Column(precision = 5, scale = 2)
-    private Double wpm;
+    private BigDecimal wpm;
 
     @Column(precision = 5, scale = 2)
-    private Double accuracy;
+    private BigDecimal accuracy;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
