@@ -47,6 +47,7 @@ public class AuthService {
                 .username(request.username())
                 .provider(AuthProvider.LOCAL)
                 .role(roleRepository.getRoleByName("USER"))
+                .isActive(Boolean.TRUE)
                 .build();
 
         userRepository.save(user);
@@ -203,9 +204,9 @@ public class AuthService {
 
     private AuthResponseDTO buildAuthResponse(String accessToken, String refreshToken, User user) {
         return new AuthResponseDTO(
+                "Bearer",
                 accessToken,
                 refreshToken,
-                "Bearer",
                 UserResponseDTO.from(user)
         );
     }
