@@ -13,6 +13,8 @@ import com.rho.backend.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class TextService {
 
@@ -101,6 +103,23 @@ public class TextService {
         return new TextResponseDTO(text);
     }
 
+    public List<TextResponseDTO> getPresetTexts(){
+        List<Text> texts = textRepository.findByIsCustomFalse();
+
+        return texts.stream().map(TextResponseDTO::new).toList();
+    }
+
+    public List<TextResponseDTO> getUserTexts(Long id){
+        userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        List<Text> texts = textRepository.findByCreatedBy(id);
+
+        return texts.stream().map(TextResponseDTO::new).toList();
+    }
+
+    public List<TextResponseDTO> getTextsByLanguage(String language){
+        List<Text> texts = textRepository.findByLanguage(language);
+        return texts.stream().map(TextResponseDTO::new).toList();
+    }
 
 
 }
