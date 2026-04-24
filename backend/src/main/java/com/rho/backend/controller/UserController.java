@@ -1,10 +1,8 @@
 package com.rho.backend.controller;
 
 import com.rho.backend.config.CustomUserDetails;
-import com.rho.backend.dto.user.request.UserDeactivateRequest;
-import com.rho.backend.dto.auth.request.RegisterRequestDTO;
-import com.rho.backend.dto.user.request.UserUpdateRequest;
-import com.rho.backend.dto.user.response.UserResponseDTO;
+import com.rho.backend.dto.user.request.UserDeactivateRequestDTO;
+import com.rho.backend.dto.user.request.UserUpdateRequestDTO;
 import com.rho.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,17 +20,16 @@ public class UserController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<?> updateUser(@Valid @RequestBody UserUpdateRequest userUpdateRequest, @PathVariable Long id){
-        userService.modifyUser(userUpdateRequest, id);
+    public ResponseEntity<?> updateUser(@Valid @RequestBody UserUpdateRequestDTO userUpdateRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
+        userService.modifyUser(userUpdateRequestDTO, customUserDetails.getUserId());
         return ResponseEntity.ok("User updated successfully");
     }
 
     @PutMapping("/deactivate")
-    public ResponseEntity<?> removeUser(@Valid @RequestBody UserDeactivateRequest userDeactivateRequest, @AuthenticationPrincipal CustomUserDetails customUserDetails){
-        userService.deactivateUser(userDeactivateRequest, customUserDetails.getUserId());
+    public ResponseEntity<?> removeUser(@Valid @RequestBody UserDeactivateRequestDTO userDeactivateRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
+        userService.deactivateUser(userDeactivateRequestDTO, customUserDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
-
 
 
 }

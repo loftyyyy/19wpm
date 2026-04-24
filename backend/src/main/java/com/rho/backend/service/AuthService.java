@@ -12,7 +12,6 @@ import com.rho.backend.model.User;
 import com.rho.backend.redis.RedisTokenStore;
 import com.rho.backend.repository.RoleRepository;
 import com.rho.backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,7 +22,6 @@ import org.springframework.stereotype.Service;
 import java.util.Date;
 
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
@@ -34,6 +32,15 @@ public class AuthService {
     private final RedisTokenStore redisTokenStore;
     private final AuthenticationManager authenticationManager;
     private final RoleRepository roleRepository;
+
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, RedisTokenStore redisTokenStore, AuthenticationManager authenticationManager, RoleRepository roleRepository){
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.redisTokenStore = redisTokenStore;
+        this.authenticationManager = authenticationManager;
+        this.roleRepository = roleRepository;
+    }
 
     // ── Register ──────────────────────────────────────────────────────────────
 

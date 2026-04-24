@@ -1,14 +1,10 @@
 package com.rho.backend.service;
 
-import com.rho.backend.dto.user.request.UserDeactivateRequest;
-import com.rho.backend.dto.auth.request.RegisterRequestDTO;
-import com.rho.backend.dto.user.request.UserUpdateRequest;
+import com.rho.backend.dto.user.request.UserDeactivateRequestDTO;
+import com.rho.backend.dto.user.request.UserUpdateRequestDTO;
 import com.rho.backend.dto.user.response.UserResponseDTO;
-import com.rho.backend.enums.AuthProvider;
 import com.rho.backend.exception.credential.PasswordException;
-import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
-import com.rho.backend.model.Role;
 import com.rho.backend.model.User;
 import com.rho.backend.repository.RoleRepository;
 import com.rho.backend.repository.UserRepository;
@@ -36,22 +32,22 @@ public class UserService {
         return new UserResponseDTO(userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found")));
     }
 
-    public UserResponseDTO modifyUser(UserUpdateRequest userUpdateRequest, Long id){
+    public UserResponseDTO modifyUser(UserUpdateRequestDTO userUpdateRequestDTO, Long id){
         User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        if(!passwordEncoder.matches(userUpdateRequest.getCurrentPassword(), user.getPassword())){
+        if(!passwordEncoder.matches(userUpdateRequestDTO.getCurrentPassword(), user.getPassword())){
             throw new PasswordException("Credentials doesn't match. Try again");
         }
 
-        user.setCountry(userUpdateRequest.getCountry());
-        user.setFirstName(userUpdateRequest.getFirstName());
-        user.setLastName(userUpdateRequest.getLastName());
+        user.setCountry(userUpdateRequestDTO.getCountry());
+        user.setFirstName(userUpdateRequestDTO.getFirstName());
+        user.setLastName(userUpdateRequestDTO.getLastName());
 
         return new UserResponseDTO(userRepository.save(user));
     }
 
-    public void deactivateUser(UserDeactivateRequest userDeactivateRequest, Long id){
+    public void deactivateUser(UserDeactivateRequestDTO userDeactivateRequestDTO, Long id){
         User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        if(!passwordEncoder.matches(userDeactivateRequest.currentPassword(), user.getPassword())){
+        if(!passwordEncoder.matches(userDeactivateRequestDTO.currentPassword(), user.getPassword())){
             throw new PasswordException("Credentials doesn't match. Try again");
         }
 

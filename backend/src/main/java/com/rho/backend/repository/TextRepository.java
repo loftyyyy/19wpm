@@ -6,5 +6,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface TextRepository extends JpaRepository<Text, Long> {
+    Text getByTextId(Long textId);
 
 }
