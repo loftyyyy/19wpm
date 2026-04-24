@@ -50,10 +50,13 @@ public class AuthService {
         }
         User user = User.builder()
                 .email(request.email())
+                .firstName(request.firstName())
+                .lastName(request.lastName())
                 .password(passwordEncoder.encode(request.password()))
                 .username(request.username())
                 .provider(AuthProvider.LOCAL)
                 .role(roleRepository.getRoleByName("USER"))
+                .country(request.country())
                 .isActive(Boolean.TRUE)
                 .build();
 
