@@ -50,7 +50,7 @@ CREATE TABLE texts (
 CREATE TABLE typing_results (
 
     typing_result_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NULL,
+    user_id BIGINT NOT NULL,
     text_id BIGINT NOT NULL,
     finished_at DATETIME NULL,
     duration_ms INT NOT NULL,
