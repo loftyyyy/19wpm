@@ -121,5 +121,4 @@ public class TextService {
         return texts.stream().map(TextResponseDTO::new).toList();
     }
 
-
 }
