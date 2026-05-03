@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserStatRepository extends JpaRepository<UserStat, Long> {
 
+    UserStat findByUserId(Long userId);
 }
