@@ -32,14 +32,16 @@ public class AuthService {
     private final RedisTokenStore redisTokenStore;
     private final AuthenticationManager authenticationManager;
     private final RoleRepository roleRepository;
+    private final UserStatService userStatService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, RedisTokenStore redisTokenStore, AuthenticationManager authenticationManager, RoleRepository roleRepository){
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, RedisTokenStore redisTokenStore, AuthenticationManager authenticationManager, RoleRepository roleRepository, UserStatService userStatService){
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.redisTokenStore = redisTokenStore;
         this.authenticationManager = authenticationManager;
         this.roleRepository = roleRepository;
+        this.userStatService = userStatService;
     }
 
     // ── Register ──────────────────────────────────────────────────────────────
@@ -61,6 +63,8 @@ public class AuthService {
                 .build();
 
         userRepository.save(user);
+        // Initialize user stats
+        userStatService.initializeUserStats(user.getUserId());
         logger.info("New user registered: {}", user.getEmail());
         return issueTokenPair(user);
     }

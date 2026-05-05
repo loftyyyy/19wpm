@@ -19,6 +19,7 @@ public record TypingResultRequestDTO(
         Integer timeConstraintMs,
 
         @NotNull(message = "wpm is required")
+        @Positive(message = "WPM must be positive")
         @DecimalMin(value = "0.0", inclusive = false, message = "wpm must be greater than 0")
         @Digits(integer = 3, fraction = 2, message = "wpm must have up to 3 integer digits and 2 decimal places")
         BigDecimal wpm,
