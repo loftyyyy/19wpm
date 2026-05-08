@@ -2,6 +2,7 @@ package com.rho.backend.controller;
 
 
 import com.rho.backend.config.CustomUserDetails;
+import com.rho.backend.dto.userStat.response.UserStatResponseDTO;
 import com.rho.backend.service.UserStatService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,12 +21,12 @@ public class UserStatController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getStat(@AuthenticationPrincipal CustomUserDetails customUserDetails){
+    public ResponseEntity<UserStatResponseDTO> getStat(@AuthenticationPrincipal CustomUserDetails customUserDetails){
         return ResponseEntity.ok(userStatService.getStat(customUserDetails.getUserId()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getUserStat(@PathVariable long id){
+    public ResponseEntity<UserStatResponseDTO> getUserStat(@PathVariable long id){
         return ResponseEntity.ok(userStatService.getStat(id));
     }
 

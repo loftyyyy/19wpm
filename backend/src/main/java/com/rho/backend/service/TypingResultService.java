@@ -27,7 +27,7 @@ public class TypingResultService {
             throw new ResourceNotFoundException("Text doesn't exist");
         }
 
-        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         TypingResult typingResult = TypingResult.builder()
                 .userId(userId)
