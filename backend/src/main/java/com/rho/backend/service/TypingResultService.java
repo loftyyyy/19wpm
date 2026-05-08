@@ -14,10 +14,12 @@ import org.springframework.stereotype.Service;
 public class TypingResultService {
     private final TypingResultRepository typingResultRepository;
     private final UserRepository userRepository;
+    private final UserStatService userStatService;
 
-    public TypingResultService(TypingResultRepository typingResultRepository, UserRepository userRepository){
+    public TypingResultService(TypingResultRepository typingResultRepository, UserRepository userRepository, UserStatService userStatService){
         this.typingResultRepository = typingResultRepository;
         this.userRepository = userRepository;
+        this.userStatService = userStatService;
     }
 
     public TypingResultResponseDTO saveTypingResult(TypingResultRequestDTO typingResultRequestDTO, long userId){
@@ -38,12 +40,9 @@ public class TypingResultService {
                 .build();
 
         typingResultRepository.save(typingResult);
-
-        // TODO: I should think about how I should increment the textCompleted and its analytics(e.g best speed, average speed, and last speed) from the user stats
-
+        userStatService.updateUserStats(userId, typingResultRequestDTO.wpm());
 
         return new TypingResultResponseDTO(typingResult);
     }
-
 
 }

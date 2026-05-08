@@ -1,11 +1,33 @@
 package com.rho.backend.controller;
 
 
+import com.rho.backend.config.CustomUserDetails;
+import com.rho.backend.service.UserStatService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
-@RestController
+@RestController("/api/v1/stat")
 public class UserStatController {
 
+    private final UserStatService userStatService;
+
+    public UserStatController(UserStatService userStatService){
+        this.userStatService = userStatService;
+
+    }
+
+    @GetMapping
+    public ResponseEntity<?> getStat(@AuthenticationPrincipal CustomUserDetails customUserDetails){
+        return ResponseEntity.ok(userStatService.getStat(customUserDetails.getUserId()));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getUserStat(@PathVariable long id){
+        return ResponseEntity.ok(userStatService.getStat(id));
+    }
 
 
 }

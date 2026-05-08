@@ -1,5 +1,6 @@
 package com.rho.backend.service;
 
+import com.rho.backend.dto.userStat.response.UserStatResponseDTO;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.model.User;
 import com.rho.backend.model.UserStat;
@@ -24,7 +25,7 @@ public class UserStatService {
 
 
     public void initializeUserStats(long userId){
-        User user = userRepository.findById(userId).orElseThrow(() -> new  ResourceNotFoundException("User not found"));
+        userRepository.findById(userId).orElseThrow(() -> new  ResourceNotFoundException("User not found"));
 
         UserStat userStat = UserStat.builder()
                 .userId(userId)
@@ -35,19 +36,25 @@ public class UserStatService {
         userStatRepository.save(userStat);
     }
 
+    public UserStatResponseDTO getStat(long userId){
+        UserStat userStat = userStatRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        return new UserStatResponseDTO(userStat);
+    }
+
+
     @Transactional
-    public void updateUserStats(long userId, int newWpm){
+    public void updateUserStats(long userId, BigDecimal newWpm){
         UserStat userStat = userStatRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("User Statistics not found"));
         int oldCount = userStat.getTextCompleted();
         int newCount = oldCount + 1;
 
-        userStat.setLastSpeed(BigDecimal.valueOf(newWpm));
+        userStat.setLastSpeed(newWpm);
 
-        if(BigDecimal.valueOf(newWpm).compareTo(userStat.getBestSpeed()) > 0){
-            userStat.setBestSpeed(BigDecimal.valueOf(newWpm));
+        if(newWpm.compareTo(userStat.getBestSpeed()) > 0){
+            userStat.setBestSpeed(newWpm);
         }
 
-        BigDecimal totalWpm = userStat.getAverageSpeed().multiply(BigDecimal.valueOf(oldCount)).add(BigDecimal.valueOf(newWpm));
+        BigDecimal totalWpm = userStat.getAverageSpeed().multiply(BigDecimal.valueOf(oldCount)).add(newWpm);
 
         userStat.setAverageSpeed(totalWpm.divide(BigDecimal.valueOf(newCount), 2, RoundingMode.HALF_UP));
         userStat.setTextCompleted(newCount);
