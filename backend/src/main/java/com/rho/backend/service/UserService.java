@@ -68,7 +68,7 @@ public class UserService {
     public List<UserResponseDTO> getUsers(long userId){
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if(!user.getRole().equals("ADMIN")){
+        if(!user.getRole().getName().equals("ADMIN")){
             throw new UnauthorizedResourceException("You are not authorized to access this.");
         }
 

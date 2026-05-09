@@ -7,6 +7,7 @@ import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.service.TextService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +39,7 @@ public class TextController {
         return ResponseEntity.ok(userTexts);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/text")
     public ResponseEntity<TextResponseDTO> createText(@Valid @RequestBody TextRequestDTO textRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
         return ResponseEntity.ok(textService.saveText(textRequestDTO, customUserDetails.getUserId()));
