@@ -50,6 +50,10 @@ public class AuthService {
         if (userRepository.existsByEmail(request.email())) {
             throw new DuplicateResourceException("Email already registered.");
         }
+
+        if(userRepository.existsByUsername(request.username())){
+            throw new DuplicateResourceException("Username already registered.");
+        }
         User user = User.builder()
                 .email(request.email())
                 .firstName(request.firstName())

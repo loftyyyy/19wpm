@@ -4,10 +4,8 @@ import com.rho.backend.dto.typingResult.request.TypingResultRequestDTO;
 import com.rho.backend.dto.typingResult.response.TypingResultResponseDTO;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.model.TypingResult;
-import com.rho.backend.model.User;
 import com.rho.backend.repository.TypingResultRepository;
 import com.rho.backend.repository.UserRepository;
-import com.rho.backend.repository.UserStatRepository;
 import org.springframework.stereotype.Service;
 
 @Service

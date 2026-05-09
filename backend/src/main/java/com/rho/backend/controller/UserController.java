@@ -3,11 +3,15 @@ package com.rho.backend.controller;
 import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.user.request.UserDeactivateRequestDTO;
 import com.rho.backend.dto.user.request.UserUpdateRequestDTO;
+import com.rho.backend.dto.user.response.UserResponseDTO;
 import com.rho.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -17,6 +21,13 @@ public class UserController {
 
     public UserController(UserService userService){
         this.userService = userService;
+    }
+
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping
+    public ResponseEntity<List<UserResponseDTO>> getUsers(@AuthenticationPrincipal CustomUserDetails customUserDetails){
+        return ResponseEntity.ok(userService.getUsers(customUserDetails.getUserId()));
     }
 
     @PatchMapping("/{id}")
@@ -30,6 +41,7 @@ public class UserController {
         userService.deactivateUser(userDeactivateRequestDTO, customUserDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
+
 
 
 }

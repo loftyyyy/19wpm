@@ -38,16 +38,14 @@ public class TextController {
         return ResponseEntity.ok(userTexts);
     }
 
+    @PostMapping("/text")
+    public ResponseEntity<TextResponseDTO> createText(@Valid @RequestBody TextRequestDTO textRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
+        return ResponseEntity.ok(textService.saveText(textRequestDTO, customUserDetails.getUserId()));
+    }
 
     @PostMapping("/custom-text")
     public ResponseEntity<TextResponseDTO> createCustomText(@Valid @RequestBody TextRequestDTO textRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
         return ResponseEntity.ok(textService.saveCustomText(textRequestDTO, customUserDetails.getUserId()));
-    }
-
-
-    @PostMapping("/text")
-    public ResponseEntity<TextResponseDTO> createText(@Valid @RequestBody TextRequestDTO textRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
-        return ResponseEntity.ok(textService.saveText(textRequestDTO, customUserDetails.getUserId()));
     }
 
     @PostMapping("/{textId}")

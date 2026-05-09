@@ -1,8 +1,10 @@
 package com.rho.backend.dto.auth.request;
 
 
+import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record RegisterRequestDTO(
@@ -17,8 +19,9 @@ public record RegisterRequestDTO(
     String lastName,
 
     @Email(message = "Invalid email format")
+    @Pattern(regexp = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", message = "Email must contain a valid domain")
     @NotBlank(message = "Email is required")
-     String email,
+    String email,
 
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")

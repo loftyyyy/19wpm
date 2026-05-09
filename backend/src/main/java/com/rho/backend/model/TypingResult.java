@@ -20,7 +20,7 @@ public class TypingResult {
     @Column(name = "typing_result_id")
     private Long typingResultId;
 
-    @Column(name = "user_id")
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
     @Column(name = "text_id", nullable = false)
