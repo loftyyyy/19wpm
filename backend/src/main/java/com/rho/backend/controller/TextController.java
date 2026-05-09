@@ -13,7 +13,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RestController("/api/v1/texts")
+@RestController
+@RequestMapping("/api/v1/texts")
 public class TextController {
 
     private final TextService textService;

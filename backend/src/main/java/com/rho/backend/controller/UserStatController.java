@@ -17,7 +17,6 @@ public class UserStatController {
 
     public UserStatController(UserStatService userStatService){
         this.userStatService = userStatService;
-
     }
 
     @GetMapping
@@ -29,6 +28,5 @@ public class UserStatController {
     public ResponseEntity<UserStatResponseDTO> getUserStat(@PathVariable long id){
         return ResponseEntity.ok(userStatService.getStat(id));
     }
-
 
 }
