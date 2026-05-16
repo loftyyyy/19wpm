@@ -1,6 +1,7 @@
 package com.rho.backend.repository;
 
 
+import com.rho.backend.enums.AuthProvider;
 import com.rho.backend.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

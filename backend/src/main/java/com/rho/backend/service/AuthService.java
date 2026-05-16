@@ -6,12 +6,14 @@ import com.rho.backend.dto.auth.request.RegisterRequestDTO;
 import com.rho.backend.dto.auth.response.AuthResponseDTO;
 import com.rho.backend.dto.user.request.UserResponseDTO;
 import com.rho.backend.enums.AuthProvider;
+import com.rho.backend.exception.InvalidResourceException;
 import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.model.User;
 import com.rho.backend.redis.RedisTokenStore;
 import com.rho.backend.repository.RoleRepository;
 import com.rho.backend.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -46,6 +48,7 @@ public class AuthService {
 
     // ── Register ──────────────────────────────────────────────────────────────
 
+    @Transactional
     public AuthResponseDTO register(RegisterRequestDTO request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new DuplicateResourceException("Email already registered.");
@@ -54,6 +57,11 @@ public class AuthService {
         if(userRepository.existsByUsername(request.username())){
             throw new DuplicateResourceException("Username already registered.");
         }
+
+        if(request.password() == null || request.password().isBlank()){
+            throw new IllegalArgumentException("Password is required for local accounts");
+        }
+
         User user = User.builder()
                 .email(request.email())
                 .firstName(request.firstName())

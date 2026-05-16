@@ -9,8 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Getter
-@Setter
+@Data
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -35,7 +34,7 @@ public class User {
     @Column(name = "username", nullable = false, length = 50)
     private String username;
 
-    @Column(name = "password", nullable = false, length = 255)
+    @Column(name = "password", length = 255)
     private String password;
 
     @Column(name = "first_name", length = 100)
@@ -67,4 +66,10 @@ public class User {
 
     @Column(name = "deactivated_at")
     private LocalDateTime deactivatedAt;
+
+//    @Override
+//    public String getPassword(){
+//        return password != null ? password : "";
+//    }
+
 }

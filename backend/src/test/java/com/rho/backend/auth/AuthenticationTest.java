@@ -203,7 +203,7 @@ public class AuthenticationTest {
                             .content(objectMapper.writeValueAsString(authRequestDTO)))
                     .andDo(print())
                     .andExpect(jsonPath("$.message").value("Validation Failed"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isBadRequest());
         }
 
     }

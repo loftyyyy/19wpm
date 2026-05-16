@@ -8,7 +8,7 @@ CREATE TABLE users (
     role_id BIGINT NOT NULL,
     username VARCHAR(50) NOT NULL,
     email VARCHAR(255) NOT NULL,
-    password VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NULL,
     first_name VARCHAR(100) NULL,
     last_name VARCHAR(100) NULL,
     country VARCHAR(100) NULL,
@@ -25,6 +25,15 @@ CREATE TABLE users (
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Optional: separate table for linked OAuth providers
+CREATE TABLE user_oauth_providers (
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT NOT NULL,
+    provider    ENUM('GOOGLE', 'GITHUB') NOT NULL,
+    provider_id VARCHAR(255) NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    UNIQUE KEY uk_provider (provider, provider_id)
+);
 
 CREATE TABLE texts (
     text_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
