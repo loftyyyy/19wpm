@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
 @Transactional // rolls back DB changes after each test
-public class AuthenticationTest {
+public class AuthIntegrationTest {
     @Autowired
     private WebApplicationContext webApplicationContext;
 
