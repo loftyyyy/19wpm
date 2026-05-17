@@ -7,6 +7,8 @@ import com.rho.backend.model.Role;
 import com.rho.backend.repository.RoleRepository;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -37,6 +39,9 @@ public class TextIntegrationTest {
     @Autowired
     private RoleRepository roleRepository;
 
+    private String presetTextsURL = "/api/v1/texts/preset-texts";
+
+
     private RegisterRequestDTO validRegister = new RegisterRequestDTO(
             "james", "John", "Doe", "james@gmail.com", "Test12345", "PH"
     );
@@ -55,7 +60,7 @@ public class TextIntegrationTest {
     }
 
     private Map<String, String> createUser(RegisterRequestDTO registerRequestDTO) throws Exception{
-        String responseBody = mockMvc.perform(post("/api/v1/auth/login")
+        String responseBody = mockMvc.perform(post("/api/v1/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(registerRequestDTO)))
                 .andDo(print())
@@ -70,6 +75,17 @@ public class TextIntegrationTest {
         return Map.of("accessToken", accessToken, "refreshToken", refreshToken);
     }
 
+    @DisplayName("Should return preset texts")
+    @Test
+    void getPresetTexts() throws Exception{
+        String accessToken = createUser(validRegister).get("accessToken");
+
+        mockMvc.perform(get(presetTextsURL)
+                .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andDo(print())
+                .andExpect(status().isOk());
+    }
 
 
 
