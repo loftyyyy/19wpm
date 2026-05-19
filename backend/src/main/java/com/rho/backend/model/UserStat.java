@@ -18,8 +18,9 @@ public class UserStat {
     @Column(name = "user_stats_id", nullable = false)
     private Long userStatsId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Column(name = "average_speed", precision = 5, scale = 2)
     private BigDecimal averageSpeed;

@@ -27,7 +27,7 @@ public class TextService {
     }
 
     public TextResponseDTO saveText(TextRequestDTO textRequestDTO, Long id){
-        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if(!user.getRole().getName().equals("ADMIN")){
             throw new UnauthorizedResourceException("You cannot perform this action");
@@ -110,7 +110,7 @@ public class TextService {
     }
 
     public List<TextResponseDTO> getUserTexts(Long id){
-        userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         List<Text> texts = textRepository.findByCreatedBy(id);
 
         return texts.stream().map(TextResponseDTO::new).toList();

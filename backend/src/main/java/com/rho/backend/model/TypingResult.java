@@ -20,8 +20,9 @@ public class TypingResult {
     @Column(name = "typing_result_id")
     private Long typingResultId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Column(name = "text_id", nullable = false)
     private Long textId;

@@ -120,7 +120,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
 
         // 2. Only check by email if we actually have one
         if (email != null) {
-            Optional<User> byEmail = userRepository.findByEmail(email);
+            Optional<User> byEmail = userRepository.findByEmailWithRole(email);
             if (byEmail.isPresent()) {
                 User existingUser = byEmail.get();
                 linkOAuthProvider(existingUser, provider, providerId);
