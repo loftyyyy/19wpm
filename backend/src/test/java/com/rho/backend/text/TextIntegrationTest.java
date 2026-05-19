@@ -86,5 +86,4 @@ public class TextIntegrationTest {
                 .andDo(print())
                 .andExpect(status().isOk());
     }
-
 }
