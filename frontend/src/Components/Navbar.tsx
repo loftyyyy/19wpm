@@ -21,16 +21,16 @@ export default function Navbar() {
                     {/* Desktop Navigation - centered*/}
                     <div className="hidden md:flex justify-center">
                         <div className="flex gap-6 text-sm md:text-base text-[#566252]" style={{ fontFamily: 'Inter' }}>
-                            <a href="#" className="hover:text-[#82524D] hover:underline-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
                                 Practice
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
                                 Compete
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
                                 Leaderboard
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
                                 About
                             </a>
                         </div>
@@ -68,16 +68,16 @@ export default function Navbar() {
                 {isMenuOpen && (
                     <div className="md:hidden pb-4">
                         <div className="flex flex-col gap-4 text-[#566252]" style={{ fontFamily: 'Inter' }}>
-                            <a href="#" className="no-underline hover:text-[#82524D] transition-colors py-2">
+                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
                                 Practice
                             </a>
-                            <a href="#" className="no-underline hover:text-[#82524D] transition-colors py-2">
+                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
                                 Compete
                             </a>
-                            <a href="#" className="no-underline hover:text-[#82524D] transition-colors py-2">
+                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
                                 Leaderboard
                             </a>
-                            <a href="#" className="no-underline hover:text-[#82524D] transition-colors py-2">
+                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
                                 About
                             </a>
                             <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
