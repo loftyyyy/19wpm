@@ -2,6 +2,7 @@ import Navbar from '../Components/Navbar';
 import ProgressionChart from '../Components/ProgressionChart';
 import UsersCard from '../Components/UsersCard';
 import RecentHistory from '../Components/RecentHistory';
+import Footer from '../Components/Footer';
 export default function App() {
   return (
     <>
@@ -19,6 +20,8 @@ export default function App() {
         {/* Recent History content*/}
         <RecentHistory />
         
+        {/* Footer content */}
+        <Footer />
       </div>
     </>
   )
