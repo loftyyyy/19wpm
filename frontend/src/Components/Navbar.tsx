@@ -21,16 +21,16 @@ export default function Navbar() {
                     {/* Desktop Navigation - centered*/}
                     <div className="hidden md:flex justify-center">
                         <div className="flex gap-6 text-sm md:text-base text-[#566252]" style={{ fontFamily: 'Inter' }}>
-                            <a href="#" className="no-underline hover:text-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#82524D] hover:underline-[#82524D] transition-colors">
                                 Practice
                             </a>
-                            <a href="#" className="no-underline hover:text-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#82524D] hover:underline-[#82524D] transition-colors">
                                 Compete
                             </a>
-                            <a href="#" className="no-underline hover:text-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#82524D] hover:underline-[#82524D] transition-colors">
                                 Leaderboard
                             </a>
-                            <a href="#" className="no-underline hover:text-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#82524D] hover:underline-[#82524D] transition-colors">
                                 About
                             </a>
                         </div>
