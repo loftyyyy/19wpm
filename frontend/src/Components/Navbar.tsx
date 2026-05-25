@@ -21,16 +21,16 @@ export default function Navbar() {
                     {/* Desktop Navigation - centered*/}
                     <div className="hidden md:flex justify-center">
                         <div className="flex gap-6 text-sm md:text-base text-[#566252]" style={{ fontFamily: 'Inter' }}>
-                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#514442] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
                                 Practice
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#514442] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
                                 Compete
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#514442] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
                                 Leaderboard
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
+                            <a href="#" className="hover:text-[#514442] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors">
                                 About
                             </a>
                         </div>
@@ -39,16 +39,16 @@ export default function Navbar() {
                     {/* Desktop Buttons + Mobile Menu */}
                     <div className="flex items-center justify-end gap-4">
                         <div className="hidden md:flex items-center gap-3">
-                            <button className="px-4 py-2 text-[#566252] hover:text-[#82524D] transition-colors" style={{ fontFamily: 'Inter' }}>
+                            <button className="px-4 py-2 text-[#566252] hover:text-[#514442] transition-colors hover:cursor-pointer" style={{ fontFamily: 'Inter' }}>
                                 Login
                             </button>
-                            <button className="px-4 py-2 bg-[#82524D] text-white rounded-lg hover:bg-[#6b3f36] transition-colors" style={{ fontFamily: 'Inter' }}>
+                            <button className="px-4 py-2 bg-[#82524D] text-white rounded-lg hover:bg-[#6b3f36] transition-colors hover:cursor-pointer" style={{ fontFamily: 'Inter' }}>
                                 Sign Up
                             </button>
                         </div>
                         <button
                             onClick={toggleMenu}
-                            className="md:hidden p-2 rounded-md text-[#566252] hover:text-[#82524D]"
+                            className="md:hidden p-2 rounded-md text-[#566252] hover:text-[#514442] hover:cursor-pointer"
                             aria-label="Toggle menu"
                         >
                             {isMenuOpen ? (
@@ -68,23 +68,23 @@ export default function Navbar() {
                 {isMenuOpen && (
                     <div className="md:hidden pb-4">
                         <div className="flex flex-col gap-4 text-[#566252]" style={{ fontFamily: 'Inter' }}>
-                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
+                            <a href="#" className="hover:text-[#514442] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
                                 Practice
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
+                            <a href="#" className="hover:text-[#514442] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
                                 Compete
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
+                            <a href="#" className="hover:text-[#514442] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
                                 Leaderboard
                             </a>
-                            <a href="#" className="hover:text-[#82524D] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
+                            <a href="#" className="hover:text-[#514442] hover:underline hover:underline-offset-4 hover:decoration-[#82524D] transition-colors py-2">
                                 About
                             </a>
                             <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
-                                <button className="w-full px-4 py-2 text-[#566252] hover:text-[#82524D] transition-colors border border-[#566252] rounded-lg">
+                                <button className="w-full px-4 py-2 text-[#566252] hover:text-[#514442] transition-colors border border-[#566252] rounded-lg hover:cursor-pointer">
                                     Login
                                 </button>
-                                <button className="w-full px-4 py-2 bg-[#82524D] text-white rounded-lg hover:bg-[#6b3f36] transition-colors">
+                                <button className="w-full px-4 py-2 bg-[#82524D] text-white rounded-lg hover:bg-[#6b3f36] transition-colors hover:cursor-pointer">
                                     Sign Up
                                 </button>
                             </div>
