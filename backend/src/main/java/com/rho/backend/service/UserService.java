@@ -34,11 +34,11 @@ public class UserService {
     }
 
     public UserResponseDTO getMe(Long id){
-        return new UserResponseDTO(userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found")));
+        return new UserResponseDTO(userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found")));
     }
 
     public UserResponseDTO modifyUser(UserUpdateRequestDTO userUpdateRequestDTO, Long id){
-        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if(!passwordEncoder.matches(userUpdateRequestDTO.getCurrentPassword(), user.getPassword())){
             throw new PasswordException("Credentials doesn't match. Try again");
         }
@@ -51,7 +51,7 @@ public class UserService {
     }
 
     public void deactivateUser(UserDeactivateRequestDTO userDeactivateRequestDTO, Long id){
-        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if(!passwordEncoder.matches(userDeactivateRequestDTO.currentPassword(), user.getPassword())){
             throw new PasswordException("Credentials doesn't match. Try again");
         }
@@ -66,13 +66,13 @@ public class UserService {
     }
 
     public List<UserResponseDTO> getUsers(long userId){
-        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if(!user.getRole().getName().equals("ADMIN")){
             throw new UnauthorizedResourceException("You are not authorized to access this.");
         }
 
-        List<User> users = userRepository.findAll();
+        List<User> users = userRepository.findAllWithRole();
 
         return users.stream().map(UserResponseDTO::new).toList();
     }

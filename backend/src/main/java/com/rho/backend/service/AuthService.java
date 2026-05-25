@@ -1,6 +1,7 @@
 package com.rho.backend.service;
 
 
+import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.auth.request.AuthRequestDTO;
 import com.rho.backend.dto.auth.request.RegisterRequestDTO;
 import com.rho.backend.dto.auth.response.AuthResponseDTO;
@@ -18,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -85,12 +87,13 @@ public class AuthService {
 
     public AuthResponseDTO login(AuthRequestDTO request) {
         // Throws AuthenticationException → 401 if credentials are wrong
-        authenticationManager.authenticate(
+        Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
 
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
+        User user = userDetails.getUser();
+
 
         logger.info("User logged in: {}", user.getEmail());
         return issueTokenPair(user);
@@ -120,7 +123,7 @@ public class AuthService {
         }
 
         // 2. Load user
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailWithRole(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
         // 3. Verify token exists in Redis — rejects revoked tokens even if JWT is valid
@@ -169,7 +172,7 @@ public class AuthService {
         if (refreshToken != null && !refreshToken.isBlank()) {
             try {
                 String email = jwtService.extractSubject(refreshToken);
-                User user = userRepository.findByEmail(email)
+                User user = userRepository.findByEmailWithRole(email)
                         .orElseThrow(() -> new ResourceNotFoundException("User not found."));
                 redisTokenStore.revokeRefreshToken(user.getUserId(), refreshToken);
             } catch (Exception e) {
@@ -197,7 +200,7 @@ public class AuthService {
 
         try {
             String email = jwtService.extractSubject(accessToken);
-            User user = userRepository.findByEmail(email)
+            User user = userRepository.findByEmailWithRole(email)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
             // Blocklist current access token

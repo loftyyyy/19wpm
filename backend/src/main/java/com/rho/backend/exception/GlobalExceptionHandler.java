@@ -133,5 +133,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.of(HttpStatus.BAD_REQUEST, "Validation failed", errors));
     }
 
+    @ExceptionHandler(UnauthorizedResourceException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedResourceException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ErrorResponse.of(HttpStatus.FORBIDDEN, ex.getMessage()));
+}
 }
 

@@ -25,10 +25,10 @@ public class UserStatService {
 
 
     public void initializeUserStats(long userId){
-        userRepository.findById(userId).orElseThrow(() -> new  ResourceNotFoundException("User not found"));
+        User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new  ResourceNotFoundException("User not found"));
 
         UserStat userStat = UserStat.builder()
-                .userId(userId)
+                .user(user)
                 .bestSpeed(BigDecimal.valueOf(0))
                 .averageSpeed(BigDecimal.valueOf(0))
                 .textCompleted(0)
@@ -37,14 +37,14 @@ public class UserStatService {
     }
 
     public UserStatResponseDTO getStat(long userId){
-        UserStat userStat = userStatRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        UserStat userStat = userStatRepository.findByUser(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return new UserStatResponseDTO(userStat);
     }
 
 
     @Transactional
     public void updateUserStats(long userId, BigDecimal newWpm){
-        UserStat userStat = userStatRepository.findByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("User Statistics not found"));
+        UserStat userStat = userStatRepository.findByUser(userId).orElseThrow(() -> new ResourceNotFoundException("User Statistics not found"));
         int oldCount = userStat.getTextCompleted();
         int newCount = oldCount + 1;
 

@@ -4,6 +4,8 @@ import com.rho.backend.dto.typingResult.request.TypingResultRequestDTO;
 import com.rho.backend.dto.typingResult.response.TypingResultResponseDTO;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.model.TypingResult;
+import com.rho.backend.model.User;
+import com.rho.backend.repository.TextRepository;
 import com.rho.backend.repository.TypingResultRepository;
 import com.rho.backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -13,22 +15,24 @@ public class TypingResultService {
     private final TypingResultRepository typingResultRepository;
     private final UserRepository userRepository;
     private final UserStatService userStatService;
+    private final TextRepository textRepository;
 
-    public TypingResultService(TypingResultRepository typingResultRepository, UserRepository userRepository, UserStatService userStatService){
+    public TypingResultService(TypingResultRepository typingResultRepository, UserRepository userRepository, UserStatService userStatService, TextRepository textRepository){
         this.typingResultRepository = typingResultRepository;
         this.userRepository = userRepository;
         this.userStatService = userStatService;
+        this.textRepository = textRepository;
     }
 
     public TypingResultResponseDTO saveTypingResult(TypingResultRequestDTO typingResultRequestDTO, long userId){
-        if(!typingResultRepository.existsById(typingResultRequestDTO.textId())){
+        if(!textRepository.existsById(typingResultRequestDTO.textId())){
             throw new ResourceNotFoundException("Text doesn't exist");
         }
 
-        userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         TypingResult typingResult = TypingResult.builder()
-                .userId(userId)
+                .user(user)
                 .textId(typingResultRequestDTO.textId())
                 .finishedAt(typingResultRequestDTO.finishedAt())
                 .durationMs(typingResultRequestDTO.durationMs())
