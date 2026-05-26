@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export default function Navbar() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -39,12 +40,12 @@ export default function Navbar() {
                     {/* Desktop Buttons + Mobile Menu */}
                     <div className="flex items-center justify-end gap-4">
                         <div className="hidden md:flex items-center gap-3">
-                            <button className="px-4 py-2 text-[#566252] hover:text-[#514442] transition-colors hover:cursor-pointer" style={{ fontFamily: 'Inter' }}>
+                            <Link to="/login" className="px-4 py-2 text-[#566252] hover:text-[#514442] transition-colors hover:cursor-pointer" style={{ fontFamily: 'Inter' }}>
                                 Login
-                            </button>
-                            <button className="px-4 py-2 bg-[#82524D] text-white rounded-lg hover:bg-[#6b3f36] transition-colors hover:cursor-pointer" style={{ fontFamily: 'Inter' }}>
+                            </Link>
+                            <Link to="/register" className="px-4 py-2 bg-[#82524D] text-white rounded-lg hover:bg-[#6b3f36] transition-colors hover:cursor-pointer" style={{ fontFamily: 'Inter' }}>
                                 Sign Up
-                            </button>
+                            </Link>
                         </div>
                         <button
                             onClick={toggleMenu}
@@ -81,12 +82,12 @@ export default function Navbar() {
                                 About
                             </a>
                             <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
-                                <button className="w-full px-4 py-2 text-[#566252] hover:text-[#514442] transition-colors border border-[#566252] rounded-lg hover:cursor-pointer">
+                                <Link to="/login" className="w-full px-4 py-2 text-[#566252] hover:text-[#514442] transition-colors border border-[#566252] rounded-lg hover:cursor-pointer">
                                     Login
-                                </button>
-                                <button className="w-full px-4 py-2 bg-[#82524D] text-white rounded-lg hover:bg-[#6b3f36] transition-colors hover:cursor-pointer">
+                                </Link>
+                                <Link to="/register" className="w-full px-4 py-2 bg-[#82524D] text-white rounded-lg hover:bg-[#6b3f36] transition-colors hover:cursor-pointer">
                                     Sign Up
-                                </button>
+                                </Link>
                             </div>
                         </div>
                     </div>
