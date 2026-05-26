@@ -39,6 +39,7 @@ const historyData = [
 
 export default function RecentHistory() {
   return (
+    // RECENT HISTORY TABLE
     <div className="mt-10 ml-[155px] mr-[155px]">
       <div className="flex flex-col rounded-[10px] shadow-md bg-[#F6EBEA] w-270">
         <div className="flex flex-row p-8 items-center">
