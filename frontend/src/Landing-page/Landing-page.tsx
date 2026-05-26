@@ -93,7 +93,7 @@ export default function LandingPage() {
             </div>
            
            {/* Footer components */}
-           <div className="mb-5">
+           <div className="mb-10 mt-50">
                 <Footer />
            </div>
         </>
