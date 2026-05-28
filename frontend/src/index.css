@@ -1,5 +1,54 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-display: 'Montserrat', sans-serif;
+
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-card: var(--card);
+  --color-text-main: var(--text-main);
+  --color-text-sub: var(--text-sub);
+  --color-text-dim: var(--text-dim);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-nav: var(--nav);
+  --color-line: var(--line);
+}
+
+:root {
+  --surface: #F7F4F0;
+  --muted: #F6EBEA;
+  --card: #FFFFFF;
+  --text-main: #1F1A1A;
+  --text-sub: #514442;
+  --text-dim: #808080;
+  --accent: #C9908A;
+  --accent-hover: #b07a74;
+  --success: #A8B5A2;
+  --error: #D4756B;
+  --nav: #82524D;
+  --line: #E8DDD9;
+}
+
+[data-theme="dark"] {
+  --surface: #11131e;
+  --muted: #1e2030;
+  --card: #282A36;
+  --text-main: #f8f8f2;
+  --text-sub: #c0bff0;
+  --text-dim: #6272a4;
+  --accent: #bd93f9;
+  --accent-hover: #caa8ff;
+  --success: #50fa7b;
+  --error: #ff5555;
+  --nav: #bd93f9;
+  --line: #44475a;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -13,3 +62,57 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   display: none;
 }
 
+.transition-theme {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes pulse-caret {
+  0%, 100% { border-color: var(--accent); }
+  50% { border-color: transparent; }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.char-current {
+  border-left: 2px solid var(--accent);
+  animation: pulse-caret 1s step-end infinite;
+}
+
+.typed-correct {
+  color: var(--success);
+}
+
+.typed-incorrect {
+  color: var(--error);
+  text-decoration: underline;
+  text-decoration-color: var(--error);
+}
+
+.char-current {
+  border-left: 2px solid var(--accent);
+  animation: pulse-caret 1s step-end infinite;
+}
+
+.char-untyped {
+  color: var(--text-dim);
+}
+
+.char-correct {
+  color: var(--success);
+}
+
+.char-incorrect {
+  color: var(--error);
+}
