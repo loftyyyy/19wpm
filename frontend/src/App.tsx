@@ -5,6 +5,9 @@ import TestResults from './Components/TypingTest/TestResults';
 import LoginContainer from './Components/Auth/LoginContainer';
 import Dashboard from './Components/Dashboard/Dashboard';
 import ContentCreation from './Components/Content/ContentCreation';
+import Compete from './Pages/Compete';
+import Leaderboard from './Pages/Leaderboard';
+import About from './Pages/About';
 
 export default function App() {
   return (
@@ -16,6 +19,9 @@ export default function App() {
         <Route path="/login" element={<LoginContainer />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/create" element={<ContentCreation />} />
+        <Route path="/compete" element={<Compete />} />
+        <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/about" element={<About />} />
       </Routes>
     </Router>
   );

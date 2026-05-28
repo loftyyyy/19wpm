@@ -12,9 +12,9 @@ export default function Navbar() {
 
   const navLinks = [
     { label: 'Practice', path: '/solo' },
-    { label: 'Compete', path: '#' },
-    { label: 'Leaderboard', path: '#' },
-    { label: 'About', path: '#' },
+    { label: 'Compete', path: '/compete' },
+    { label: 'Leaderboard', path: '/leaderboard' },
+    { label: 'About', path: '/about' },
   ];
 
   return (

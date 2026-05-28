@@ -9,9 +9,23 @@ import Leaf from '../assets/LeafIcon.svg';
 import Notebook from '../assets/Notebook.svg';
 
 const durations: Duration[] = [15, 30, 60];
+const DURATION_KEY = '19wpm-duration';
+
+function getSavedDuration(): Duration {
+  try {
+    const saved = localStorage.getItem(DURATION_KEY);
+    if (saved === '15' || saved === '60') return parseInt(saved) as Duration;
+  } catch {}
+  return 30;
+}
 
 export default function LandingPage() {
-  const [selectedDuration, setSelectedDuration] = useState<Duration>(30);
+  const [selectedDuration, setSelectedDuration] = useState<Duration>(getSavedDuration);
+
+  const handleDurationChange = (d: Duration) => {
+    setSelectedDuration(d);
+    localStorage.setItem(DURATION_KEY, String(d));
+  };
   const navigate = useNavigate();
 
   return (
@@ -50,7 +64,7 @@ export default function LandingPage() {
               {durations.map(d => (
                 <button
                   key={d}
-                  onClick={() => setSelectedDuration(d)}
+                  onClick={() => handleDurationChange(d)}
                   className={`px-4 py-2 text-sm font-semibold font-sans rounded-xl transition-all hover:cursor-pointer ${
                     selectedDuration === d
                       ? 'bg-accent text-white'

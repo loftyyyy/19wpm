@@ -5,10 +5,10 @@ export default function Footer() {
         &copy; 2024 19wpm. Crafted for focused performance.
       </p>
       <div className="flex gap-6 text-text-dim text-sm font-sans transition-theme">
-        <a href="#" className="hover:text-text-sub transition-colors">Support</a>
-        <a href="#" className="hover:text-text-sub transition-colors">Privacy</a>
-        <a href="#" className="hover:text-text-sub transition-colors">Terms</a>
-        <a href="#" className="hover:text-text-sub transition-colors">Discord</a>
+        <a href="https://github.com/anomalyco/opencode/issues" target="_blank" rel="noopener noreferrer" className="hover:text-text-sub transition-colors">GitHub</a>
+        <a href="https://opencode.ai" target="_blank" rel="noopener noreferrer" className="hover:text-text-sub transition-colors">Docs</a>
+        <a href="/about" className="hover:text-text-sub transition-colors">About</a>
+        <a href="/leaderboard" className="hover:text-text-sub transition-colors">Leaderboard</a>
       </div>
     </div>
   );

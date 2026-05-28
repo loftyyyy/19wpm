@@ -3,6 +3,7 @@ import type { User, TestResult } from '../types';
 
 const USERS_KEY = '19wpm-users';
 const SESSION_KEY = '19wpm-session';
+const GUEST_RESULTS_KEY = '19wpm-guest-results';
 
 interface StoredUser extends User {
   password: string;
@@ -57,12 +58,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionUser(user);
   }, [user]);
 
+  function migrateGuestResults(userId: string) {
+    try {
+      const guestResults: TestResult[] = JSON.parse(localStorage.getItem(GUEST_RESULTS_KEY) || '[]');
+      if (guestResults.length === 0) return;
+      const userKey = `19wpm-results-${userId}`;
+      const userResults: TestResult[] = JSON.parse(localStorage.getItem(userKey) || '[]');
+      const merged = [...guestResults, ...userResults].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      localStorage.setItem(userKey, JSON.stringify(merged));
+      localStorage.removeItem(GUEST_RESULTS_KEY);
+    } catch {}
+  }
+
   const login = useCallback((email: string, password: string): string | null => {
     const users = getStoredUsers();
     const found = users.find(u => u.email === email);
     if (!found) return 'No account found with this email.';
     if (found.password !== password) return 'Incorrect password.';
     const { password: _, ...safe } = found;
+    migrateGuestResults(safe.id);
     setUser(safe);
     return null;
   }, []);
@@ -80,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setStoredUsers([...users, newUser]);
     const { password: _, ...safe } = newUser;
+    migrateGuestResults(safe.id);
     setUser(safe);
     return null;
   }, []);
@@ -104,16 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addResult = useCallback((result: TestResult) => {
-    if (!user) return;
-    const key = `19wpm-results-${user.id}`;
+    const key = user ? `19wpm-results-${user.id}` : GUEST_RESULTS_KEY;
     const existing: TestResult[] = JSON.parse(localStorage.getItem(key) || '[]');
     existing.unshift(result);
     localStorage.setItem(key, JSON.stringify(existing));
   }, [user]);
 
   const getResults = useCallback((): TestResult[] => {
-    if (!user) return [];
-    const key = `19wpm-results-${user.id}`;
+    const key = user ? `19wpm-results-${user.id}` : GUEST_RESULTS_KEY;
     try {
       return JSON.parse(localStorage.getItem(key) || '[]');
     } catch {
