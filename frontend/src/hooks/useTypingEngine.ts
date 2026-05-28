@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useCallback } from 'react';
-import type { Passage, Duration, TestResult } from '../types';
+import type { Passage, Duration, TestResult, WpmPoint } from '../types';
 import { v4 } from '../utils/id';
 
 interface TypingState {
@@ -12,9 +12,12 @@ interface TypingState {
   isFinished: boolean;
   wpm: number;
   accuracy: number;
-  wpmHistory: { time: number; wpm: number }[];
+  wpmHistory: WpmPoint[];
   correctChars: number;
   incorrectChars: number;
+  totalCorrect: number;
+  totalIncorrect: number;
+  errorsThisSecond: number;
   startTime: number | null;
 }
 
@@ -39,13 +42,11 @@ function initialState(passage: Passage, duration: Duration): TypingState {
     wpmHistory: [],
     correctChars: 0,
     incorrectChars: 0,
+    totalCorrect: 0,
+    totalIncorrect: 0,
+    errorsThisSecond: 0,
     startTime: null,
   };
-}
-
-function calcAccuracy(correct: number, incorrect: number): number {
-  const total = correct + incorrect;
-  return total > 0 ? Math.round((correct / total) * 100) : 100;
 }
 
 function reducer(state: TypingState, action: Action): TypingState {
@@ -56,13 +57,19 @@ function reducer(state: TypingState, action: Action): TypingState {
       const isCorrect = action.key === expected;
       const newCorrect = state.correctChars + (isCorrect ? 1 : 0);
       const newIncorrect = state.incorrectChars + (isCorrect ? 0 : 1);
+      const newTotalCorrect = state.totalCorrect + (isCorrect ? 1 : 0);
+      const newTotalIncorrect = state.totalIncorrect + (isCorrect ? 0 : 1);
+      const totalAttempted = newTotalCorrect + newTotalIncorrect;
       return {
         ...state,
         typedChars: [...state.typedChars, action.key],
         currentIndex: state.currentIndex + 1,
         correctChars: newCorrect,
         incorrectChars: newIncorrect,
-        accuracy: calcAccuracy(newCorrect, newIncorrect),
+        totalCorrect: newTotalCorrect,
+        totalIncorrect: newTotalIncorrect,
+        errorsThisSecond: state.errorsThisSecond + (isCorrect ? 0 : 1),
+        accuracy: totalAttempted > 0 ? Math.round((newTotalCorrect / totalAttempted) * 100) : 100,
         isRunning: true,
         startTime: state.startTime ?? Date.now(),
       };
@@ -71,16 +78,12 @@ function reducer(state: TypingState, action: Action): TypingState {
       if (state.currentIndex <= 0) return state;
       const removed = state.typedChars[state.currentIndex - 1];
       const wasCorrect = removed === state.passage.text[state.currentIndex - 1];
-      const newCorrect = state.correctChars - (wasCorrect ? 1 : 0);
-      const newIncorrect = state.incorrectChars - (wasCorrect ? 0 : 1);
-      const newTyped = state.typedChars.slice(0, -1);
       return {
         ...state,
-        typedChars: newTyped,
+        typedChars: state.typedChars.slice(0, -1),
         currentIndex: state.currentIndex - 1,
-        correctChars: newCorrect,
-        incorrectChars: newIncorrect,
-        accuracy: calcAccuracy(newCorrect, newIncorrect),
+        correctChars: state.correctChars - (wasCorrect ? 1 : 0),
+        incorrectChars: state.incorrectChars - (wasCorrect ? 0 : 1),
       };
     }
     case 'DELETE_WORD': {
@@ -97,22 +100,20 @@ function reducer(state: TypingState, action: Action): TypingState {
         if (typed === state.passage.text[i]) correctDeduction++;
         else incorrectDeduction++;
       }
-      const newCorrect = state.correctChars - correctDeduction;
-      const newIncorrect = state.incorrectChars - incorrectDeduction;
       return {
         ...state,
         typedChars: state.typedChars.slice(0, start),
         currentIndex: start,
-        correctChars: newCorrect,
-        incorrectChars: newIncorrect,
-        accuracy: calcAccuracy(newCorrect, newIncorrect),
+        correctChars: state.correctChars - correctDeduction,
+        incorrectChars: state.incorrectChars - incorrectDeduction,
       };
     }
     case 'TICK': {
       const newTimeLeft = Math.round((state.timeLeft - 0.1) * 10) / 10;
       const elapsedSeconds = Math.round(state.totalTime - newTimeLeft);
       const elapsedMinutes = elapsedSeconds / 60;
-      const wpm = elapsedMinutes > 0 ? Math.round((state.correctChars / 5) / elapsedMinutes) : 0;
+      const netCorrect = state.correctChars;
+      const wpm = elapsedMinutes > 0 ? Math.round((netCorrect / 5) / elapsedMinutes) : 0;
       const finished = newTimeLeft <= 0 || state.currentIndex >= state.passage.text.length;
       const lastRecorded = state.wpmHistory.length > 0 ? state.wpmHistory[state.wpmHistory.length - 1].time : -1;
       const shouldRecord = elapsedSeconds > lastRecorded;
@@ -120,7 +121,12 @@ function reducer(state: TypingState, action: Action): TypingState {
         ...state,
         timeLeft: Math.max(0, newTimeLeft),
         wpm,
-        wpmHistory: finished ? state.wpmHistory : shouldRecord ? [...state.wpmHistory, { time: elapsedSeconds, wpm }] : state.wpmHistory,
+        wpmHistory: finished
+          ? state.wpmHistory
+          : shouldRecord
+            ? [...state.wpmHistory, { time: elapsedSeconds, wpm, errors: state.errorsThisSecond }]
+            : state.wpmHistory,
+        errorsThisSecond: shouldRecord ? 0 : state.errorsThisSecond,
         isRunning: !finished,
         isFinished: finished,
       };
@@ -187,6 +193,8 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
       duration: Math.round(elapsed),
       correctChars: state.correctChars,
       incorrectChars: state.incorrectChars,
+      totalCorrect: state.totalCorrect,
+      totalIncorrect: state.totalIncorrect,
       wpmHistory: state.wpmHistory,
       date: new Date().toISOString(),
     };

@@ -7,6 +7,12 @@ export interface User {
   streak: number;
 }
 
+export interface WpmPoint {
+  time: number;
+  wpm: number;
+  errors: number;
+}
+
 export interface TestResult {
   id: string;
   passage: string;
@@ -17,7 +23,9 @@ export interface TestResult {
   duration: number;
   correctChars: number;
   incorrectChars: number;
-  wpmHistory: { time: number; wpm: number }[];
+  totalCorrect: number;
+  totalIncorrect: number;
+  wpmHistory: WpmPoint[];
   date: string;
 }
 
@@ -25,12 +33,6 @@ export interface Passage {
   text: string;
   author: string;
   source: string;
-}
-
-export interface CharState {
-  char: string;
-  typed: string | undefined;
-  index: number;
 }
 
 export type Duration = 15 | 30 | 60;
