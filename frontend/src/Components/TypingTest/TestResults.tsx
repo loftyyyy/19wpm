@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { TestResult, WpmPoint } from '../../types';
@@ -9,19 +9,31 @@ const ERROR_DOT_Y = 16;
 const PADDING_LEFT = 40;
 const PADDING_RIGHT = 16;
 const PEAK_BADGE_WIDTH = 80;
+const INNER_RIGHT = PADDING_RIGHT + PEAK_BADGE_WIDTH + 8;
 
 function WpmBurstChart({ data }: { data: WpmPoint[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(600);
+  const [tooltip, setTooltip] = useState<{ x: number; wpm: number; time: number; errors: number } | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const resize = () => setContainerWidth(el.clientWidth);
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const maxWpm = useMemo(() => Math.max(...data.map(d => d.wpm), 1), [data]);
   const totalErrors = useMemo(() => data.reduce((s, d) => s + d.errors, 0), [data]);
   const avgWpm = useMemo(() => Math.round(data.reduce((s, d) => s + d.wpm, 0) / data.length), [data]);
 
-  const availableWidth = useMemo(() => {
-    return Math.max(300, (typeof window !== 'undefined' ? window.innerWidth : 600) - 128);
-  }, []);
-
-  const barWidth = Math.min(24, Math.max(4, (availableWidth - PADDING_LEFT - PADDING_RIGHT - PEAK_BADGE_WIDTH - 16) / data.length - 2));
-  const chartWidth = Math.max(availableWidth, data.length * (barWidth + 2) + PADDING_LEFT + PADDING_RIGHT + PEAK_BADGE_WIDTH + 16);
-  const barGap = 2;
+  const innerWidth = containerWidth - PADDING_LEFT - INNER_RIGHT;
+  const barGap = Math.max(0.5, Math.min(2, innerWidth / data.length * 0.08));
+  const barWidth = Math.max(3, (innerWidth - barGap * (data.length - 1)) / data.length);
+  const svgWidth = containerWidth;
 
   const peakPoint = useMemo(() => {
     let peak = data[0];
@@ -30,12 +42,12 @@ function WpmBurstChart({ data }: { data: WpmPoint[] }) {
   }, [data]);
 
   return (
-    <div className="w-full overflow-x-auto">
-      <svg width={chartWidth} height={CHART_HEIGHT} className="select-none">
+    <div ref={containerRef} className="w-full relative">
+      <svg width={svgWidth} height={CHART_HEIGHT} className="select-none block">
         <defs>
           <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.85" />
-            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.35" />
           </linearGradient>
         </defs>
 
@@ -44,7 +56,7 @@ function WpmBurstChart({ data }: { data: WpmPoint[] }) {
           const label = Math.round(maxWpm * frac);
           return (
             <g key={frac}>
-              <line x1={PADDING_LEFT} y1={y} x2={chartWidth - PADDING_RIGHT - PEAK_BADGE_WIDTH - 8} y2={y} stroke="var(--line)" strokeOpacity="0.5" strokeDasharray="3 3" />
+              <line x1={PADDING_LEFT} y1={y} x2={svgWidth - INNER_RIGHT} y2={y} stroke="var(--line)" strokeOpacity="0.4" strokeDasharray="3 3" />
               <text x={PADDING_LEFT - 6} y={y + 4} textAnchor="end" fill="var(--text-dim)" fontSize="10" fontFamily="var(--font-sans)">
                 {label}
               </text>
@@ -58,43 +70,41 @@ function WpmBurstChart({ data }: { data: WpmPoint[] }) {
           const y = BAR_AREA_HEIGHT + 4 - barH;
 
           return (
-            <g key={i}>
+            <g
+              key={i}
+              onMouseEnter={() => setTooltip({ x: x + barWidth / 2, wpm: point.wpm, time: point.time, errors: point.errors })}
+              onMouseLeave={() => setTooltip(null)}
+              style={{ cursor: 'pointer' }}
+            >
               <rect x={x} y={y} width={barWidth} height={barH} rx={2} fill="url(#barGrad)" />
               {point.errors > 0 && (
-                <circle cx={x + barWidth / 2} cy={ERROR_DOT_Y} r={3} fill="var(--error)" opacity={0.85} />
+                <circle cx={x + barWidth / 2} cy={ERROR_DOT_Y} r={3} fill="var(--error)" opacity={0.8} />
               )}
+              <rect x={x} y={0} width={barWidth} height={BAR_AREA_HEIGHT + 4} fill="transparent" />
             </g>
           );
         })}
 
-        <line
-          x1={PADDING_LEFT}
-          y1={BAR_AREA_HEIGHT + 4}
-          x2={chartWidth - PADDING_RIGHT - PEAK_BADGE_WIDTH - 8}
-          y2={BAR_AREA_HEIGHT + 4}
-          stroke="var(--line)"
-          strokeWidth="1"
-        />
+        <line x1={PADDING_LEFT} y1={BAR_AREA_HEIGHT + 4} x2={svgWidth - INNER_RIGHT} y2={BAR_AREA_HEIGHT + 4} stroke="var(--line)" strokeWidth="1" />
 
         {data.filter((_, i) => i % 5 === 0 || i === data.length - 1).map((point, j, filtered) => {
           const idx = data.indexOf(point);
           const x = PADDING_LEFT + idx * (barWidth + barGap) + barWidth / 2;
-          const label = filtered.length <= 8 || j % 2 === 0 ? point.time : '';
+          const show = filtered.length <= 8 || j % 2 === 0;
           return (
             <g key={idx}>
               <line x1={x} y1={BAR_AREA_HEIGHT + 4} x2={x} y2={BAR_AREA_HEIGHT + 8} stroke="var(--line)" />
-              {label !== '' && (
+              {show && (
                 <text x={x} y={BAR_AREA_HEIGHT + 20} textAnchor="middle" fill="var(--text-dim)" fontSize="9" fontFamily="var(--font-sans)">
-                  {label}s
+                  {point.time}s
                 </text>
               )}
             </g>
           );
         })}
 
-        {/* Peak badge */}
         {peakPoint && (
-          <g transform={`translate(${chartWidth - PADDING_RIGHT - PEAK_BADGE_WIDTH}, 8)`}>
+          <g transform={`translate(${svgWidth - INNER_RIGHT + 8}, 8)`}>
             <rect width={PEAK_BADGE_WIDTH} height={44} rx={6} fill="var(--muted)" />
             <text x={PEAK_BADGE_WIDTH / 2} y={18} textAnchor="middle" fill="var(--accent)" fontSize="14" fontWeight="700" fontFamily="var(--font-display)">
               {peakPoint.wpm}
@@ -105,6 +115,21 @@ function WpmBurstChart({ data }: { data: WpmPoint[] }) {
           </g>
         )}
       </svg>
+
+      {tooltip && (
+        <div
+          className="absolute z-10 bg-card border border-line rounded-lg px-3 py-2 shadow-lg pointer-events-none transition-theme"
+          style={{
+            left: Math.min(tooltip.x - 40, containerWidth - 100),
+            top: -8,
+          }}
+        >
+          <p className="text-sm font-bold font-display text-accent">{tooltip.wpm} wpm</p>
+          <p className="text-xs font-sans text-text-sub mt-0.5">
+            {tooltip.time}s {tooltip.errors > 0 && <span className="text-error">&middot; {tooltip.errors} {tooltip.errors === 1 ? 'error' : 'errors'}</span>}
+          </p>
+        </div>
+      )}
 
       <div className="flex items-center justify-between mt-2 text-xs font-sans text-text-dim">
         <div className="flex gap-4">
@@ -119,6 +144,26 @@ function WpmBurstChart({ data }: { data: WpmPoint[] }) {
             </span>
           )}
           <span>{data.length}s elapsed</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MistakeWordsList({ words }: { words: { expected: string; typed: string }[] }) {
+  if (words.length === 0) return null;
+  return (
+    <div className="mb-8">
+      <p className="text-text-sub font-sans text-sm font-semibold mb-3 transition-theme">Missed Words</p>
+      <div className="bg-muted rounded-xl p-4 transition-theme max-h-48 overflow-y-auto">
+        <div className="flex flex-wrap gap-2">
+          {words.map((w, i) => (
+            <div key={i} className="flex items-center gap-1.5 bg-card rounded-lg px-3 py-1.5 border border-line transition-theme text-sm font-mono">
+              <span className="text-success">{w.expected}</span>
+              <span className="text-text-dim">&rarr;</span>
+              <span className="text-error">{w.typed}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -190,6 +235,8 @@ export default function TestResults() {
               )}
             </div>
           </div>
+
+          <MistakeWordsList words={safeResult.mistakeWords} />
 
           <div className="grid grid-cols-3 gap-3 md:gap-4 mb-8">
             <div className="bg-muted rounded-xl p-4 text-center transition-theme">

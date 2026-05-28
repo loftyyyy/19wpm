@@ -1,6 +1,31 @@
 import { useReducer, useEffect, useCallback } from 'react';
-import type { Passage, Duration, TestResult, WpmPoint } from '../types';
+import type { Passage, Duration, TestResult, WpmPoint, MistakeWord } from '../types';
 import { v4 } from '../utils/id';
+
+interface WordBoundary {
+  start: number;
+  end: number;
+}
+
+function getWordBoundaries(text: string): WordBoundary[] {
+  const words: WordBoundary[] = [];
+  let i = 0;
+  while (i < text.length) {
+    while (i < text.length && text[i] === ' ') i++;
+    if (i >= text.length) break;
+    const start = i;
+    while (i < text.length && text[i] !== ' ') i++;
+    words.push({ start, end: i });
+  }
+  return words;
+}
+
+function wordIndexAt(charIndex: number, boundaries: WordBoundary[]): number {
+  for (let i = 0; i < boundaries.length; i++) {
+    if (charIndex >= boundaries[i].start && charIndex < boundaries[i].end) return i;
+  }
+  return -1;
+}
 
 interface TypingState {
   passage: Passage;
@@ -18,6 +43,8 @@ interface TypingState {
   totalCorrect: number;
   totalIncorrect: number;
   errorsThisSecond: number;
+  mistakeWordIndices: Set<number>;
+  wordBoundaries: WordBoundary[];
   startTime: number | null;
 }
 
@@ -45,6 +72,8 @@ function initialState(passage: Passage, duration: Duration): TypingState {
     totalCorrect: 0,
     totalIncorrect: 0,
     errorsThisSecond: 0,
+    mistakeWordIndices: new Set(),
+    wordBoundaries: getWordBoundaries(passage.text),
     startTime: null,
   };
 }
@@ -60,6 +89,11 @@ function reducer(state: TypingState, action: Action): TypingState {
       const newTotalCorrect = state.totalCorrect + (isCorrect ? 1 : 0);
       const newTotalIncorrect = state.totalIncorrect + (isCorrect ? 0 : 1);
       const totalAttempted = newTotalCorrect + newTotalIncorrect;
+      const newMistakes = new Set(state.mistakeWordIndices);
+      if (!isCorrect) {
+        const wi = wordIndexAt(state.currentIndex, state.wordBoundaries);
+        if (wi >= 0) newMistakes.add(wi);
+      }
       return {
         ...state,
         typedChars: [...state.typedChars, action.key],
@@ -70,6 +104,7 @@ function reducer(state: TypingState, action: Action): TypingState {
         totalIncorrect: newTotalIncorrect,
         errorsThisSecond: state.errorsThisSecond + (isCorrect ? 0 : 1),
         accuracy: totalAttempted > 0 ? Math.round((newTotalCorrect / totalAttempted) * 100) : 100,
+        mistakeWordIndices: newMistakes,
         isRunning: true,
         startTime: state.startTime ?? Date.now(),
       };
@@ -136,6 +171,26 @@ function reducer(state: TypingState, action: Action): TypingState {
   }
 }
 
+function computeMistakeWords(
+  passage: Passage,
+  typedChars: string[],
+  mistakeIndices: Set<number>,
+  boundaries: WordBoundary[]
+): MistakeWord[] {
+  const result: MistakeWord[] = [];
+  const sorted = [...mistakeIndices].sort((a, b) => a - b);
+  for (const wi of sorted) {
+    const { start, end } = boundaries[wi];
+    const expected = passage.text.slice(start, end);
+    let typed = '';
+    for (let i = start; i < end; i++) {
+      typed += typedChars[i] !== undefined ? typedChars[i] : '';
+    }
+    result.push({ expected, typed: typed || '(skipped)' });
+  }
+  return result;
+}
+
 export function useTypingEngine(passage: Passage, duration: Duration) {
   const [state, dispatch] = useReducer(reducer, passage, (p) => initialState(p, duration));
 
@@ -196,6 +251,7 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
       totalCorrect: state.totalCorrect,
       totalIncorrect: state.totalIncorrect,
       wpmHistory: state.wpmHistory,
+      mistakeWords: computeMistakeWords(state.passage, state.typedChars, state.mistakeWordIndices, state.wordBoundaries),
       date: new Date().toISOString(),
     };
   }, [state]);

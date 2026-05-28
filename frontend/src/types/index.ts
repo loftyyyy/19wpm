@@ -13,6 +13,11 @@ export interface WpmPoint {
   errors: number;
 }
 
+export interface MistakeWord {
+  expected: string;
+  typed: string;
+}
+
 export interface TestResult {
   id: string;
   passage: string;
@@ -26,6 +31,7 @@ export interface TestResult {
   totalCorrect: number;
   totalIncorrect: number;
   wpmHistory: WpmPoint[];
+  mistakeWords: MistakeWord[];
   date: string;
 }
 
