@@ -109,6 +109,8 @@ function reducer(state: TypingState, action: Action): TypingState {
         };
       }
 
+      if (expected === ' ' && state.extraChars.length > 0) return state;
+
       const isCorrect = action.key === expected;
       const newCorrect = state.correctChars + (isCorrect ? 1 : 0);
       const newIncorrect = state.incorrectChars + (isCorrect ? 0 : 1);
