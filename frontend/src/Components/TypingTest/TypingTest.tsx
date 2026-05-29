@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getRandomPassage } from '../../utils/passages';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
@@ -12,6 +12,7 @@ export default function TypingTest() {
   const navigate = useNavigate();
   const { addResult } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
+  const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
 
   const passage = useMemo((): Passage => {
@@ -27,7 +28,7 @@ export default function TypingTest() {
     }
     return getRandomPassage();
   }, []);
-  const { state, handleKeyDown, getResult } = useTypingEngine(passage, duration);
+  const { state, handleKeyDown, getResult, reset } = useTypingEngine(passage, duration);
 
   const passageWords = useMemo(() => {
     const words: { chars: { char: string; globalIdx: number }[] }[] = [];
@@ -47,6 +48,23 @@ export default function TypingTest() {
     if (currentWord.length > 0) words.push({ chars: currentWord });
     return words;
   }, [passage.text]);
+
+  const handleRestart = useCallback(() => {
+    reset();
+    navigatedRef.current = false;
+    containerRef.current?.focus();
+  }, [reset]);
+
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      if (restartBtnRef.current) {
+        e.preventDefault();
+        restartBtnRef.current.focus();
+      }
+      return;
+    }
+    handleKeyDown(e);
+  }, [handleKeyDown]);
 
   useEffect(() => {
     if (state.isFinished && !navigatedRef.current) {
@@ -97,7 +115,7 @@ export default function TypingTest() {
         <div
           ref={containerRef}
           tabIndex={0}
-          onKeyDown={handleKeyDown}
+          onKeyDown={handleContainerKeyDown}
           onClick={() => containerRef.current?.focus()}
           className="w-full p-6 rounded-xl bg-card border border-line transition-theme focus:outline-none focus:ring-2 focus:ring-accent/30 font-mono text-xl md:text-2xl leading-relaxed cursor-text select-none"
         >
@@ -134,10 +152,24 @@ export default function TypingTest() {
           </div>
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center flex items-center justify-center gap-4">
           <p className="text-text-dim font-sans text-sm italic transition-theme">
             &mdash; {passage.author}, <em>{passage.source}</em>
           </p>
+          <button
+            ref={restartBtnRef}
+            onClick={handleRestart}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleRestart(); } }}
+            tabIndex={0}
+            className="p-2 rounded-xl text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50"
+            title="Restart test (Tab to focus, Enter to confirm)"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>

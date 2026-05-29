@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { TestResult, WpmPoint } from '../../types';
@@ -170,6 +170,335 @@ function MistakeWordsList({ words }: { words: { expected: string; typed: string 
   );
 }
 
+function TypingReplay({ result }: { result: TestResult }) {
+  const [playState, setPlayState] = useState<'idle' | 'playing' | 'paused' | 'done'>('idle');
+  const [typedChars, setTypedChars] = useState<string[]>([]);
+  const [currentEventIdx, setCurrentEventIdx] = useState(0);
+  const [liveWpm, setLiveWpm] = useState(0);
+  const [liveCorrect, setLiveCorrect] = useState(0);
+  const [liveIncorrect, setLiveIncorrect] = useState(0);
+  const timerRef = useRef<number | null>(null);
+
+  const passageWords = useMemo(() => {
+    const w: { chars: { char: string; globalIdx: number }[] }[] = [];
+    let gi = 0;
+    const parts = result.passage.split('');
+    let cur: { char: string; globalIdx: number }[] = [];
+    for (const ch of parts) {
+      if (ch === ' ') {
+        w.push({ chars: cur });
+        cur = [];
+        gi++;
+      } else {
+        cur.push({ char: ch, globalIdx: gi });
+        gi++;
+      }
+    }
+    if (cur.length > 0) w.push({ chars: cur });
+    return w;
+  }, [result.passage]);
+
+  const wordClickEvents = useMemo(() => {
+    const wordStarts: number[] = [];
+    let inWord = false;
+    for (let i = 0; i < result.passage.length; i++) {
+      if (result.passage[i] !== ' ' && !inWord) {
+        wordStarts.push(i);
+        inWord = true;
+      } else if (result.passage[i] === ' ') {
+        inWord = false;
+      }
+    }
+    const firstEventForChar: Record<number, number> = {};
+    let typedLen = 0;
+    for (let ei = 0; ei < result.replayEvents.length; ei++) {
+      const e = result.replayEvents[ei];
+      if (e.type === 'key') {
+        if (firstEventForChar[typedLen] === undefined) firstEventForChar[typedLen] = ei;
+        typedLen++;
+      } else if (e.type === 'backspace') {
+        typedLen = Math.max(0, typedLen - 1);
+      } else if (e.type === 'deleteWord') {
+        if (typedLen > 0) {
+          let i = typedLen - 1;
+          while (i >= 0 && result.passage[i] !== ' ') i--;
+          typedLen = Math.max(0, i + 1);
+        }
+      }
+    }
+    return wordStarts.map(ws => firstEventForChar[ws]).filter(ei => ei !== undefined);
+  }, [result.passage, result.replayEvents]);
+
+  const stopPlayback = useCallback(() => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }, []);
+
+  const processEvent = useCallback((idx: number, chars: string[], correct: number, incorrect: number) => {
+    const ev = result.replayEvents[idx];
+    if (!ev) return { chars, correct, incorrect };
+
+    const newChars = [...chars];
+    let newCorrect = correct;
+    let newIncorrect = incorrect;
+
+    if (ev.type === 'key' && ev.key) {
+      const charIdx = newChars.length;
+      const expected = result.passage[charIdx];
+      const isCorrect = ev.key === expected;
+      if (isCorrect) newCorrect++;
+      else newIncorrect++;
+      newChars.push(ev.key);
+    } else if (ev.type === 'backspace') {
+      if (newChars.length > 0) {
+        const removed = newChars.pop()!;
+        const charIdx = newChars.length;
+        const expected = result.passage[charIdx];
+        const wasCorrect = removed === expected;
+        if (wasCorrect) newCorrect = Math.max(0, newCorrect - 1);
+        else newIncorrect = Math.max(0, newIncorrect - 1);
+      }
+    } else if (ev.type === 'deleteWord') {
+      while (newChars.length > 0) {
+        const removed = newChars.pop()!;
+        const charIdx = newChars.length;
+        const expected = result.passage[charIdx];
+        const wasCorrect = removed === expected;
+        if (wasCorrect) newCorrect = Math.max(0, newCorrect - 1);
+        else newIncorrect = Math.max(0, newIncorrect - 1);
+        if (newChars.length > 0 && newChars[newChars.length - 1] === ' ') break;
+      }
+    }
+
+    return { chars: newChars, correct: newCorrect, incorrect: newIncorrect };
+  }, [result.replayEvents, result.passage]);
+
+  const runPlayback = useCallback((startIdx: number) => {
+    stopPlayback();
+    let idx = startIdx;
+    let chars: string[] = [];
+    let correct = 0;
+    let incorrect = 0;
+    for (let i = 0; i < idx; i++) {
+      const r = processEvent(i, chars, correct, incorrect);
+      chars = r.chars;
+      correct = r.correct;
+      incorrect = r.incorrect;
+    }
+    setTypedChars(chars);
+    setCurrentEventIdx(idx);
+    setLiveCorrect(correct);
+    setLiveIncorrect(incorrect);
+    const elapsedMin = idx > 0 && result.replayEvents[idx - 1]
+      ? (result.replayEvents[idx - 1].timestamp / 1000) / 60
+      : 0;
+    setLiveWpm(elapsedMin > 0 ? Math.round((correct / 5) / elapsedMin) : 0);
+    setPlayState('playing');
+
+    function scheduleNext() {
+      if (idx >= result.replayEvents.length) {
+        setPlayState('done');
+        return;
+      }
+      const ev = result.replayEvents[idx];
+      const nextEv = result.replayEvents[idx + 1];
+      const delay = nextEv ? Math.max(1, nextEv.timestamp - ev.timestamp) : 300;
+
+      timerRef.current = window.setTimeout(() => {
+        const r = processEvent(idx, chars, correct, incorrect);
+        chars = r.chars;
+        correct = r.correct;
+        incorrect = r.incorrect;
+        setTypedChars(chars);
+        setCurrentEventIdx(idx + 1);
+
+        const elapsedMin = (ev.timestamp / 1000) / 60;
+        const wpm = elapsedMin > 0 ? Math.round((correct / 5) / elapsedMin) : 0;
+        setLiveWpm(wpm);
+        setLiveCorrect(correct);
+        setLiveIncorrect(incorrect);
+
+        idx++;
+        scheduleNext();
+      }, delay);
+    }
+    scheduleNext();
+  }, [result.replayEvents, processEvent, stopPlayback]);
+
+  const startPlayback = useCallback(() => {
+    if (result.replayEvents.length === 0) return;
+    stopPlayback();
+    setCurrentEventIdx(0);
+    runPlayback(0);
+  }, [result.replayEvents, stopPlayback, runPlayback]);
+
+  const togglePause = useCallback(() => {
+    if (playState === 'playing') {
+      stopPlayback();
+      setPlayState('paused');
+    } else if (playState === 'paused') {
+      runPlayback(currentEventIdx);
+    }
+  }, [playState, currentEventIdx, stopPlayback, runPlayback]);
+
+  const seekTo = useCallback((eventIdx: number) => {
+    if (eventIdx < 0 || eventIdx >= result.replayEvents.length) return;
+    setCurrentEventIdx(eventIdx);
+    runPlayback(eventIdx);
+  }, [result.replayEvents, runPlayback]);
+
+  const resetPlayback = useCallback(() => {
+    stopPlayback();
+    setTypedChars([]);
+    setCurrentEventIdx(0);
+    setLiveWpm(0);
+    setLiveCorrect(0);
+    setLiveIncorrect(0);
+    setPlayState('idle');
+  }, [stopPlayback]);
+
+  useEffect(() => {
+    return () => stopPlayback();
+  }, [stopPlayback]);
+
+  const accuracy = (liveCorrect + liveIncorrect) > 0
+    ? Math.round((liveCorrect / (liveCorrect + liveIncorrect)) * 100)
+    : 100;
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-text-sub font-sans text-sm font-semibold transition-theme">
+          {playState === 'idle' ? 'Watch Replay' : playState === 'playing' ? 'Replaying' : playState === 'paused' ? 'Paused' : 'Replay Complete'}
+        </p>
+        <div className="flex items-center gap-4">
+          {playState !== 'idle' && (
+            <div className="flex items-center gap-3 text-xs font-sans">
+              <span className="text-accent font-semibold">{liveWpm} wpm</span>
+              <span className="text-text-dim">&middot;</span>
+              <span className="text-text-sub">{accuracy}%</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            {playState === 'idle' && (
+              <button
+                onClick={startPlayback}
+                className="p-1.5 rounded-lg text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer"
+                title="Play"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
+            )}
+            {(playState === 'playing' || playState === 'paused') && (
+              <button
+                onClick={togglePause}
+                className="p-1.5 rounded-lg text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer"
+                title={playState === 'playing' ? 'Pause' : 'Resume'}
+              >
+                {playState === 'playing' ? (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
+              </button>
+            )}
+            {playState !== 'idle' && (
+              <button
+                onClick={resetPlayback}
+                className="p-1.5 rounded-lg text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer"
+                title="Reset replay"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {result.replayEvents.length === 0 ? (
+        <div className="bg-muted rounded-xl p-4 transition-theme">
+          <p className="text-text-dim text-sm font-sans text-center py-4">No replay data available.</p>
+        </div>
+      ) : (
+        <div className="bg-card border border-line rounded-xl p-4 md:p-5 transition-theme font-mono text-lg md:text-xl leading-relaxed select-none">
+          <div className="flex gap-2 mb-3">
+            {(playState === 'playing' || playState === 'paused') && (
+              <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
+                <div
+                  className="h-full bg-accent rounded-full transition-all duration-75"
+                  style={{ width: `${result.replayEvents.length > 0 ? (currentEventIdx / result.replayEvents.length) * 100 : 0}%` }}
+                />
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-x-2 gap-y-1">
+            {passageWords.map((word, wi) => (
+              <span
+                key={wi}
+                className="flex relative group"
+              >
+                {word.chars.map(({ char, globalIdx }) => {
+                  const typed = typedChars[globalIdx];
+                  const isCurrent = globalIdx === typedChars.length;
+                  const isCorrect = typed !== undefined && typed === char;
+                  const isIncorrect = typed !== undefined && typed !== char;
+
+                  let cls = 'char-untyped transition-colors';
+                  if (isCorrect) cls = 'char-correct';
+                  if (isIncorrect) cls = 'char-incorrect';
+                  if (isCurrent && playState === 'playing') cls = 'char-current text-text-main';
+
+                  return (
+                    <span key={globalIdx} className={cls}>
+                      {char}
+                    </span>
+                  );
+                })}
+                {wi < passageWords.length - 1 && (
+                  <span className="text-text-dim"> </span>
+                )}
+                {playState !== 'idle' && wordClickEvents[wi] !== undefined && (
+                  <button
+                    onClick={() => seekTo(wordClickEvents[wi])}
+                    className="absolute inset-0 w-full h-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity rounded-md focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    style={{ background: 'var(--accent)', opacity: 0 }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.08'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0'; }}
+                    title="Seek to this word"
+                  />
+                )}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 text-center">
+            <p className="text-xs font-sans text-text-dim transition-theme">
+              {playState !== 'idle' ? 'Click a word to seek the replay to that point' : 'Press play to start the replay'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {playState === 'done' && (
+        <div className="mt-3 text-center">
+          <span className="text-xs font-sans text-text-dim">
+            Replay finished &middot; <button onClick={resetPlayback} className="text-accent hover:underline hover:cursor-pointer">replay</button>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TestResults() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -224,6 +553,8 @@ export default function TestResults() {
               <p className="text-text-sub font-sans text-sm mt-1 transition-theme">Accuracy</p>
             </div>
           </div>
+
+          <TypingReplay result={safeResult} />
 
           <div className="mb-8">
             <p className="text-text-sub font-sans text-sm font-semibold mb-3 transition-theme">WPM Burst Chart</p>

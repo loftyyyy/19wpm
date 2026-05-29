@@ -1,5 +1,5 @@
-import { useReducer, useEffect, useCallback } from 'react';
-import type { Passage, Duration, TestResult, WpmPoint, MistakeWord } from '../types';
+import { useReducer, useEffect, useCallback, useRef } from 'react';
+import type { Passage, Duration, TestResult, WpmPoint, MistakeWord, ReplayEvent } from '../types';
 import { v4 } from '../utils/id';
 
 interface WordBoundary {
@@ -46,6 +46,7 @@ interface TypingState {
   mistakeWordIndices: Set<number>;
   wordBoundaries: WordBoundary[];
   startTime: number | null;
+  lockedIndex: number;
 }
 
 type Action =
@@ -75,6 +76,7 @@ function initialState(passage: Passage, duration: Duration): TypingState {
     mistakeWordIndices: new Set(),
     wordBoundaries: getWordBoundaries(passage.text),
     startTime: null,
+    lockedIndex: 0,
   };
 }
 
@@ -94,10 +96,11 @@ function reducer(state: TypingState, action: Action): TypingState {
         const wi = wordIndexAt(state.currentIndex, state.wordBoundaries);
         if (wi >= 0) newMistakes.add(wi);
       }
+      const newIndex = state.currentIndex + 1;
       return {
         ...state,
         typedChars: [...state.typedChars, action.key],
-        currentIndex: state.currentIndex + 1,
+        currentIndex: newIndex,
         correctChars: newCorrect,
         incorrectChars: newIncorrect,
         totalCorrect: newTotalCorrect,
@@ -107,10 +110,11 @@ function reducer(state: TypingState, action: Action): TypingState {
         mistakeWordIndices: newMistakes,
         isRunning: true,
         startTime: state.startTime ?? Date.now(),
+        lockedIndex: action.key === ' ' ? newIndex : state.lockedIndex,
       };
     }
     case 'BACKSPACE': {
-      if (state.currentIndex <= 0) return state;
+      if (state.currentIndex <= state.lockedIndex) return state;
       const removed = state.typedChars[state.currentIndex - 1];
       const wasCorrect = removed === state.passage.text[state.currentIndex - 1];
       return {
@@ -122,11 +126,12 @@ function reducer(state: TypingState, action: Action): TypingState {
       };
     }
     case 'DELETE_WORD': {
-      if (state.currentIndex <= 0) return state;
+      if (state.currentIndex <= state.lockedIndex) return state;
       let start = state.currentIndex - 1;
       while (start >= 0 && state.passage.text[start] === ' ') start--;
       while (start >= 0 && state.passage.text[start] !== ' ') start--;
       start++;
+      if (start < state.lockedIndex) start = state.lockedIndex;
       let correctDeduction = 0;
       let incorrectDeduction = 0;
       for (let i = start; i < state.currentIndex; i++) {
@@ -193,8 +198,10 @@ function computeMistakeWords(
 
 export function useTypingEngine(passage: Passage, duration: Duration) {
   const [state, dispatch] = useReducer(reducer, passage, (p) => initialState(p, duration));
+  const replayEventsRef = useRef<ReplayEvent[]>([]);
 
   useEffect(() => {
+    replayEventsRef.current = [];
     dispatch({ type: 'RESET', passage, duration });
   }, [passage, duration]);
 
@@ -205,10 +212,13 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
   }, [state.isRunning, state.isFinished]);
 
   const reset = useCallback(() => {
+    replayEventsRef.current = [];
     dispatch({ type: 'RESET', passage, duration });
   }, [passage, duration]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const now = Date.now();
+
     if (e.key === 'Escape') {
       e.preventDefault();
       reset();
@@ -218,6 +228,7 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
 
     if (e.key === 'Backspace' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
+      replayEventsRef.current.push({ type: 'deleteWord', timestamp: now });
       dispatch({ type: 'DELETE_WORD' });
       return;
     }
@@ -226,18 +237,25 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
 
     if (e.key === 'Backspace') {
       e.preventDefault();
+      replayEventsRef.current.push({ type: 'backspace', timestamp: now });
       dispatch({ type: 'BACKSPACE' });
       return;
     }
 
     if (e.key.length === 1 && e.key >= ' ') {
       e.preventDefault();
+      replayEventsRef.current.push({ type: 'key', key: e.key, timestamp: now });
       dispatch({ type: 'KEY_PRESS', key: e.key });
     }
   }, [state.isFinished, reset]);
 
   const getResult = useCallback((): TestResult => {
     const elapsed = state.totalTime - state.timeLeft;
+    const startTime = state.startTime ?? (replayEventsRef.current.length > 0 ? replayEventsRef.current[0].timestamp : Date.now());
+    const normalizedEvents = replayEventsRef.current.map(e => ({
+      ...e,
+      timestamp: Math.max(0, e.timestamp - startTime),
+    }));
     return {
       id: v4(),
       passage: state.passage.text,
@@ -252,6 +270,7 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
       totalIncorrect: state.totalIncorrect,
       wpmHistory: state.wpmHistory,
       mistakeWords: computeMistakeWords(state.passage, state.typedChars, state.mistakeWordIndices, state.wordBoundaries),
+      replayEvents: normalizedEvents,
       date: new Date().toISOString(),
     };
   }, [state]);

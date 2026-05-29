@@ -18,6 +18,12 @@ export interface MistakeWord {
   typed: string;
 }
 
+export interface ReplayEvent {
+  type: 'key' | 'backspace' | 'deleteWord';
+  key?: string;
+  timestamp: number;
+}
+
 export interface TestResult {
   id: string;
   passage: string;
@@ -32,6 +38,7 @@ export interface TestResult {
   totalIncorrect: number;
   wpmHistory: WpmPoint[];
   mistakeWords: MistakeWord[];
+  replayEvents: ReplayEvent[];
   date: string;
 }
 
