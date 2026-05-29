@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useCallback, useRef } from 'react';
-import type { Passage, Duration, TestResult, WpmPoint, MistakeWord, ReplayEvent } from '../types';
+import type { Passage, Duration, TestResult, WpmPoint, MistakeWord, ReplayEvent, TestMode, WordCount, ContentType } from '../types';
 import { v4 } from '../utils/id';
 
 interface WordBoundary {
@@ -30,9 +30,11 @@ function wordIndexAt(charIndex: number, boundaries: WordBoundary[]): number {
 interface TypingState {
   passage: Passage;
   typedChars: string[];
+  extraChars: string[];
   currentIndex: number;
   timeLeft: number;
   totalTime: number;
+  elapsedSeconds: number;
   isRunning: boolean;
   isFinished: boolean;
   wpm: number;
@@ -47,6 +49,9 @@ interface TypingState {
   wordBoundaries: WordBoundary[];
   startTime: number | null;
   lockedIndex: number;
+  testMode: TestMode;
+  wordCount: WordCount;
+  contentType: ContentType;
 }
 
 type Action =
@@ -54,15 +59,17 @@ type Action =
   | { type: 'BACKSPACE' }
   | { type: 'DELETE_WORD' }
   | { type: 'TICK' }
-  | { type: 'RESET'; passage: Passage; duration: Duration };
+  | { type: 'RESET'; passage: Passage; duration: Duration; testMode: TestMode; wordCount: WordCount; contentType: ContentType };
 
-function initialState(passage: Passage, duration: Duration): TypingState {
+function initialState(passage: Passage, duration: Duration, testMode: TestMode, wordCount: WordCount, contentType: ContentType): TypingState {
   return {
     passage,
     typedChars: [],
+    extraChars: [],
     currentIndex: 0,
     timeLeft: duration,
     totalTime: duration,
+    elapsedSeconds: 0,
     isRunning: false,
     isFinished: false,
     wpm: 0,
@@ -77,6 +84,9 @@ function initialState(passage: Passage, duration: Duration): TypingState {
     wordBoundaries: getWordBoundaries(passage.text),
     startTime: null,
     lockedIndex: 0,
+    testMode,
+    wordCount,
+    contentType,
   };
 }
 
@@ -85,6 +95,20 @@ function reducer(state: TypingState, action: Action): TypingState {
     case 'KEY_PRESS': {
       if (state.isFinished || state.currentIndex >= state.passage.text.length) return state;
       const expected = state.passage.text[state.currentIndex];
+
+      if (expected === ' ' && action.key !== ' ') {
+        return {
+          ...state,
+          extraChars: [...state.extraChars, action.key],
+          totalIncorrect: state.totalIncorrect + 1,
+          incorrectChars: state.incorrectChars + 1,
+          errorsThisSecond: state.errorsThisSecond + 1,
+          accuracy: Math.round((state.totalCorrect / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
+          isRunning: true,
+          startTime: state.startTime ?? Date.now(),
+        };
+      }
+
       const isCorrect = action.key === expected;
       const newCorrect = state.correctChars + (isCorrect ? 1 : 0);
       const newIncorrect = state.incorrectChars + (isCorrect ? 0 : 1);
@@ -111,9 +135,18 @@ function reducer(state: TypingState, action: Action): TypingState {
         isRunning: true,
         startTime: state.startTime ?? Date.now(),
         lockedIndex: action.key === ' ' ? newIndex : state.lockedIndex,
+        extraChars: action.key === ' ' ? [] : state.extraChars,
       };
     }
     case 'BACKSPACE': {
+      if (state.extraChars.length > 0) {
+        return {
+          ...state,
+          extraChars: state.extraChars.slice(0, -1),
+          totalIncorrect: state.totalIncorrect - 1,
+          incorrectChars: state.incorrectChars - 1,
+        };
+      }
       if (state.currentIndex <= state.lockedIndex) return state;
       const removed = state.typedChars[state.currentIndex - 1];
       const wasCorrect = removed === state.passage.text[state.currentIndex - 1];
@@ -126,7 +159,15 @@ function reducer(state: TypingState, action: Action): TypingState {
       };
     }
     case 'DELETE_WORD': {
-      if (state.currentIndex <= state.lockedIndex) return state;
+      if (state.currentIndex <= state.lockedIndex && state.extraChars.length === 0) return state;
+      if (state.extraChars.length > 0) {
+        return {
+          ...state,
+          extraChars: [],
+          totalIncorrect: state.totalIncorrect - state.extraChars.length,
+          incorrectChars: state.incorrectChars - state.extraChars.length,
+        };
+      }
       let start = state.currentIndex - 1;
       while (start >= 0 && state.passage.text[start] === ' ') start--;
       while (start >= 0 && state.passage.text[start] !== ' ') start--;
@@ -149,22 +190,28 @@ function reducer(state: TypingState, action: Action): TypingState {
       };
     }
     case 'TICK': {
-      const newTimeLeft = Math.round((state.timeLeft - 0.1) * 10) / 10;
-      const elapsedSeconds = Math.round(state.totalTime - newTimeLeft);
-      const elapsedMinutes = elapsedSeconds / 60;
+      const newElapsed = state.elapsedSeconds + 0.1;
+      const roundedElapsed = Math.round(newElapsed);
+      const elapsedMinutes = newElapsed / 60;
       const netCorrect = state.correctChars;
       const wpm = elapsedMinutes > 0 ? Math.round((netCorrect / 5) / elapsedMinutes) : 0;
-      const finished = newTimeLeft <= 0 || state.currentIndex >= state.passage.text.length;
+      const newTimeLeft = state.testMode === 'timed'
+        ? Math.max(0, Math.round((state.timeLeft - 0.1) * 10) / 10)
+        : state.timeLeft;
+      const finishedByTime = state.testMode === 'timed' && newTimeLeft <= 0;
+      const finishedByPassage = state.currentIndex >= state.passage.text.length;
+      const finished = finishedByTime || finishedByPassage;
       const lastRecorded = state.wpmHistory.length > 0 ? state.wpmHistory[state.wpmHistory.length - 1].time : -1;
-      const shouldRecord = elapsedSeconds > lastRecorded;
+      const shouldRecord = roundedElapsed > lastRecorded;
       return {
         ...state,
-        timeLeft: Math.max(0, newTimeLeft),
+        timeLeft: newTimeLeft,
+        elapsedSeconds: newElapsed,
         wpm,
         wpmHistory: finished
           ? state.wpmHistory
           : shouldRecord
-            ? [...state.wpmHistory, { time: elapsedSeconds, wpm, errors: state.errorsThisSecond }]
+            ? [...state.wpmHistory, { time: roundedElapsed, wpm, errors: state.errorsThisSecond }]
             : state.wpmHistory,
         errorsThisSecond: shouldRecord ? 0 : state.errorsThisSecond,
         isRunning: !finished,
@@ -172,7 +219,7 @@ function reducer(state: TypingState, action: Action): TypingState {
       };
     }
     case 'RESET':
-      return initialState(action.passage, action.duration);
+      return initialState(action.passage, action.duration, action.testMode, action.wordCount, action.contentType);
   }
 }
 
@@ -196,14 +243,14 @@ function computeMistakeWords(
   return result;
 }
 
-export function useTypingEngine(passage: Passage, duration: Duration) {
-  const [state, dispatch] = useReducer(reducer, passage, (p) => initialState(p, duration));
+export function useTypingEngine(passage: Passage, duration: Duration, testMode: TestMode = 'timed', wordCount: WordCount = 25, contentType: ContentType = 'phrases') {
+  const [state, dispatch] = useReducer(reducer, { passage, duration, testMode, wordCount, contentType }, (cfg) => initialState(cfg.passage, cfg.duration, cfg.testMode, cfg.wordCount, cfg.contentType));
   const replayEventsRef = useRef<ReplayEvent[]>([]);
 
   useEffect(() => {
     replayEventsRef.current = [];
-    dispatch({ type: 'RESET', passage, duration });
-  }, [passage, duration]);
+    dispatch({ type: 'RESET', passage, duration, testMode, wordCount, contentType });
+  }, [passage, duration, testMode, wordCount, contentType]);
 
   useEffect(() => {
     if (!state.isRunning || state.isFinished) return;
@@ -213,8 +260,8 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
 
   const reset = useCallback(() => {
     replayEventsRef.current = [];
-    dispatch({ type: 'RESET', passage, duration });
-  }, [passage, duration]);
+    dispatch({ type: 'RESET', passage, duration, testMode, wordCount, contentType });
+  }, [passage, duration, testMode, wordCount, contentType]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const now = Date.now();
@@ -250,7 +297,7 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
   }, [state.isFinished, reset]);
 
   const getResult = useCallback((): TestResult => {
-    const elapsed = state.totalTime - state.timeLeft;
+    const elapsed = state.testMode === 'timed' ? state.totalTime - state.timeLeft : Math.round(state.elapsedSeconds);
     const startTime = state.startTime ?? (replayEventsRef.current.length > 0 ? replayEventsRef.current[0].timestamp : Date.now());
     const normalizedEvents = replayEventsRef.current.map(e => ({
       ...e,
@@ -263,7 +310,7 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
       source: state.passage.source,
       wpm: state.wpm,
       accuracy: state.accuracy,
-      duration: Math.round(elapsed),
+      duration: Math.max(1, elapsed),
       correctChars: state.correctChars,
       incorrectChars: state.incorrectChars,
       totalCorrect: state.totalCorrect,
@@ -271,6 +318,9 @@ export function useTypingEngine(passage: Passage, duration: Duration) {
       wpmHistory: state.wpmHistory,
       mistakeWords: computeMistakeWords(state.passage, state.typedChars, state.mistakeWordIndices, state.wordBoundaries),
       replayEvents: normalizedEvents,
+      testMode: state.testMode,
+      wordCount: state.wordCount,
+      contentType: state.contentType,
       date: new Date().toISOString(),
     };
   }, [state]);

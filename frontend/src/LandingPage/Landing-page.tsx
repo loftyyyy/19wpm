@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
-import type { Duration } from '../types';
+import type { Duration, Mode, WordCount, PhraseLength } from '../types';
 import English from '../assets/English.svg';
 import Type from '../assets/TYPEIMAGE.png';
 import Leaf from '../assets/LeafIcon.svg';
 import Notebook from '../assets/Notebook.svg';
 
 const durations: Duration[] = [15, 30, 60];
+const wordCounts: WordCount[] = [10, 25, 50, 100];
+const phraseLengths: PhraseLength[] = ['short', 'medium', 'long', 'thicc', 'all'];
 const DURATION_KEY = '19wpm-duration';
 
 function getSavedDuration(): Duration {
@@ -19,14 +21,32 @@ function getSavedDuration(): Duration {
   return 30;
 }
 
+function buildQuery(mode: Mode, duration: Duration, wordCount: WordCount, phraseLength: PhraseLength): string {
+  const params = new URLSearchParams();
+  params.set('mode', mode);
+  if (mode === 'words') params.set('count', String(wordCount));
+  if (mode === 'time') params.set('time', String(duration));
+  if (mode === 'phrases') params.set('length', phraseLength);
+  return params.toString();
+}
+
+const modes: Mode[] = ['words', 'phrases', 'time'];
+
 export default function LandingPage() {
+  const [mode, setMode] = useState<Mode>('time');
   const [selectedDuration, setSelectedDuration] = useState<Duration>(getSavedDuration);
+  const [wordCount, setWordCount] = useState<WordCount>(25);
+  const [phraseLength, setPhraseLength] = useState<PhraseLength>('medium');
 
   const handleDurationChange = (d: Duration) => {
     setSelectedDuration(d);
     localStorage.setItem(DURATION_KEY, String(d));
   };
   const navigate = useNavigate();
+
+  const handleStart = () => {
+    navigate(`/solo?${buildQuery(mode, selectedDuration, wordCount, phraseLength)}`);
+  };
 
   return (
     <div className="min-h-screen bg-surface transition-theme flex flex-col">
@@ -46,39 +66,89 @@ export default function LandingPage() {
 
           <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <button
-              onClick={() => navigate(`/solo?time=${selectedDuration}`)}
+              onClick={handleStart}
               className="px-8 py-4 bg-accent text-white rounded-xl font-sans font-semibold text-sm hover:bg-accent-hover transition-colors hover:cursor-pointer shadow-sm"
             >
               Start Typing
             </button>
             <button
-              onClick={() => navigate(`/solo?time=${selectedDuration}`)}
+              onClick={handleStart}
               className="px-8 py-4 border border-accent text-accent rounded-xl font-sans font-semibold text-sm hover:bg-muted transition-colors hover:cursor-pointer"
             >
               Join a Race
             </button>
           </div>
 
-          <div className="mt-10 flex items-center justify-center gap-4">
-            <div className="bg-muted flex items-center justify-center p-1 gap-1 rounded-2xl shadow-sm transition-theme">
-              {durations.map(d => (
-                <button
-                  key={d}
-                  onClick={() => handleDurationChange(d)}
-                  className={`px-4 py-2 text-sm font-semibold font-sans rounded-xl transition-all hover:cursor-pointer ${
-                    selectedDuration === d
-                      ? 'bg-accent text-white'
-                      : 'text-text-sub hover:text-text-main'
-                  }`}
-                >
-                  {d}s
-                </button>
+          <div className="mt-8 flex flex-col items-center gap-3">
+            {/* Group 1 — Mode selector */}
+            <div className="flex items-center gap-2 text-xs font-sans">
+              {modes.map((m, i) => (
+                <span key={m} className="flex items-center gap-2">
+                  <button
+                    onClick={() => setMode(m)}
+                    className={`transition-colors hover:cursor-pointer capitalize ${
+                      mode === m ? 'text-accent font-semibold' : 'text-text-dim hover:text-text-sub'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                  {i < modes.length - 1 && (
+                    <span className="text-text-dim/40 font-light">·</span>
+                  )}
+                </span>
               ))}
             </div>
-            <div className="w-px h-6 bg-line transition-theme" />
-            <div className="bg-muted flex items-center justify-center gap-2 rounded-2xl px-4 py-2 shadow-sm transition-theme hover:cursor-pointer">
-              <img src={English} alt="English" className="w-4 h-4" />
-              <span className="text-sm text-text-sub font-semibold font-sans">English</span>
+
+            {/* Group 2 — Context-sensitive options */}
+            {mode === 'phrases' ? (
+              <div className="flex items-center gap-2 text-xs font-sans">
+                {phraseLengths.map((pl, i) => (
+                  <span key={pl} className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPhraseLength(pl)}
+                      className={`transition-colors hover:cursor-pointer capitalize ${
+                        phraseLength === pl ? 'text-accent font-semibold' : 'text-text-dim hover:text-text-sub'
+                      }`}
+                    >
+                      {pl}
+                    </button>
+                    {i < phraseLengths.length - 1 && (
+                      <span className="text-text-dim/40 font-light">·</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs font-sans">
+                {(mode === 'time' ? durations : wordCounts).map((v, i, arr) => (
+                  <span key={v} className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (mode === 'time') handleDurationChange(v as Duration);
+                        else setWordCount(v as WordCount);
+                      }}
+                      className={`transition-colors hover:cursor-pointer ${
+                        (mode === 'time' ? selectedDuration : wordCount) === v
+                          ? 'text-accent font-semibold'
+                          : 'text-text-dim hover:text-text-sub'
+                      }`}
+                    >
+                      {mode === 'time' ? `${v}` : v}
+                    </button>
+                    {i < arr.length - 1 && (
+                      <span className="text-text-dim/40 font-light">·</span>
+                    )}
+                  </span>
+                ))}
+                {mode === 'time' && (
+                  <span className="text-text-dim/40 text-[10px]">sec</span>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 mt-1">
+              <img src={English} alt="English" className="w-3 h-3" />
+              <span className="text-[11px] text-text-dim font-sans">English</span>
             </div>
           </div>
         </div>

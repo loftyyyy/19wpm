@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { TestResult, WpmPoint } from '../../types';
@@ -177,7 +177,12 @@ function TypingReplay({ result }: { result: TestResult }) {
   const [liveWpm, setLiveWpm] = useState(0);
   const [liveCorrect, setLiveCorrect] = useState(0);
   const [liveIncorrect, setLiveIncorrect] = useState(0);
+  const [liveExtraChars, setLiveExtraChars] = useState<string[]>([]);
   const timerRef = useRef<number | null>(null);
+  const replayViewportRef = useRef<HTMLDivElement>(null);
+  const replayContentRef = useRef<HTMLDivElement>(null);
+  const replayWordRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const replayLineHeightRef = useRef(0);
 
   const passageWords = useMemo(() => {
     const w: { chars: { char: string; globalIdx: number }[] }[] = [];
@@ -197,6 +202,17 @@ function TypingReplay({ result }: { result: TestResult }) {
     if (cur.length > 0) w.push({ chars: cur });
     return w;
   }, [result.passage]);
+
+  const replayCurrentWordIndex = useMemo(() => {
+    for (let i = 0; i < passageWords.length; i++) {
+      const word = passageWords[i];
+      const first = word.chars[0].globalIdx;
+      const last = word.chars[word.chars.length - 1].globalIdx;
+      if (typedChars.length >= first && typedChars.length <= last) return i;
+      if (i > 0 && typedChars.length === first - 1) return i - 1;
+    }
+    return Math.max(0, passageWords.length - 1);
+  }, [typedChars.length, passageWords]);
 
   const wordClickEvents = useMemo(() => {
     const wordStarts: number[] = [];
@@ -234,23 +250,32 @@ function TypingReplay({ result }: { result: TestResult }) {
     timerRef.current = null;
   }, []);
 
-  const processEvent = useCallback((idx: number, chars: string[], correct: number, incorrect: number) => {
+  const processEvent = useCallback((idx: number, chars: string[], correct: number, incorrect: number, extraChars: string[]) => {
     const ev = result.replayEvents[idx];
-    if (!ev) return { chars, correct, incorrect };
+    if (!ev) return { chars, correct, incorrect, extraChars };
 
     const newChars = [...chars];
     let newCorrect = correct;
     let newIncorrect = incorrect;
+    let newExtraChars = [...extraChars];
 
     if (ev.type === 'key' && ev.key) {
       const charIdx = newChars.length;
-      const expected = result.passage[charIdx];
-      const isCorrect = ev.key === expected;
-      if (isCorrect) newCorrect++;
-      else newIncorrect++;
-      newChars.push(ev.key);
+      if (charIdx < result.passage.length && result.passage[charIdx] === ' ' && ev.key !== ' ') {
+        newExtraChars = [...newExtraChars, ev.key];
+        newIncorrect++;
+      } else {
+        const expected = result.passage[charIdx];
+        const isCorrect = ev.key === expected;
+        if (isCorrect) newCorrect++;
+        else newIncorrect++;
+        newChars.push(ev.key);
+      }
     } else if (ev.type === 'backspace') {
-      if (newChars.length > 0) {
+      if (newExtraChars.length > 0) {
+        newExtraChars = newExtraChars.slice(0, -1);
+        newIncorrect = Math.max(0, newIncorrect - 1);
+      } else if (newChars.length > 0) {
         const removed = newChars.pop()!;
         const charIdx = newChars.length;
         const expected = result.passage[charIdx];
@@ -259,6 +284,7 @@ function TypingReplay({ result }: { result: TestResult }) {
         else newIncorrect = Math.max(0, newIncorrect - 1);
       }
     } else if (ev.type === 'deleteWord') {
+      newExtraChars = [];
       while (newChars.length > 0) {
         const removed = newChars.pop()!;
         const charIdx = newChars.length;
@@ -270,7 +296,7 @@ function TypingReplay({ result }: { result: TestResult }) {
       }
     }
 
-    return { chars: newChars, correct: newCorrect, incorrect: newIncorrect };
+    return { chars: newChars, correct: newCorrect, incorrect: newIncorrect, extraChars: newExtraChars };
   }, [result.replayEvents, result.passage]);
 
   const runPlayback = useCallback((startIdx: number) => {
@@ -279,16 +305,19 @@ function TypingReplay({ result }: { result: TestResult }) {
     let chars: string[] = [];
     let correct = 0;
     let incorrect = 0;
+    let extraChars: string[] = [];
     for (let i = 0; i < idx; i++) {
-      const r = processEvent(i, chars, correct, incorrect);
+      const r = processEvent(i, chars, correct, incorrect, extraChars);
       chars = r.chars;
       correct = r.correct;
       incorrect = r.incorrect;
+      extraChars = r.extraChars;
     }
     setTypedChars(chars);
     setCurrentEventIdx(idx);
     setLiveCorrect(correct);
     setLiveIncorrect(incorrect);
+    setLiveExtraChars(extraChars);
     const elapsedMin = idx > 0 && result.replayEvents[idx - 1]
       ? (result.replayEvents[idx - 1].timestamp / 1000) / 60
       : 0;
@@ -305,12 +334,14 @@ function TypingReplay({ result }: { result: TestResult }) {
       const delay = nextEv ? Math.max(1, nextEv.timestamp - ev.timestamp) : 300;
 
       timerRef.current = window.setTimeout(() => {
-        const r = processEvent(idx, chars, correct, incorrect);
+        const r = processEvent(idx, chars, correct, incorrect, extraChars);
         chars = r.chars;
         correct = r.correct;
         incorrect = r.incorrect;
+        extraChars = r.extraChars;
         setTypedChars(chars);
         setCurrentEventIdx(idx + 1);
+        setLiveExtraChars(extraChars);
 
         const elapsedMin = (ev.timestamp / 1000) / 60;
         const wpm = elapsedMin > 0 ? Math.round((correct / 5) / elapsedMin) : 0;
@@ -354,12 +385,41 @@ function TypingReplay({ result }: { result: TestResult }) {
     setLiveWpm(0);
     setLiveCorrect(0);
     setLiveIncorrect(0);
+    setLiveExtraChars([]);
     setPlayState('idle');
   }, [stopPlayback]);
 
   useEffect(() => {
     return () => stopPlayback();
   }, [stopPlayback]);
+
+  useLayoutEffect(() => {
+    const elements = replayWordRefs.current;
+    if (!elements.length || !replayContentRef.current) return;
+
+    const tops = new Set<number>();
+    elements.forEach(el => { if (el) tops.add(el.offsetTop); });
+    const sortedTops = [...tops].sort((a, b) => a - b);
+    if (sortedTops.length < 2) return;
+
+    const lineHeight = sortedTops[1] - sortedTops[0];
+    if (!replayLineHeightRef.current && replayViewportRef.current) {
+      replayLineHeightRef.current = lineHeight;
+      replayViewportRef.current.style.height = `${lineHeight * 3}px`;
+    }
+
+    const currentEl = elements[replayCurrentWordIndex];
+    if (!currentEl) return;
+
+    const lineIdx = sortedTops.indexOf(currentEl.offsetTop);
+    if (lineIdx < 0) return;
+
+    const startLine = Math.max(0, Math.min(lineIdx - 1, sortedTops.length - 3));
+    const offset = -sortedTops[startLine];
+
+    replayContentRef.current.style.transform = `translateY(${offset}px)`;
+    replayContentRef.current.style.transition = 'transform 0.15s ease-out';
+  }, [replayCurrentWordIndex, passageWords.length]);
 
   const accuracy = (liveCorrect + liveIncorrect) > 0
     ? Math.round((liveCorrect / (liveCorrect + liveIncorrect)) * 100)
@@ -441,10 +501,12 @@ function TypingReplay({ result }: { result: TestResult }) {
               </div>
             )}
           </div>
-          <div className="flex flex-wrap gap-x-2 gap-y-1">
+          <div ref={replayViewportRef} className="overflow-hidden">
+            <div ref={replayContentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
             {passageWords.map((word, wi) => (
               <span
                 key={wi}
+                ref={el => { replayWordRefs.current[wi] = el; }}
                 className="flex relative group"
               >
                 {word.chars.map(({ char, globalIdx }) => {
@@ -467,6 +529,9 @@ function TypingReplay({ result }: { result: TestResult }) {
                 {wi < passageWords.length - 1 && (
                   <span className="text-text-dim"> </span>
                 )}
+                {wi === replayCurrentWordIndex && liveExtraChars.map((ch, i) => (
+                  <span key={`rx-${i}`} className="char-incorrect">{ch}</span>
+                ))}
                 {playState !== 'idle' && wordClickEvents[wi] !== undefined && (
                   <button
                     onClick={() => seekTo(wordClickEvents[wi])}
@@ -479,6 +544,7 @@ function TypingReplay({ result }: { result: TestResult }) {
                 )}
               </span>
             ))}
+          </div>
           </div>
           <div className="mt-3 text-center">
             <p className="text-xs font-sans text-text-dim transition-theme">

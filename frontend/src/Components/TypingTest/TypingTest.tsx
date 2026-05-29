@@ -1,19 +1,40 @@
-import { useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getRandomPassage } from '../../utils/passages';
+import { generateTestPassage } from '../../utils/passages';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
 import { useAuth } from '../../context/AuthContext';
-import type { Duration, Passage } from '../../types';
+import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength } from '../../types';
+
+const wordCounts: WordCount[] = [10, 25, 50, 100];
 
 export default function TypingTest() {
   const [searchParams] = useSearchParams();
-  const durationParam = searchParams.get('time');
-  const duration: Duration = (durationParam === '15' || durationParam === '60') ? parseInt(durationParam) as Duration : 30;
   const navigate = useNavigate();
   const { addResult } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
+
+  const modeParam = searchParams.get('mode');
+  const mode: Mode = modeParam === 'words' || modeParam === 'phrases' ? modeParam : 'time';
+
+  const durationParam = searchParams.get('time');
+  const duration: Duration = (durationParam === '15' || durationParam === '60') ? parseInt(durationParam) as Duration : 30;
+
+  const countParam = searchParams.get('count');
+  const wordCount: WordCount = wordCounts.includes(Number(countParam) as WordCount) ? Number(countParam) as WordCount : 25;
+
+  const lengthParam = searchParams.get('length');
+  const phraseLength: PhraseLength = lengthParam === 'short' || lengthParam === 'medium' || lengthParam === 'long' || lengthParam === 'thicc' || lengthParam === 'all' ? lengthParam : 'medium';
+
+  const { contentType, testMode } = useMemo(() => {
+    if (mode === 'phrases') return { contentType: 'phrases' as ContentType, testMode: 'words' as TestMode };
+    if (mode === 'words') return { contentType: 'words' as ContentType, testMode: 'words' as TestMode };
+    return { contentType: 'words' as ContentType, testMode: 'timed' as TestMode };
+  }, [mode]);
 
   const passage = useMemo((): Passage => {
     const isCustom = searchParams.get('custom');
@@ -26,9 +47,9 @@ export default function TypingTest() {
         }
       } catch {}
     }
-    return getRandomPassage();
+    return generateTestPassage(mode, duration, wordCount, mode === 'phrases' ? phraseLength : undefined);
   }, []);
-  const { state, handleKeyDown, getResult, reset } = useTypingEngine(passage, duration);
+  const { state, handleKeyDown, getResult, reset } = useTypingEngine(passage, duration, testMode, wordCount, contentType);
 
   const passageWords = useMemo(() => {
     const words: { chars: { char: string; globalIdx: number }[] }[] = [];
@@ -48,6 +69,17 @@ export default function TypingTest() {
     if (currentWord.length > 0) words.push({ chars: currentWord });
     return words;
   }, [passage.text]);
+
+  const currentWordIndex = useMemo(() => {
+    for (let i = 0; i < passageWords.length; i++) {
+      const word = passageWords[i];
+      const first = word.chars[0].globalIdx;
+      const last = word.chars[word.chars.length - 1].globalIdx;
+      if (state.currentIndex >= first && state.currentIndex <= last) return i;
+      if (i > 0 && state.currentIndex === first - 1) return i - 1;
+    }
+    return Math.max(0, passageWords.length - 1);
+  }, [state.currentIndex, passageWords]);
 
   const handleRestart = useCallback(() => {
     reset();
@@ -82,6 +114,36 @@ export default function TypingTest() {
   useEffect(() => {
     containerRef.current?.focus();
   }, []);
+
+  const lineHeightRef = useRef(0);
+
+  useLayoutEffect(() => {
+    const elements = wordRefs.current;
+    if (!elements.length || !contentRef.current) return;
+
+    const tops = new Set<number>();
+    elements.forEach(el => { if (el) tops.add(el.offsetTop); });
+    const sortedTops = [...tops].sort((a, b) => a - b);
+    if (sortedTops.length < 2) return;
+
+    const lineHeight = sortedTops[1] - sortedTops[0];
+    if (!lineHeightRef.current && viewportRef.current) {
+      lineHeightRef.current = lineHeight;
+      viewportRef.current.style.height = `${lineHeight * 3}px`;
+    }
+
+    const currentEl = elements[currentWordIndex];
+    if (!currentEl) return;
+
+    const lineIdx = sortedTops.indexOf(currentEl.offsetTop);
+    if (lineIdx < 0) return;
+
+    const startLine = Math.max(0, Math.min(lineIdx - 1, sortedTops.length - 3));
+    const offset = -sortedTops[startLine];
+
+    contentRef.current.style.transform = `translateY(${offset}px)`;
+    contentRef.current.style.transition = 'transform 0.15s ease-out';
+  }, [currentWordIndex, passageWords.length]);
 
   const progressPct = state.totalTime > 0 ? ((state.totalTime - state.timeLeft) / state.totalTime) * 100 : 0;
   const timerDisplay = `${Math.floor(state.timeLeft / 60)}:${String(Math.floor(state.timeLeft % 60)).padStart(2, '0')}`;
@@ -124,31 +186,36 @@ export default function TypingTest() {
               Start typing to begin &middot; Press Esc to restart
             </div>
           )}
-          <div className="flex flex-wrap gap-x-2 gap-y-1">
-            {passageWords.map((word, wi) => (
-              <span key={wi} className="flex">
-                {word.chars.map(({ char, globalIdx }) => {
-                  const typed = state.typedChars[globalIdx];
-                  const isCurrent = globalIdx === state.currentIndex;
-                  const isCorrect = typed !== undefined && typed === char;
-                  const isIncorrect = typed !== undefined && typed !== char;
+          <div ref={viewportRef} className="overflow-hidden">
+            <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
+              {passageWords.map((word, wi) => (
+                <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">
+                  {word.chars.map(({ char, globalIdx }) => {
+                    const typed = state.typedChars[globalIdx];
+                    const isCurrent = globalIdx === state.currentIndex;
+                    const isCorrect = typed !== undefined && typed === char;
+                    const isIncorrect = typed !== undefined && typed !== char;
 
-                  let cls = 'char-untyped transition-colors';
-                  if (isCorrect) cls = 'char-correct';
-                  if (isIncorrect) cls = 'char-incorrect';
-                  if (isCurrent) cls = 'char-current text-text-main';
+                    let cls = 'char-untyped transition-colors';
+                    if (isCorrect) cls = 'char-correct';
+                    if (isIncorrect) cls = 'char-incorrect';
+                    if (isCurrent) cls = 'char-current text-text-main';
 
-                  return (
-                    <span key={globalIdx} className={cls}>
-                      {char}
-                    </span>
-                  );
-                })}
-                {wi < passageWords.length - 1 && (
-                  <span className="text-text-dim"> </span>
-                )}
-              </span>
-            ))}
+                    return (
+                      <span key={globalIdx} className={cls}>
+                        {char}
+                      </span>
+                    );
+                  })}
+                  {wi < passageWords.length - 1 && (
+                    <span className="text-text-dim"> </span>
+                  )}
+                  {wi === currentWordIndex && state.extraChars.map((ch, i) => (
+                    <span key={`ex-${i}`} className="char-incorrect">{ch}</span>
+                  ))}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 

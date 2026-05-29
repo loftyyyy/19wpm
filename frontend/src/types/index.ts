@@ -39,6 +39,9 @@ export interface TestResult {
   wpmHistory: WpmPoint[];
   mistakeWords: MistakeWord[];
   replayEvents: ReplayEvent[];
+  testMode: TestMode;
+  wordCount: WordCount;
+  contentType: ContentType;
   date: string;
 }
 
@@ -49,5 +52,10 @@ export interface Passage {
 }
 
 export type Duration = 15 | 30 | 60;
+export type ContentType = 'words' | 'phrases';
+export type TestMode = 'timed' | 'words';
+export type WordCount = 10 | 25 | 50 | 100;
+export type Mode = 'words' | 'phrases' | 'time';
+export type PhraseLength = 'short' | 'medium' | 'long' | 'thicc' | 'all';
 
 export type Theme = 'light' | 'dark';

@@ -1,4 +1,13 @@
-import type { Passage } from '../types';
+import type { Passage, WordCount, PhraseLength, Mode } from '../types';
+import { generateRandomWords } from './words';
+
+const PHRASE_LENGTH_MAP: Record<PhraseLength, number | null> = {
+  short: 15,
+  medium: 30,
+  long: 50,
+  thicc: 80,
+  all: null, // full passage
+};
 
 export const passages: Passage[] = [
   {
@@ -55,4 +64,31 @@ export const passages: Passage[] = [
 
 export function getRandomPassage(): Passage {
   return passages[Math.floor(Math.random() * passages.length)];
+}
+
+function truncateToWords(text: string, count: number): string {
+  return text.split(/\s+/).slice(0, count).join(' ');
+}
+
+export function generateTestPassage(
+  mode: Mode,
+  duration: number,
+  wordCount: WordCount,
+  phraseLength?: PhraseLength,
+): Passage {
+  if (mode === 'time' || mode === 'words') {
+    const wordLimit = mode === 'words' ? wordCount : Math.max(200, duration * 4);
+    return {
+      text: generateRandomWords(wordLimit),
+      author: 'random',
+      source: 'word list',
+    };
+  }
+
+  const base = getRandomPassage();
+  const limit = phraseLength ? PHRASE_LENGTH_MAP[phraseLength] : null;
+  if (limit !== null) {
+    return { ...base, text: truncateToWords(base.text, limit) };
+  }
+  return base;
 }
