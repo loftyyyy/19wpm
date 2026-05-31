@@ -34,7 +34,13 @@ public class TextService {
             throw new UnauthorizedResourceException("You cannot perform this action");
         }
 
+
         //TODO: Add conditionals if content is empty. Enforcement
+
+
+        String content = textRequestDTO.content();
+
+        int wordCount = wordCountCalculator(content);
 
         Text text = Text.builder()
                 .isCustom(false)
@@ -43,15 +49,20 @@ public class TextService {
                 .author(textRequestDTO.author())
                 .source(textRequestDTO.source())
                 .language(textRequestDTO.language())
-                .content(textRequestDTO.content())
-                .wordCount(textRequestDTO.content().trim().split("\\s+").length)
-                .charLength(textRequestDTO.content().length())
+                .content(content)
+                .wordCount(wordCount)
+                .charLength(content.length())
+                .type(determineType(content.length()))
                 .build();
 
         return new TextResponseDTO(textRepository.save(text));
     }
     public TextResponseDTO saveCustomText(TextRequestDTO textRequestDTO, Long id){
         //TODO: Add conditionals if content is empty
+        String content = textRequestDTO.content();
+
+        int wordCount = wordCountCalculator(content);
+
         Text text = Text.builder()
                 .isCustom(true)
                 .createdBy(id)
@@ -59,9 +70,10 @@ public class TextService {
                 .author(textRequestDTO.author())
                 .source(textRequestDTO.source())
                 .language(textRequestDTO.language())
-                .content(textRequestDTO.content())
-                .wordCount(textRequestDTO.content().trim().split("\\s+").length)
-                .charLength(textRequestDTO.content().length())
+                .content(content)
+                .wordCount(wordCount)
+                .charLength(content.length())
+                .type(determineType(content.length()))
                 .build();
 
         return new TextResponseDTO(textRepository.save(text));
@@ -88,11 +100,12 @@ public class TextService {
         }
         if(textUpdateRequestDTO.content() != null){
             String content = textUpdateRequestDTO.content();
+            int wordCount = wordCountCalculator(content);
 
             text.setContent(content);
-            text.setWordCount(content.trim().split("\\s+").length);
+            text.setWordCount(wordCount);
             text.setCharLength(content.length());
-            text.setType();
+            text.setType(determineType(content.length()));
         }
 
         return new TextResponseDTO(textRepository.save(text));
@@ -126,10 +139,25 @@ public class TextService {
         return texts.stream().map(TextResponseDTO::new).toList();
     }
 
-    private TextType determineType(int wordCount){
+    private TextType determineType(int charLength){
+        if(charLength < 100){
+            return TextType.SHORT;
+        }else if(charLength >= 100 && charLength < 300){
+            return TextType.MEDIUM;
+        }else if(charLength >= 300 && charLength < 600){
+            return TextType.LONG;
+        }
 
+        return TextType.THICC;
 
+    }
 
+    private int wordCountCalculator(String content){
+        if(content == null || content.isBlank()){
+            return 0;
+        }
+
+        return content.trim().split("\\s+").length;
     }
 
 }
