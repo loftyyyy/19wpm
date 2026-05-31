@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { generateTestPassage } from '../../utils/passages';
+import { generateTestPassage } from '../../services/passages';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
 import { useAuth } from '../../context/AuthContext';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength } from '../../types';
