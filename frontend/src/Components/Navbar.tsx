@@ -10,10 +10,10 @@ export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
-  const navLinks = [
+  const navLinks: { label: string; path: string; disabled?: boolean }[] = [
     { label: 'Practice', path: '/solo' },
-    { label: 'Compete', path: '/compete' },
-    { label: 'Leaderboard', path: '/leaderboard' },
+    { label: 'Compete', path: '/compete', disabled: true },
+    { label: 'Leaderboard', path: '/leaderboard', disabled: true },
     { label: 'About', path: '/about' },
   ];
 
@@ -30,7 +30,15 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-6">
             <div className="flex gap-6 text-sm md:text-base text-text-sub font-sans">
               {navLinks.map(link =>
-                link.path.startsWith('/') ? (
+                link.disabled ? (
+                  <span
+                    key={link.label}
+                    title="Coming soon!"
+                    className="line-through text-text-dim cursor-not-allowed select-none"
+                  >
+                    {link.label}
+                  </span>
+                ) : link.path.startsWith('/') ? (
                   <Link
                     key={link.label}
                     to={link.path}
@@ -131,7 +139,15 @@ export default function Navbar() {
           <div className="md:hidden pb-4 bg-surface transition-theme">
             <div className="flex flex-col gap-3 text-text-sub font-sans">
               {navLinks.map(link =>
-                link.path.startsWith('/') ? (
+                link.disabled ? (
+                  <span
+                    key={link.label}
+                    title="Coming soon!"
+                    className="line-through text-text-dim cursor-not-allowed select-none py-2"
+                  >
+                    {link.label}
+                  </span>
+                ) : link.path.startsWith('/') ? (
                   <Link
                     key={link.label}
                     to={link.path}

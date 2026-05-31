@@ -72,8 +72,9 @@ export default function LandingPage() {
               Start Typing
             </button>
             <button
-              onClick={handleStart}
-              className="px-8 py-4 border border-accent text-accent rounded-xl font-sans font-semibold text-sm hover:bg-muted transition-colors hover:cursor-pointer"
+              title="Coming soon!"
+              disabled
+              className="px-8 py-4 border border-line text-text-dim rounded-xl font-sans font-semibold text-sm line-through cursor-not-allowed select-none"
             >
               Join a Race
             </button>

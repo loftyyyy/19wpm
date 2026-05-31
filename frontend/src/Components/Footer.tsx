@@ -8,7 +8,7 @@ export default function Footer() {
         <a href="https://github.com/anomalyco/opencode/issues" target="_blank" rel="noopener noreferrer" className="hover:text-text-sub transition-colors">GitHub</a>
         <a href="https://opencode.ai" target="_blank" rel="noopener noreferrer" className="hover:text-text-sub transition-colors">Docs</a>
         <a href="/about" className="hover:text-text-sub transition-colors">About</a>
-        <a href="/leaderboard" className="hover:text-text-sub transition-colors">Leaderboard</a>
+        <span title="Coming soon!" className="line-through cursor-not-allowed select-none">Leaderboard</span>
       </div>
     </div>
   );
