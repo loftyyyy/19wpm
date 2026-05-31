@@ -3,6 +3,7 @@ package com.rho.backend.service;
 import com.rho.backend.dto.text.request.TextRequestDTO;
 import com.rho.backend.dto.text.request.TextUpdateRequestDTO;
 import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.enums.TextType;
 import com.rho.backend.exception.InvalidResourceException;
 import com.rho.backend.exception.UnauthorizedResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
@@ -33,6 +34,8 @@ public class TextService {
             throw new UnauthorizedResourceException("You cannot perform this action");
         }
 
+        //TODO: Add conditionals if content is empty. Enforcement
+
         Text text = Text.builder()
                 .isCustom(false)
                 .createdBy(id)
@@ -48,6 +51,7 @@ public class TextService {
         return new TextResponseDTO(textRepository.save(text));
     }
     public TextResponseDTO saveCustomText(TextRequestDTO textRequestDTO, Long id){
+        //TODO: Add conditionals if content is empty
         Text text = Text.builder()
                 .isCustom(true)
                 .createdBy(id)
@@ -88,6 +92,7 @@ public class TextService {
             text.setContent(content);
             text.setWordCount(content.trim().split("\\s+").length);
             text.setCharLength(content.length());
+            text.setType();
         }
 
         return new TextResponseDTO(textRepository.save(text));
@@ -119,6 +124,12 @@ public class TextService {
     public List<TextResponseDTO> getTextsByLanguage(String language){
         List<Text> texts = textRepository.findByLanguage(language);
         return texts.stream().map(TextResponseDTO::new).toList();
+    }
+
+    private TextType determineType(int wordCount){
+
+
+
     }
 
 }
