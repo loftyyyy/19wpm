@@ -1,10 +1,15 @@
 package com.rho.backend.repository;
 
+import com.rho.backend.enums.TextType;
 import com.rho.backend.model.Text;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TextRepository extends JpaRepository<Text, Long> {
@@ -13,4 +18,11 @@ public interface TextRepository extends JpaRepository<Text, Long> {
     List<Text> findByCreatedBy(Long userId);
     List<Text> findByLanguage(String language);
 
+    List<Text> findByType(TextType type);
+
+    @Query("SELECT MAX(t.textId) FROM Text t WHERE t.isCustom = false")
+    Optional<Long> findMaxPresetId();
+
+    @Query("SELECT t FROM Text t WHERE t.textId >= :randId AND t.isCustom = false ORDER BY t.textId ASC")
+    List<Text> findFirstPresetByIdGreaterThanEqual(@Param("randId") Long randId, Pageable pageable);
 }

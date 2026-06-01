@@ -12,9 +12,12 @@ import com.rho.backend.model.User;
 import com.rho.backend.repository.TextRepository;
 import com.rho.backend.repository.UserRepository;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.awt.print.Pageable;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class TextService {
@@ -138,6 +141,43 @@ public class TextService {
         List<Text> texts = textRepository.findByLanguage(language);
         return texts.stream().map(TextResponseDTO::new).toList();
     }
+
+    public List<TextResponseDTO> getShortTexts(){
+        List<Text> smallTexts = textRepository.findByType(TextType.SHORT);
+        return smallTexts.stream().map(TextResponseDTO::new).toList();
+    }
+
+    public List<TextResponseDTO> getMediumTexts(){
+        List<Text> mediumTexts = textRepository.findByType(TextType.MEDIUM);
+        return mediumTexts.stream().map(TextResponseDTO::new).toList();
+    }
+
+    public List<TextResponseDTO> getLongTexts(){
+        List<Text> longTexts = textRepository.findByType(TextType.LONG);
+        return longTexts.stream().map(TextResponseDTO::new).toList();
+    }
+
+    public List<TextResponseDTO> getThiccTexts(){
+        List<Text> thiccTexts = textRepository.findByType(TextType.THICC);
+        return thiccTexts.stream().map(TextResponseDTO::new).toList();
+    }
+
+    public TextResponseDTO getRandomText() {
+        Long maxId = textRepository.findMaxPresetId()
+                .orElseThrow(() -> new ResourceNotFoundException("No preset texts found"));
+
+        Long randId = ThreadLocalRandom.current().nextLong(1, maxId + 1);
+
+        List<Text> results = textRepository.findFirstPresetByIdGreaterThanEqual(randId, PageRequest.of(0, 1));
+
+        // Fallback in case randId lands on a gap (deleted rows)
+        if (results.isEmpty()) {
+            results = textRepository.findFirstPresetByIdGreaterThanEqual(1L, PageRequest.of(0, 1));
+        }
+
+        return new TextResponseDTO(results.get(0));
+    }
+
 
     private TextType determineType(int charLength){
         if(charLength < 100){
