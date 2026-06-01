@@ -4,6 +4,7 @@ import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.text.request.TextRequestDTO;
 import com.rho.backend.dto.text.request.TextUpdateRequestDTO;
 import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.enums.TextType;
 import com.rho.backend.service.TextService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -38,6 +39,15 @@ public class TextController {
     public ResponseEntity<List<TextResponseDTO>> getUserTexts(@AuthenticationPrincipal CustomUserDetails customUserDetails){
         List<TextResponseDTO> userTexts = textService.getUserTexts(customUserDetails.getUserId());
         return ResponseEntity.ok(userTexts);
+    }
+
+    @GetMapping("/random")
+    public ResponseEntity<TextResponseDTO> getRandomTextByType(@RequestParam(required = false)TextType type){
+        if(type == null){
+            return ResponseEntity.ok(textService.getRandomText());
+        }
+
+        return ResponseEntity.ok(textService.getRandomTextByType(type));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

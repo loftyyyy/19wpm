@@ -12,6 +12,7 @@ import com.rho.backend.model.User;
 import com.rho.backend.repository.TextRepository;
 import com.rho.backend.repository.UserRepository;
 import jakarta.validation.Valid;
+import org.apache.coyote.Response;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -140,6 +141,23 @@ public class TextService {
     public List<TextResponseDTO> getTextsByLanguage(String language){
         List<Text> texts = textRepository.findByLanguage(language);
         return texts.stream().map(TextResponseDTO::new).toList();
+    }
+
+    // Should be randomized by type
+
+    public TextResponseDTO getRandomTextByType(TextType type) {
+        Long maxId = textRepository.findMaxPresetIdByType(type)
+                .orElseThrow(() -> new ResourceNotFoundException("No texts found for type: " + type));
+
+        Long randId = ThreadLocalRandom.current().nextLong(1, maxId + 1);
+
+        List<Text> results = textRepository.findFirstPresetByIdGreaterThanEqualAndType(randId, type, PageRequest.of(0, 1));
+
+        if (results.isEmpty()) {
+            results = textRepository.findFirstPresetByIdGreaterThanEqualAndType(1L, type, PageRequest.of(0, 1));
+        }
+
+        return new TextResponseDTO(results.get(0));
     }
 
     public List<TextResponseDTO> getShortTexts(){
