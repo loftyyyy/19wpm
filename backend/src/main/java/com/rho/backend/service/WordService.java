@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -60,25 +61,21 @@ public class WordService {
             throw new InvalidResourceException("Count must be greater than 0");
         }
 
-        Long maxId = wordRepository.findMaxIdByLanguageAndDifficulty(language, difficulty.name())
-                .orElseThrow(() -> new ResourceNotFoundException("No words found for language: " + language + " and difficulty: " + difficulty));
+        List<Word> words = wordRepository.findByLanguageAndDifficulty(language, difficulty);
 
-        List<Word> results = new ArrayList<>();
-
-        for(int i = 0; i < count; i++){
-            Long randId = ThreadLocalRandom.current().nextLong(1, maxId + 1);
-            List<Word> found = wordRepository.findFirstByIdGreaterThanEqualAndLanguageAndDifficulty(
-                    randId, language, difficulty, PageRequest.of(0, 1));
-
-            if(found.isEmpty()){
-                found = wordRepository.findFirstByIdGreaterThanEqualAndLanguageAndDifficulty(
-                        1L, language, difficulty, PageRequest.of(0, 1));
-            }
-
-            results.add(found.get(0));
+        if(words.isEmpty()){
+            throw new ResourceNotFoundException("No words found for language: " + language + " and difficulty: " + difficulty);
+        }
+        if(count > words.size()){
+            throw new InvalidResourceException("Count exceeds available words");
         }
 
-        return results.stream().map(WordResponseDTO::new).toList();
+        Collections.shuffle(words);
+
+        return words.stream()
+                .limit(count)
+                .map(WordResponseDTO::new)
+                .toList();
     }
 
     public void saveWords(List<WordRequestDTO> wordRequestDTOs, long userId){

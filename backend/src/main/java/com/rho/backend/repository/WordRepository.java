@@ -14,9 +14,11 @@ import java.util.Optional;
 @Repository
 public interface WordRepository extends JpaRepository<Word, Long> {
 
-    @Query(value = "SELECT MAX(id) FROM words WHERE language = :language AND difficulty = :difficulty", nativeQuery = true)
-    Optional<Long> findMaxIdByLanguageAndDifficulty(@Param("language") String language, @Param("difficulty") String difficulty);
+//    @Query(value = "SELECT MAX(id) FROM words WHERE language = :language AND difficulty = :difficulty", nativeQuery = true)
+//    Optional<Long> findMaxIdByLanguageAndDifficulty(@Param("language") String language, @Param("difficulty") String difficulty);
+//
+//    @Query("SELECT w FROM Word w WHERE w.id >= :randId AND w.language = :language AND w.difficulty = :difficulty ORDER BY w.id ASC")
+//    List<Word> findFirstByIdGreaterThanEqualAndLanguageAndDifficulty(@Param("randId") Long randId, @Param("language") String language, @Param("difficulty") TextDifficulty difficulty, Pageable pageable);
 
-    @Query("SELECT w FROM Word w WHERE w.id >= :randId AND w.language = :language AND w.difficulty = :difficulty ORDER BY w.id ASC")
-    List<Word> findFirstByIdGreaterThanEqualAndLanguageAndDifficulty(@Param("randId") Long randId, @Param("language") String language, @Param("difficulty") TextDifficulty difficulty, Pageable pageable);
+    List<Word> findByLanguageAndDifficulty(String language, TextDifficulty difficulty);
 }
