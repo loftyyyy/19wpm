@@ -56,6 +56,13 @@ CREATE TABLE texts (
     INDEX idx_texts_created_by (created_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE words (
+    word_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    word VARCHAR(255) NOT NULL,
+    language VARCHAR(50) NOT NULL DEFAULT 'en',
+    difficulty ENUM('EASY', 'MEDIUM', 'HARD', 'EXPERT') NOT NULL
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE typing_results (
 
