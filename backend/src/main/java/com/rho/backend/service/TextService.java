@@ -38,12 +38,17 @@ public class TextService {
             throw new UnauthorizedResourceException("You cannot perform this action");
         }
 
-
-        //TODO: Add conditionals if content is empty. Enforcement
-
+        if(textRequestDTO.content() == null || textRequestDTO.content().isBlank()){
+            throw new InvalidResourceException("Content cannot be empty");
+        }
+        if(textRequestDTO.title() == null || textRequestDTO.title().isBlank()){
+            throw new InvalidResourceException("Title cannot be empty");
+        }
+        if(textRequestDTO.language() == null || textRequestDTO.language().isBlank()){
+            throw new InvalidResourceException("Language cannot be empty");
+        }
 
         String content = textRequestDTO.content();
-
         int wordCount = wordCountCalculator(content);
 
         Text text = Text.builder()
@@ -61,10 +66,19 @@ public class TextService {
 
         return new TextResponseDTO(textRepository.save(text));
     }
-    public TextResponseDTO saveCustomText(TextRequestDTO textRequestDTO, Long id){
-        //TODO: Add conditionals if content is empty
-        String content = textRequestDTO.content();
 
+    public TextResponseDTO saveCustomText(TextRequestDTO textRequestDTO, Long id){
+        if(textRequestDTO.content() == null || textRequestDTO.content().isBlank()){
+            throw new InvalidResourceException("Content cannot be empty");
+        }
+        if(textRequestDTO.title() == null || textRequestDTO.title().isBlank()){
+            throw new InvalidResourceException("Title cannot be empty");
+        }
+        if(textRequestDTO.language() == null || textRequestDTO.language().isBlank()){
+            throw new InvalidResourceException("Language cannot be empty");
+        }
+
+        String content = textRequestDTO.content();
         int wordCount = wordCountCalculator(content);
 
         Text text = Text.builder()
@@ -88,6 +102,16 @@ public class TextService {
 
         if(text.getCreatedBy() == null || !text.getCreatedBy().equals(id)){
             throw new UnauthorizedResourceException("You do not own this text!");
+        }
+
+        if(textUpdateRequestDTO.title() != null && textUpdateRequestDTO.title().isBlank()){
+            throw new InvalidResourceException("Title cannot be empty");
+        }
+        if(textUpdateRequestDTO.language() != null && textUpdateRequestDTO.language().isBlank()){
+            throw new InvalidResourceException("Language cannot be empty");
+        }
+        if(textUpdateRequestDTO.content() != null && textUpdateRequestDTO.content().isBlank()){
+            throw new InvalidResourceException("Content cannot be empty");
         }
 
         if(textUpdateRequestDTO.title() != null){
@@ -127,25 +151,28 @@ public class TextService {
 
     public List<TextResponseDTO> getPresetTexts(){
         List<Text> texts = textRepository.findByIsCustomFalse();
-
         return texts.stream().map(TextResponseDTO::new).toList();
     }
 
     public List<TextResponseDTO> getUserTexts(Long id){
         userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         List<Text> texts = textRepository.findByCreatedBy(id);
-
         return texts.stream().map(TextResponseDTO::new).toList();
     }
 
     public List<TextResponseDTO> getTextsByLanguage(String language){
+        if(language == null || language.isBlank()){
+            throw new InvalidResourceException("Language cannot be empty");
+        }
         List<Text> texts = textRepository.findByLanguage(language);
         return texts.stream().map(TextResponseDTO::new).toList();
     }
 
-    // Should be randomized by type
-
     public TextResponseDTO getRandomTextByType(TextType type) {
+        if(type == null){
+            throw new InvalidResourceException("Type cannot be null");
+        }
+
         Long maxId = textRepository.findMaxPresetIdByType(type)
                 .orElseThrow(() -> new ResourceNotFoundException("No texts found for type: " + type));
 
@@ -188,14 +215,12 @@ public class TextService {
 
         List<Text> results = textRepository.findFirstPresetByIdGreaterThanEqual(randId, PageRequest.of(0, 1));
 
-        // Fallback in case randId lands on a gap (deleted rows)
         if (results.isEmpty()) {
             results = textRepository.findFirstPresetByIdGreaterThanEqual(1L, PageRequest.of(0, 1));
         }
 
         return new TextResponseDTO(results.get(0));
     }
-
 
     private TextType determineType(int charLength){
         if(charLength < 100){
@@ -205,17 +230,13 @@ public class TextService {
         }else if(charLength >= 300 && charLength < 600){
             return TextType.LONG;
         }
-
         return TextType.THICC;
-
     }
 
     private int wordCountCalculator(String content){
         if(content == null || content.isBlank()){
             return 0;
         }
-
         return content.trim().split("\\s+").length;
     }
-
 }
