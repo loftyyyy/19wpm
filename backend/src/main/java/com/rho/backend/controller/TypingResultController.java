@@ -5,6 +5,7 @@ import com.rho.backend.dto.typingResult.request.TypingResultRequestDTO;
 import com.rho.backend.dto.typingResult.response.TypingResultResponseDTO;
 import com.rho.backend.service.TypingResultService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +25,7 @@ public class TypingResultController {
 
     @PostMapping
     public ResponseEntity<TypingResultResponseDTO> createTypingResult(@Valid @RequestBody TypingResultRequestDTO typingResultRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
-        return ResponseEntity.ok(typingResultService.saveTypingResult(typingResultRequestDTO, customUserDetails.getUserId()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(typingResultService.saveTypingResult(typingResultRequestDTO, customUserDetails.getUserId()));
     }
 
 }

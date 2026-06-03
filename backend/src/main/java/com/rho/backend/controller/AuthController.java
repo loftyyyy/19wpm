@@ -46,7 +46,7 @@ public class AuthController {
 
     @PostMapping("/signup")
     public ResponseEntity<AuthResponseDTO> signup(@Valid @RequestBody RegisterRequestDTO registerRequestDTO){
-        return ResponseEntity.ok(authService.register(registerRequestDTO));
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(registerRequestDTO));
     }
 
     // POST /api/auth/logout
