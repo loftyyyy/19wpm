@@ -7,6 +7,7 @@ import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.service.TextService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/texts")
 public class TextController {
-
     private final TextService textService;
 
     public TextController(TextService textService){
@@ -25,46 +25,78 @@ public class TextController {
     }
 
     @GetMapping("/{textId}")
-    public ResponseEntity<TextResponseDTO> getTextById(@PathVariable long textId, @AuthenticationPrincipal CustomUserDetails customUserDetails){
+    public ResponseEntity<TextResponseDTO> getTextById(
+            @PathVariable long textId,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails){
         return ResponseEntity.ok(textService.getTextById(textId, customUserDetails.getUserId()));
     }
 
     @GetMapping("/preset-texts")
     public ResponseEntity<List<TextResponseDTO>> getPresetTexts(){
-        List<TextResponseDTO> presetTexts = textService.getPresetTexts();
-        return ResponseEntity.ok(presetTexts);
+        return ResponseEntity.ok(textService.getPresetTexts());
     }
 
     @GetMapping("/user-texts")
-    public ResponseEntity<List<TextResponseDTO>> getUserTexts(@AuthenticationPrincipal CustomUserDetails customUserDetails){
-        List<TextResponseDTO> userTexts = textService.getUserTexts(customUserDetails.getUserId());
-        return ResponseEntity.ok(userTexts);
+    public ResponseEntity<List<TextResponseDTO>> getUserTexts(
+            @AuthenticationPrincipal CustomUserDetails customUserDetails){
+        return ResponseEntity.ok(textService.getUserTexts(customUserDetails.getUserId()));
+    }
+
+    @GetMapping("/language")
+    public ResponseEntity<List<TextResponseDTO>> getTextsByLanguage(
+            @RequestParam String language){
+        return ResponseEntity.ok(textService.getTextsByLanguage(language));
     }
 
     @GetMapping("/random")
-    public ResponseEntity<TextResponseDTO> getRandomTextByType(@RequestParam(required = false)TextType type){
+    public ResponseEntity<TextResponseDTO> getRandomTextByType(
+            @RequestParam(required = false) TextType type){
         if(type == null){
             return ResponseEntity.ok(textService.getRandomText());
         }
-
         return ResponseEntity.ok(textService.getRandomTextByType(type));
+    }
+
+    @GetMapping("/short")
+    public ResponseEntity<List<TextResponseDTO>> getShortTexts(){
+        return ResponseEntity.ok(textService.getShortTexts());
+    }
+
+    @GetMapping("/medium")
+    public ResponseEntity<List<TextResponseDTO>> getMediumTexts(){
+        return ResponseEntity.ok(textService.getMediumTexts());
+    }
+
+    @GetMapping("/long")
+    public ResponseEntity<List<TextResponseDTO>> getLongTexts(){
+        return ResponseEntity.ok(textService.getLongTexts());
+    }
+
+    @GetMapping("/thicc")
+    public ResponseEntity<List<TextResponseDTO>> getThiccTexts(){
+        return ResponseEntity.ok(textService.getThiccTexts());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/text")
-    public ResponseEntity<TextResponseDTO> createText(@Valid @RequestBody TextRequestDTO textRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
-        return ResponseEntity.ok(textService.saveText(textRequestDTO, customUserDetails.getUserId()));
+    public ResponseEntity<TextResponseDTO> createText(
+            @Valid @RequestBody TextRequestDTO textRequestDTO,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails){
+        return ResponseEntity.status(HttpStatus.CREATED).body(textService.saveText(textRequestDTO, customUserDetails.getUserId()));
     }
 
     @PostMapping("/custom-text")
-    public ResponseEntity<TextResponseDTO> createCustomText(@Valid @RequestBody TextRequestDTO textRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
-        return ResponseEntity.ok(textService.saveCustomText(textRequestDTO, customUserDetails.getUserId()));
+    public ResponseEntity<TextResponseDTO> createCustomText(
+            @Valid @RequestBody TextRequestDTO textRequestDTO,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails){
+        return ResponseEntity.status(HttpStatus.CREATED).body(textService.saveCustomText(textRequestDTO, customUserDetails.getUserId()));
     }
 
-    @PostMapping("/{textId}")
-    public ResponseEntity<TextResponseDTO> modifyText(@Valid @RequestBody TextUpdateRequestDTO textUpdateRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails, @PathVariable long textId){
+    @PutMapping("/{textId}")
+    public ResponseEntity<TextResponseDTO> modifyText(
+            @Valid @RequestBody TextUpdateRequestDTO textUpdateRequestDTO,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails,
+            @PathVariable long textId){
         return ResponseEntity.ok(textService.modifyText(textUpdateRequestDTO, customUserDetails.getUserId(), textId));
     }
-
-
 }
