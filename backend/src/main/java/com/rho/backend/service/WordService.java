@@ -50,34 +50,6 @@ public class WordService {
         return new WordResponseDTO(wordRepository.save(word));
     }
 
-    public List<WordResponseDTO> getRandomWords(String language, TextDifficulty difficulty, int count){
-        if(language == null || language.isBlank()){
-            throw new InvalidResourceException("Language cannot be empty");
-        }
-        if(difficulty == null){
-            throw new InvalidResourceException("Difficulty cannot be null");
-        }
-        if(count <= 0){
-            throw new InvalidResourceException("Count must be greater than 0");
-        }
-
-        List<Word> words = wordRepository.findByLanguageAndDifficulty(language, difficulty);
-
-        if(words.isEmpty()){
-            throw new ResourceNotFoundException("No words found for language: " + language + " and difficulty: " + difficulty);
-        }
-        if(count > words.size()){
-            throw new InvalidResourceException("Count exceeds available words");
-        }
-
-        Collections.shuffle(words);
-
-        return words.stream()
-                .limit(count)
-                .map(WordResponseDTO::new)
-                .toList();
-    }
-
     public void saveWords(List<WordRequestDTO> wordRequestDTOs, long userId){
         assertAdmin(userId);
 
@@ -95,6 +67,34 @@ public class WordService {
                 .toList();
 
         wordRepository.saveAll(words);
+    }
+
+    public List<WordResponseDTO> getRandomWords(String language, TextDifficulty difficulty, int count){
+        if(language == null || language.isBlank()){
+            throw new InvalidResourceException("Language cannot be empty");
+        }
+        if(difficulty == null){
+            throw new InvalidResourceException("Difficulty cannot be null");
+        }
+        if(count <= 0){
+            throw new InvalidResourceException("Count must be greater than 0");
+        }
+
+        List<Word> words = wordRepository.findByLanguageAndDifficulty(language.trim().toLowerCase(), difficulty);
+
+        if(words.isEmpty()){
+            throw new ResourceNotFoundException("No words found for language: " + language + " and difficulty: " + difficulty);
+        }
+        if(count > words.size()){
+            throw new InvalidResourceException("Count exceeds available words");
+        }
+
+        Collections.shuffle(words);
+
+        return words.stream()
+                .limit(count)
+                .map(WordResponseDTO::new)
+                .toList();
     }
 
     public void deleteWord(Long wordId, long userId){
