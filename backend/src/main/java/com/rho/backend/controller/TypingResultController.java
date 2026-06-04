@@ -8,10 +8,13 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/result")
@@ -26,6 +29,11 @@ public class TypingResultController {
     @PostMapping
     public ResponseEntity<TypingResultResponseDTO> createTypingResult(@Valid @RequestBody TypingResultRequestDTO typingResultRequestDTO, @AuthenticationPrincipal CustomUserDetails customUserDetails){
         return ResponseEntity.status(HttpStatus.CREATED).body(typingResultService.saveTypingResult(typingResultRequestDTO, customUserDetails.getUserId()));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<TypingResultResponseDTO>> getMyResults(@AuthenticationPrincipal CustomUserDetails customUserDetails){
+        return ResponseEntity.ok(typingResultService.getResultsByUser(customUserDetails.getUserId()));
     }
 
 }

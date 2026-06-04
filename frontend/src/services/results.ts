@@ -1,4 +1,8 @@
 import type { TestResult } from '../types';
+import type { ApiTypingResultRequest, ApiTypingResultResponse } from '../types/api';
+import { api } from './api';
+
+// ── Existing localStorage-based functions (unchanged) ──
 
 const GUEST_RESULTS_KEY = '19wpm-guest-results';
 
@@ -36,5 +40,30 @@ export function migrateGuestResults(userId: string): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+// ── New API-based functions ──
+
+export async function apiSaveResult(result: ApiTypingResultRequest): Promise<{ data: ApiTypingResultResponse | null; error: string | null }> {
+  try {
+    const data = await api.post<ApiTypingResultResponse>('/result', result);
+    return { data, error: null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to save result';
+    return { data: null, error: msg };
+  }
+}
+
+export async function apiGetResults(): Promise<{ data: ApiTypingResultResponse[] | null; error: string | null }> {
+  try {
+    const data = await api.get<ApiTypingResultResponse[]>('/result');
+    return { data, error: null };
+  } catch (err: unknown) {
+    if (err instanceof Error && (err as { status?: number }).status === 404) {
+      return { data: [], error: null };
+    }
+    const msg = err instanceof Error ? err.message : 'Failed to fetch results';
+    return { data: null, error: msg };
   }
 }

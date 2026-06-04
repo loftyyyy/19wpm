@@ -25,14 +25,14 @@ export default function LoginContainer() {
 
     try {
       if (activeTab === 'login') {
-        const err = login(email, password);
+        const err = await login(email, password);
         if (err) setError(err);
         else navigate('/dashboard');
       } else {
         if (!name.trim()) { setError('Name is required.'); setLoading(false); return; }
         if (password !== confirmPassword) { setError('Passwords do not match.'); setLoading(false); return; }
         if (password.length < 6) { setError('Password must be at least 6 characters.'); setLoading(false); return; }
-        const err = register(name, email, password);
+        const err = await register(name, email, password);
         if (err) setError(err);
         else navigate('/dashboard');
       }

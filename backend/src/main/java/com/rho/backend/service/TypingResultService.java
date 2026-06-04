@@ -10,6 +10,8 @@ import com.rho.backend.repository.TypingResultRepository;
 import com.rho.backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class TypingResultService {
     private final TypingResultRepository typingResultRepository;
@@ -45,6 +47,13 @@ public class TypingResultService {
         userStatService.updateUserStats(userId, typingResultRequestDTO.wpm());
 
         return new TypingResultResponseDTO(typingResult);
+    }
+
+    public List<TypingResultResponseDTO> getResultsByUser(long userId){
+        return typingResultRepository.findByUserWithUser(userId)
+                .stream()
+                .map(TypingResultResponseDTO::new)
+                .toList();
     }
 
 }

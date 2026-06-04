@@ -1,15 +1,14 @@
 package com.rho.backend.dto.typingResult.response;
 
-
 import com.rho.backend.model.TypingResult;
-import com.rho.backend.model.User;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record TypingResultResponseDTO(
         long typingResultId,
-        User user,
+        long userId,
+        String username,
         long textId,
         LocalDateTime finishedAt,
         int durationMs,
@@ -21,7 +20,8 @@ public record TypingResultResponseDTO(
     public TypingResultResponseDTO(TypingResult typingResult){
         this(
                 typingResult.getTypingResultId(),
-                typingResult.getUser(),
+                typingResult.getUser().getUserId(),
+                typingResult.getUser().getUsername(),
                 typingResult.getTextId(),
                 typingResult.getFinishedAt(),
                 typingResult.getDurationMs(),
