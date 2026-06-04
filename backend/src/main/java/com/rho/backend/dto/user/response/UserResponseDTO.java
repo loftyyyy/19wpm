@@ -10,6 +10,8 @@ public record UserResponseDTO (
     String lastName,
     String email,
     String country,
+    String avatar,
+    Integer streak,
     Boolean isActive,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
@@ -24,6 +26,8 @@ public record UserResponseDTO (
                 user.getLastName(),
                 user.getEmail(),
                 user.getCountry(),
+                user.getAvatar(),
+                user.getStreak(),
                 user.getIsActive(),
                 user.getCreatedAt(),
                 user.getUpdatedAt(),
@@ -31,5 +35,3 @@ public record UserResponseDTO (
         );
     }
 }
-
-

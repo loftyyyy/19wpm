@@ -1,10 +1,14 @@
 export interface User {
   id: string;
-  name: string;
+  username: string;
+  firstName: string;
+  lastName: string;
   email: string;
+  country: string;
   avatar?: string;
   joinDate: string;
   streak: number;
+  isActive: boolean;
 }
 
 export interface WpmPoint {
@@ -26,6 +30,7 @@ export interface ReplayEvent {
 
 export interface TestResult {
   id: string;
+  textId?: number;
   passage: string;
   author: string;
   source: string;
@@ -46,6 +51,7 @@ export interface TestResult {
 }
 
 export interface Passage {
+  textId?: number;
   text: string;
   author: string;
   source: string;
@@ -59,3 +65,10 @@ export type Mode = 'words' | 'phrases' | 'time';
 export type PhraseLength = 'short' | 'medium' | 'long' | 'thicc' | 'all';
 
 export type Theme = 'light' | 'dark';
+
+export function userDisplayName(user: Pick<User, 'firstName' | 'lastName' | 'username'>): string {
+  if (user.firstName || user.lastName) {
+    return [user.firstName, user.lastName].filter(Boolean).join(' ');
+  }
+  return user.username;
+}

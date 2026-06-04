@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { userDisplayName } from '../types';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -83,9 +84,9 @@ export default function Navbar() {
                   className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-white font-sans text-sm font-semibold hover:bg-accent-hover transition-colors hover:cursor-pointer"
                 >
                   <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
-                    {user!.name.charAt(0).toUpperCase()}
+                    {userDisplayName(user!).charAt(0).toUpperCase()}
                   </span>
-                  <span className="hidden sm:inline">{user!.name}</span>
+                  <span className="hidden sm:inline">{userDisplayName(user!)}</span>
                 </button>
                 {isProfileOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-card border border-line rounded-lg shadow-lg transition-theme z-50">

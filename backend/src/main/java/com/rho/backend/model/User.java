@@ -67,6 +67,12 @@ public class User {
     @Column(name = "deactivated_at")
     private LocalDateTime deactivatedAt;
 
+    @Column(name = "avatar", length = 500)
+    private String avatar;
+
+    @Column(name = "streak")
+    private Integer streak;
+
 //    @Override
 //    public String getPassword(){
 //        return password != null ? password : "";

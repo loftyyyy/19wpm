@@ -1,6 +1,7 @@
 import { useAuth } from '../../context/AuthContext';
 import { useMemo } from 'react';
 import type { TestResult } from '../../types';
+import { userDisplayName } from '../../types';
 import UserProfile from '../../assets/User-Avatar.png';
 import FireIcon from '../../assets/FireIcon.svg';
 import AverageWPM from '../../assets/AverageIcon.svg';
@@ -36,7 +37,7 @@ export default function UsersCard() {
           <img src={UserProfile} alt="Profile" className="w-full h-full object-cover" />
         </div>
         <h2 className="mt-4 text-xl font-display font-semibold text-text-main transition-theme">
-          {user?.name ?? 'Guest'}
+          {user ? userDisplayName(user) : 'Guest'}
         </h2>
         <p className="text-sm text-text-sub font-sans mt-1 transition-theme">
           Member since {user?.joinDate ?? 'today'}

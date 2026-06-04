@@ -26,6 +26,8 @@ export interface ApiUserProfile {
   lastName: string;
   email: string;
   country: string;
+  avatar: string | null;
+  streak: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

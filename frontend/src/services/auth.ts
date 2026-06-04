@@ -44,13 +44,18 @@ export function loginUser(email: string, password: string): { user: User | null;
 export function registerUser(name: string, email: string, password: string): { user: User | null; error: string | null } {
   const users = getStoredUsers();
   if (users.find(u => u.email === email)) return { user: null, error: 'An account with this email already exists.' };
+  const nameParts = name.trim().split(/\s+/);
   const newUser: StoredUser = {
     id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
-    name,
+    username: email.split('@')[0],
+    firstName: nameParts[0] || name,
+    lastName: nameParts.slice(1).join(' ') || '',
     email,
     password,
+    country: '',
     joinDate: new Date().toISOString().split('T')[0],
     streak: 0,
+    isActive: true,
   };
   setStoredUsers([...users, newUser]);
   const { password: _, ...safe } = newUser;
@@ -87,20 +92,29 @@ export function updateUserProfile(id: string, updates: Partial<User>): User | nu
 function mapMinimalUserToUser(dto: NonNullable<ApiAuthResponse['userResponseDTO']>): User {
   return {
     id: String(dto.id),
-    name: dto.username,
+    username: dto.username,
+    firstName: '',
+    lastName: '',
     email: dto.email,
+    country: '',
     joinDate: new Date().toISOString().split('T')[0],
     streak: 0,
+    isActive: true,
   };
 }
 
 function mapProfileToUser(dto: ApiUserProfile): User {
   return {
     id: String(dto.userId),
-    name: dto.firstName ? `${dto.firstName} ${dto.lastName}`.trim() : dto.username,
+    username: dto.username,
+    firstName: dto.firstName || '',
+    lastName: dto.lastName || '',
     email: dto.email,
+    country: dto.country || '',
+    avatar: dto.avatar || undefined,
     joinDate: dto.createdAt ? dto.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
-    streak: 0,
+    streak: dto.streak ?? 0,
+    isActive: dto.isActive,
   };
 }
 

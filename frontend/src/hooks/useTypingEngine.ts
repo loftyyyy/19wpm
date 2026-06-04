@@ -307,6 +307,7 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
     }));
     return {
       id: v4(),
+      textId: state.passage.textId,
       passage: state.passage.text,
       author: state.passage.author,
       source: state.passage.source,

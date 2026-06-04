@@ -6,15 +6,6 @@ import { api } from './api';
 
 // ── Existing localStorage-based functions (unchanged) ──
 
-export function generateTestPassage(
-  mode: Mode,
-  duration: number,
-  wordCount: WordCount,
-  phraseLength?: PhraseLength,
-): Passage {
-  return localGeneratePassage(mode, duration, wordCount, phraseLength);
-}
-
 export function getRandomPassage(): Passage {
   return localRandomPassage();
 }
@@ -23,10 +14,32 @@ export function generateRandomWords(count: number): string {
   return localRandomWords(count);
 }
 
+// ── API-first passage generation with local fallback ──
+
+export async function generateTestPassage(
+  mode: Mode,
+  duration: number,
+  wordCount: WordCount,
+  phraseLength?: PhraseLength,
+): Promise<Passage> {
+  if (mode === 'phrases' || mode === 'time') {
+    try {
+      const type = !phraseLength || phraseLength === 'all' ? undefined : phraseLength;
+      const result = await apiFetchRandomText(type);
+      if (result.data) return result.data;
+    } catch {
+      // API unreachable — fall through to local
+    }
+  }
+  // mode === 'words' or API unavailable: fall back to local generation
+  return localGeneratePassage(mode, duration, wordCount, phraseLength);
+}
+
 // ── New API-based functions ──
 
 function mapTextToPassage(dto: ApiTextResponse): Passage {
   return {
+    textId: dto.textId,
     text: dto.content,
     author: dto.author,
     source: dto.source,

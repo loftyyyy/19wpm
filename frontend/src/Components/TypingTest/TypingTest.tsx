@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useCallback, useLayoutEffect } from 'react';
+import { useEffect, useRef, useMemo, useCallback, useLayoutEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { generateTestPassage } from '../../services/passages';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
@@ -36,22 +36,37 @@ export default function TypingTest() {
     return { contentType: 'words' as ContentType, testMode: 'timed' as TestMode };
   }, [mode]);
 
-  const passage = useMemo((): Passage => {
+  // Async passage loading: API first, local fallback
+  const [passage, setPassage] = useState<Passage | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
     const isCustom = searchParams.get('custom');
+
     if (isCustom) {
       try {
         const stored = localStorage.getItem('19wpm-custom-passage');
         if (stored) {
           const p = JSON.parse(stored);
-          return { text: p.text, author: p.author, source: p.source };
+          if (!cancelled) setPassage({ text: p.text, author: p.author, source: p.source });
+          return;
         }
       } catch {}
     }
-    return generateTestPassage(mode, duration, wordCount, mode === 'phrases' ? phraseLength : undefined);
-  }, []);
-  const { state, handleKeyDown, getResult, reset } = useTypingEngine(passage, duration, testMode, wordCount, contentType);
+
+    generateTestPassage(mode, duration, wordCount, mode === 'phrases' ? phraseLength : undefined)
+      .then(p => { if (!cancelled) setPassage(p); });
+
+    return () => { cancelled = true; };
+  }, [mode, duration, wordCount, phraseLength]);
+
+  const { state, handleKeyDown, getResult, reset } = useTypingEngine(
+    passage ?? { text: '', author: '', source: '' },
+    duration, testMode, wordCount, contentType
+  );
 
   const passageWords = useMemo(() => {
+    if (!passage) return [];
     const words: { chars: { char: string; globalIdx: number }[] }[] = [];
     let globalIdx = 0;
     const parts = passage.text.split('');
@@ -68,9 +83,10 @@ export default function TypingTest() {
     }
     if (currentWord.length > 0) words.push({ chars: currentWord });
     return words;
-  }, [passage.text]);
+  }, [passage]);
 
   const currentWordIndex = useMemo(() => {
+    if (passageWords.length === 0) return 0;
     for (let i = 0; i < passageWords.length; i++) {
       const word = passageWords[i];
       const first = word.chars[0].globalIdx;
@@ -181,63 +197,69 @@ export default function TypingTest() {
           onClick={() => containerRef.current?.focus()}
           className="w-full p-6 rounded-xl bg-card border border-line transition-theme focus:outline-none focus:ring-2 focus:ring-accent/30 font-mono text-xl md:text-2xl leading-relaxed cursor-text select-none"
         >
-          {!state.isRunning && !state.isFinished && (
+          {!passage ? (
+            <div className="text-center text-text-dim font-sans text-sm transition-theme">Loading passage...</div>
+          ) : !state.isRunning && !state.isFinished ? (
             <div className="text-center text-text-dim font-sans text-sm mb-4 transition-theme">
               Start typing to begin &middot; Press Esc to restart
             </div>
-          )}
-          <div ref={viewportRef} className="overflow-hidden">
-            <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
-              {passageWords.map((word, wi) => (
-                <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">
-                  {word.chars.map(({ char, globalIdx }) => {
-                    const typed = state.typedChars[globalIdx];
-                    const isCurrent = globalIdx === state.currentIndex;
-                    const isCorrect = typed !== undefined && typed === char;
-                    const isIncorrect = typed !== undefined && typed !== char;
+          ) : null}
+          {passage && (
+            <div ref={viewportRef} className="overflow-hidden">
+              <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
+                {passageWords.map((word, wi) => (
+                  <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">
+                    {word.chars.map(({ char, globalIdx }) => {
+                      const typed = state.typedChars[globalIdx];
+                      const isCurrent = globalIdx === state.currentIndex;
+                      const isCorrect = typed !== undefined && typed === char;
+                      const isIncorrect = typed !== undefined && typed !== char;
 
-                    let cls = 'char-untyped transition-colors';
-                    if (isCorrect) cls = 'char-correct';
-                    if (isIncorrect) cls = 'char-incorrect';
-                    if (isCurrent) cls = 'char-current text-text-main';
+                      let cls = 'char-untyped transition-colors';
+                      if (isCorrect) cls = 'char-correct';
+                      if (isIncorrect) cls = 'char-incorrect';
+                      if (isCurrent) cls = 'char-current text-text-main';
 
-                    return (
-                      <span key={globalIdx} className={cls}>
-                        {char}
-                      </span>
-                    );
-                  })}
-                  {wi < passageWords.length - 1 && (
-                    <span className="text-text-dim"> </span>
-                  )}
-                  {wi === currentWordIndex && state.extraChars.map((ch, i) => (
-                    <span key={`ex-${i}`} className="char-incorrect">{ch}</span>
-                  ))}
-                </span>
-              ))}
+                      return (
+                        <span key={globalIdx} className={cls}>
+                          {char}
+                        </span>
+                      );
+                    })}
+                    {wi < passageWords.length - 1 && (
+                      <span className="text-text-dim"> </span>
+                    )}
+                    {wi === currentWordIndex && state.extraChars.map((ch, i) => (
+                      <span key={`ex-${i}`} className="char-incorrect">{ch}</span>
+                    ))}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        <div className="mt-6 text-center flex items-center justify-center gap-4">
-          <p className="text-text-dim font-sans text-sm italic transition-theme">
-            &mdash; {passage.author}, <em>{passage.source}</em>
-          </p>
-          <button
-            ref={restartBtnRef}
-            onClick={handleRestart}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleRestart(); } }}
-            tabIndex={0}
-            className="p-2 rounded-xl text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50"
-            title="Restart test (Tab to focus, Enter to confirm)"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-          </button>
-        </div>
+        {passage && (
+          <div className="mt-6 text-center flex items-center justify-center gap-4">
+            <p className="text-text-dim font-sans text-sm italic transition-theme">
+              &mdash; {passage.author}, <em>{passage.source}</em>
+            </p>
+            <button
+              ref={restartBtnRef}
+              onClick={handleRestart}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleRestart(); } }}
+              tabIndex={0}
+              className="p-2 rounded-xl text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50"
+              title="Restart test (Tab to focus, Enter to confirm)"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

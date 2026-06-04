@@ -3,6 +3,7 @@ import type { User, TestResult } from '../types';
 import type { ApiAuthResponse, ApiUserProfile } from '../types/api';
 import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile } from '../services/auth';
 import { saveResult as localStorageSaveResult, getResults as localStorageGetResults, migrateGuestResults } from '../services/results';
+import { apiSaveResult } from '../services/results';
 import { api, setTokens, clearTokens, getAccessToken, ApiError } from '../services/api';
 
 interface AuthContextValue {
@@ -22,10 +23,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 function mapProfileToUser(dto: ApiUserProfile): User {
   return {
     id: String(dto.userId),
-    name: dto.firstName ? `${dto.firstName} ${dto.lastName}`.trim() : dto.username,
+    username: dto.username,
+    firstName: dto.firstName || '',
+    lastName: dto.lastName || '',
     email: dto.email,
+    country: dto.country || '',
+    avatar: dto.avatar || undefined,
     joinDate: dto.createdAt ? dto.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
-    streak: 0,
+    streak: dto.streak ?? 0,
+    isActive: dto.isActive,
   };
 }
 
@@ -64,10 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
       setUserAndMigrate({
         id: String(data.userResponseDTO.id),
-        name: data.userResponseDTO.username,
+        username: data.userResponseDTO.username,
+        firstName: '',
+        lastName: '',
         email: data.userResponseDTO.email,
+        country: '',
         joinDate: new Date().toISOString().split('T')[0],
         streak: 0,
+        isActive: true,
       });
       return null;
     } catch (err) {
@@ -102,10 +112,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
       setUserAndMigrate({
         id: String(data.userResponseDTO.id),
-        name: data.userResponseDTO.username,
+        username: data.userResponseDTO.username,
+        firstName: nameParts[0] || name,
+        lastName: nameParts.slice(1).join(' ') || '',
         email: data.userResponseDTO.email,
+        country: '',
         joinDate: new Date().toISOString().split('T')[0],
         streak: 0,
+        isActive: true,
       });
       return null;
     } catch (err) {
@@ -146,6 +160,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const addResult = useCallback((result: TestResult) => {
     localStorageSaveResult(result, user?.id);
+    if (result.textId) {
+      apiSaveResult({
+        textId: result.textId,
+        finishedAt: new Date(result.date).toISOString(),
+        durationMs: result.duration,
+        timeConstraintMs: null,
+        wpm: result.wpm,
+        accuracy: result.accuracy,
+      });
+    }
   }, [user]);
 
   const getResults = useCallback((): TestResult[] => {
