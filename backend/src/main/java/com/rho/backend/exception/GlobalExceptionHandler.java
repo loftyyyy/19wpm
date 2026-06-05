@@ -1,5 +1,6 @@
 package com.rho.backend.exception;
 
+import com.rho.backend.exception.credential.PasswordException;
 import com.rho.backend.exception.user.AccessDeniedException;
 import com.rho.backend.exception.user.AuthenticationException;
 import com.rho.backend.exception.user.DuplicateResourceException;
@@ -120,6 +121,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String expected = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorResponse.of(HttpStatus.BAD_REQUEST, "Invalid value for '" + ex.getName() + "': expected type " + expected));
+    }
+
+    @ExceptionHandler(PasswordException.class)
+    public ResponseEntity<ErrorResponse> handlePasswordException(PasswordException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(HttpStatus.BAD_REQUEST, ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

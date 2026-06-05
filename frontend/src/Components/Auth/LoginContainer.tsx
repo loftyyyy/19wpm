@@ -2,9 +2,14 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
+const EMAIL_PATTERN = "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}";
+
 export default function LoginContainer() {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [country, setCountry] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -25,14 +30,18 @@ export default function LoginContainer() {
 
     try {
       if (activeTab === 'login') {
+        if (password.length < 8) { setError('Password must be at least 8 characters.'); setLoading(false); return; }
         const err = await login(email, password);
         if (err) setError(err);
         else navigate('/dashboard');
       } else {
-        if (!name.trim()) { setError('Name is required.'); setLoading(false); return; }
+        if (!username.trim()) { setError('Username is required.'); setLoading(false); return; }
+        if (!firstName.trim()) { setError('First name is required.'); setLoading(false); return; }
+        if (!lastName.trim()) { setError('Last name is required.'); setLoading(false); return; }
+        if (!country.trim()) { setError('Country is required.'); setLoading(false); return; }
         if (password !== confirmPassword) { setError('Passwords do not match.'); setLoading(false); return; }
-        if (password.length < 6) { setError('Password must be at least 6 characters.'); setLoading(false); return; }
-        const err = await register(name, email, password);
+        if (password.length < 8) { setError('Password must be at least 8 characters.'); setLoading(false); return; }
+        const err = await register(username, firstName, lastName, email, password, country);
         if (err) setError(err);
         else navigate('/dashboard');
       }
@@ -76,16 +85,43 @@ export default function LoginContainer() {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {activeTab === 'register' && (
-            <div>
-              <label className="block text-sm font-sans font-medium text-text-sub mb-1.5 transition-theme">Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Your name"
-                className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-sans font-medium text-text-sub mb-1.5 transition-theme">Username</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="Your username"
+                  required
+                  className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-sans font-medium text-text-sub mb-1.5 transition-theme">First Name</label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    placeholder="First name"
+                    required
+                    className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-sans font-medium text-text-sub mb-1.5 transition-theme">Last Name</label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    placeholder="Last name"
+                    required
+                    className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div>
@@ -96,6 +132,8 @@ export default function LoginContainer() {
               onChange={e => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
+              pattern={EMAIL_PATTERN}
+              title="Enter a valid email address (e.g. user@example.com)"
               className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
             />
           </div>
@@ -108,21 +146,37 @@ export default function LoginContainer() {
               onChange={e => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
+              minLength={8}
               className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
             />
           </div>
 
           {activeTab === 'register' && (
-            <div>
-              <label className="block text-sm font-sans font-medium text-text-sub mb-1.5 transition-theme">Confirm Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-sans font-medium text-text-sub mb-1.5 transition-theme">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  required
+                  minLength={8}
+                  className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-sans font-medium text-text-sub mb-1.5 transition-theme">Country</label>
+                <input
+                  type="text"
+                  value={country}
+                  onChange={e => setCountry(e.target.value)}
+                  placeholder="Your country"
+                  required
+                  className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
+                />
+              </div>
+            </>
           )}
 
           {error && (

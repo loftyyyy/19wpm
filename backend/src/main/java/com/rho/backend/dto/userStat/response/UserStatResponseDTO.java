@@ -1,13 +1,13 @@
 package com.rho.backend.dto.userStat.response;
 
-import com.rho.backend.model.User;
+import com.rho.backend.dto.user.request.UserResponseDTO;
 import com.rho.backend.model.UserStat;
 
 import java.math.BigDecimal;
 
 public record UserStatResponseDTO(
         long userStatId,
-        User user,
+        UserResponseDTO user,
         BigDecimal averageSpeed,
         BigDecimal bestSpeed,
         BigDecimal lastSpeed,
@@ -16,7 +16,7 @@ public record UserStatResponseDTO(
     public UserStatResponseDTO(UserStat userStat){
         this(
                 userStat.getUserStatsId(),
-                userStat.getUser(),
+                UserResponseDTO.from(userStat.getUser()),
                 userStat.getAverageSpeed(),
                 userStat.getBestSpeed(),
                 userStat.getLastSpeed(),

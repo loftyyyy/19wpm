@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../Navbar';
 import Footer from '../Footer';
 import { useAuth } from '../../context/AuthContext';
+import { apiSaveCustomText } from '../../services/passages';
 
 interface CustomPassage {
   id: string;
@@ -34,7 +35,7 @@ export default function ContentCreation() {
     return null;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
 
@@ -53,11 +54,23 @@ export default function ContentCreation() {
       source: source.trim() || 'Custom Submission',
     });
     localStorage.setItem('19wpm-custom-passages', JSON.stringify(existing));
-    setMessage({ type: 'success', text: 'Passage submitted!' });
-    setTitle('');
-    setPassage('');
-    setAuthor('');
-    setSource('');
+
+    // Also persist to the backend
+    const { error } = await apiSaveCustomText({
+      title: title.trim() || 'Untitled',
+      author: author.trim() || 'Anonymous',
+      source: source.trim() || 'Custom Submission',
+      language: 'en',
+      content: passage.trim(),
+    });
+
+    setMessage({ type: error ? 'error' : 'success', text: error || 'Passage submitted!' });
+    if (!error) {
+      setTitle('');
+      setPassage('');
+      setAuthor('');
+      setSource('');
+    }
   };
 
   const handleDelete = (id: string) => {

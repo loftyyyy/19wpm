@@ -28,7 +28,7 @@ export interface ApiUserProfile {
   country: string;
   avatar: string | null;
   streak: number | null;
-  isActive: boolean;
+  isActive: boolean | null;
   createdAt: string;
   updatedAt: string;
   deactivatedAt: string | null;
@@ -46,8 +46,10 @@ export interface ApiTokenRefreshRequest {
 }
 
 export interface ApiTokenRefreshResponse {
-  accessToken: string;
   tokenType: string;
+  accessToken: string;
+  refreshToken: string;
+  userResponseDTO: ApiUserMinimal;
 }
 
 export interface ApiLogoutRequest {

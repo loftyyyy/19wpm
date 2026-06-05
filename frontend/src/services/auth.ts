@@ -41,18 +41,17 @@ export function loginUser(email: string, password: string): { user: User | null;
   return { user: safe, error: null };
 }
 
-export function registerUser(name: string, email: string, password: string): { user: User | null; error: string | null } {
+export function registerUser(username: string, firstName: string, lastName: string, email: string, password: string, country: string): { user: User | null; error: string | null } {
   const users = getStoredUsers();
   if (users.find(u => u.email === email)) return { user: null, error: 'An account with this email already exists.' };
-  const nameParts = name.trim().split(/\s+/);
   const newUser: StoredUser = {
     id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
-    username: email.split('@')[0],
-    firstName: nameParts[0] || name,
-    lastName: nameParts.slice(1).join(' ') || '',
+    username,
+    firstName,
+    lastName,
     email,
     password,
-    country: '',
+    country,
     joinDate: new Date().toISOString().split('T')[0],
     streak: 0,
     isActive: true,
@@ -89,7 +88,7 @@ export function updateUserProfile(id: string, updates: Partial<User>): User | nu
 
 // ── New API-based functions ──
 
-function mapMinimalUserToUser(dto: NonNullable<ApiAuthResponse['userResponseDTO']>): User {
+export function mapMinimalUserToUser(dto: NonNullable<ApiAuthResponse['userResponseDTO']>): User {
   return {
     id: String(dto.id),
     username: dto.username,
@@ -103,7 +102,7 @@ function mapMinimalUserToUser(dto: NonNullable<ApiAuthResponse['userResponseDTO'
   };
 }
 
-function mapProfileToUser(dto: ApiUserProfile): User {
+export function mapProfileToUser(dto: ApiUserProfile): User {
   return {
     id: String(dto.userId),
     username: dto.username,
@@ -114,7 +113,7 @@ function mapProfileToUser(dto: ApiUserProfile): User {
     avatar: dto.avatar || undefined,
     joinDate: dto.createdAt ? dto.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
     streak: dto.streak ?? 0,
-    isActive: dto.isActive,
+    isActive: dto.isActive ?? false,
   };
 }
 

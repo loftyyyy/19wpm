@@ -1,17 +1,17 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { User, TestResult } from '../types';
-import type { ApiAuthResponse, ApiUserProfile } from '../types/api';
-import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile } from '../services/auth';
-import { saveResult as localStorageSaveResult, getResults as localStorageGetResults, migrateGuestResults } from '../services/results';
+import type { ApiAuthResponse, ApiAuthRequest, ApiRegisterRequest, ApiUserProfile, ApiTypingResultResponse } from '../types/api';
+import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile, mapProfileToUser, mapMinimalUserToUser } from '../services/auth';
+import { saveResult as localStorageSaveResult, getResults as localStorageGetResults, migrateGuestResults, apiGetResults } from '../services/results';
 import { apiSaveResult } from '../services/results';
-import { api, setTokens, clearTokens, getAccessToken, ApiError } from '../services/api';
+import { api, setTokens, clearTokens, getAccessToken, getStoredUserId, ApiError } from '../services/api';
 
 interface AuthContextValue {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<string | null>;
-  register: (name: string, email: string, password: string) => Promise<string | null>;
+  register: (username: string, firstName: string, lastName: string, email: string, password: string, country: string) => Promise<string | null>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
   addResult: (result: TestResult) => void;
@@ -19,21 +19,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function mapProfileToUser(dto: ApiUserProfile): User {
-  return {
-    id: String(dto.userId),
-    username: dto.username,
-    firstName: dto.firstName || '',
-    lastName: dto.lastName || '',
-    email: dto.email,
-    country: dto.country || '',
-    avatar: dto.avatar || undefined,
-    joinDate: dto.createdAt ? dto.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
-    streak: dto.streak ?? 0,
-    isActive: dto.isActive,
-  };
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(getSessionUser);
@@ -58,6 +43,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Sync server-side typing results into localStorage on mount
+  useEffect(() => {
+    if (!getAccessToken()) return;
+    apiGetResults().then(({ data }) => {
+      if (!data || data.length === 0) return;
+      const storedUserId = String(getStoredUserId());
+      const key = `19wpm-results-${storedUserId}`;
+      const existing: TestResult[] = JSON.parse(localStorage.getItem(key) || '[]');
+      const existingKeys = new Set(existing.map(r => `${r.date}-${r.wpm}-${r.accuracy}`));
+      const newResults: TestResult[] = [];
+      for (const r of data) {
+        const dedupKey = `${r.finishedAt || r.createdAt}-${r.wpm}-${r.accuracy}`;
+        if (!existingKeys.has(dedupKey)) {
+          newResults.push({
+            id: String(r.typingResultId),
+            textId: r.textId,
+            passage: '',
+            author: '',
+            source: '',
+            wpm: r.wpm,
+            accuracy: r.accuracy,
+            duration: Math.round(r.durationMs / 1000),
+            correctChars: 0,
+            incorrectChars: 0,
+            totalCorrect: 0,
+            totalIncorrect: 0,
+            wpmHistory: [],
+            mistakeWords: [],
+            replayEvents: [],
+            testMode: 'timed',
+            wordCount: 10,
+            contentType: 'words',
+            date: r.finishedAt || r.createdAt,
+          });
+        }
+      }
+      if (newResults.length > 0) {
+        localStorage.setItem(key, JSON.stringify([...newResults, ...existing]));
+      }
+    });
+  }, []);
+
   const setUserAndMigrate = useCallback((u: User) => {
     setUser(u);
     migrateGuestResults(u.id);
@@ -66,19 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     setIsLoading(true);
     try {
-      const data = await api.post<ApiAuthResponse>('/auth/login', { email, password });
+      const loginBody: ApiAuthRequest = { email, password };
+      const data = await api.post<ApiAuthResponse>('/auth/login', loginBody);
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
-      setUserAndMigrate({
-        id: String(data.userResponseDTO.id),
-        username: data.userResponseDTO.username,
-        firstName: '',
-        lastName: '',
-        email: data.userResponseDTO.email,
-        country: '',
-        joinDate: new Date().toISOString().split('T')[0],
-        streak: 0,
-        isActive: true,
-      });
+      setUserAndMigrate(mapMinimalUserToUser(data.userResponseDTO));
       return null;
     } catch (err) {
       const isNetworkDown = err instanceof TypeError
@@ -97,36 +115,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [setUserAndMigrate]);
 
-  const register = useCallback(async (name: string, email: string, password: string): Promise<string | null> => {
+  const register = useCallback(async (username: string, firstName: string, lastName: string, email: string, password: string, country: string): Promise<string | null> => {
     setIsLoading(true);
     try {
-      const nameParts = name.trim().split(/\s+/);
-      const data = await api.post<ApiAuthResponse>('/auth/signup', {
-        username: email.split('@')[0],
-        firstName: nameParts[0] || name,
-        lastName: nameParts.slice(1).join(' ') || '',
-        email,
-        password,
-        country: '',
-      });
+      const registerBody: ApiRegisterRequest = { username, firstName, lastName, email, password, country };
+      const data = await api.post<ApiAuthResponse>('/auth/signup', registerBody);
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
-      setUserAndMigrate({
-        id: String(data.userResponseDTO.id),
-        username: data.userResponseDTO.username,
-        firstName: nameParts[0] || name,
-        lastName: nameParts.slice(1).join(' ') || '',
-        email: data.userResponseDTO.email,
-        country: '',
-        joinDate: new Date().toISOString().split('T')[0],
-        streak: 0,
-        isActive: true,
-      });
+      const u = mapMinimalUserToUser(data.userResponseDTO);
+      setUserAndMigrate({ ...u, firstName, lastName, country });
       return null;
     } catch (err) {
       const isNetworkDown = err instanceof TypeError
         || (err instanceof ApiError && err.status >= 500);
       if (isNetworkDown) {
-        const localResult = registerUser(name, email, password);
+        const localResult = registerUser(username, firstName, lastName, email, password, country);
         if (localResult.user) {
           setUserAndMigrate(localResult.user);
           return null;
@@ -164,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       apiSaveResult({
         textId: result.textId,
         finishedAt: new Date(result.date).toISOString(),
-        durationMs: result.duration,
+        durationMs: result.duration * 1000,
         timeConstraintMs: null,
         wpm: result.wpm,
         accuracy: result.accuracy,

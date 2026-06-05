@@ -1,4 +1,4 @@
-import type { ApiAuthResponse } from '../types/api';
+import type { ApiTokenRefreshResponse } from '../types/api';
 
 const TOKEN_KEY = '19wpm-access-token';
 const REFRESH_KEY = '19wpm-refresh-token';
@@ -64,7 +64,7 @@ async function attemptTokenRefresh(): Promise<boolean> {
         clearTokens();
         return false;
       }
-      const data: ApiAuthResponse = await res.json();
+      const data: ApiTokenRefreshResponse = await res.json();
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
       return true;
     } catch {

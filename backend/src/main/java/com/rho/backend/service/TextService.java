@@ -142,7 +142,13 @@ public class TextService {
     public TextResponseDTO getTextById(Long textId, Long id){
         Text text = textRepository.findById(textId).orElseThrow(() -> new ResourceNotFoundException("Text not found"));
 
-        if(text.getCreatedBy() == null || !text.getCreatedBy().equals(id)){
+        // Preset texts are accessible to all authenticated users
+        if (!text.isCustom()) {
+            return new TextResponseDTO(text);
+        }
+
+        // Custom texts are only accessible to their owner
+        if (text.getCreatedBy() == null || !text.getCreatedBy().equals(id)) {
             throw new UnauthorizedResourceException("You do not own this text!");
         }
 
