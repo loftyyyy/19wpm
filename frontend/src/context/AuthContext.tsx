@@ -86,9 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const setUserAndMigrate = useCallback((u: User) => {
+  const setUserAndMigrate = useCallback(async (u: User) => {
     setUser(u);
-    migrateGuestResults(u.id);
+    await migrateGuestResults(u.id);
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const loginBody: ApiAuthRequest = { email, password };
       const data = await api.post<ApiAuthResponse>('/auth/login', loginBody);
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
-      setUserAndMigrate(mapMinimalUserToUser(data.userResponseDTO));
+      await setUserAndMigrate(mapMinimalUserToUser(data.userResponseDTO));
       return null;
     } catch (err) {
       const isNetworkDown = err instanceof TypeError
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isNetworkDown) {
         const localResult = loginUser(email, password);
         if (localResult.user) {
-          setUserAndMigrate(localResult.user);
+          await setUserAndMigrate(localResult.user);
           return null;
         }
       }
@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await api.post<ApiAuthResponse>('/auth/signup', registerBody);
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
       const u = mapMinimalUserToUser(data.userResponseDTO);
-      setUserAndMigrate({ ...u, firstName, lastName, country });
+      await setUserAndMigrate({ ...u, firstName, lastName, country });
       return null;
     } catch (err) {
       const isNetworkDown = err instanceof TypeError
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isNetworkDown) {
         const localResult = registerUser(username, firstName, lastName, email, password, country);
         if (localResult.user) {
-          setUserAndMigrate(localResult.user);
+          await setUserAndMigrate(localResult.user);
           return null;
         }
       }

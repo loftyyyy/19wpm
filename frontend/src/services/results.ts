@@ -26,18 +26,35 @@ export function getResults(userId?: string): TestResult[] {
   }
 }
 
-export function migrateGuestResults(userId: string): boolean {
+export async function migrateGuestResults(_userId: string): Promise<boolean> {
   try {
     const guestResults: TestResult[] = JSON.parse(localStorage.getItem(GUEST_RESULTS_KEY) || '[]');
     if (guestResults.length === 0) return true;
-    const userKey = userResultsKey(userId);
-    const userResults: TestResult[] = JSON.parse(localStorage.getItem(userKey) || '[]');
-    const merged = [...guestResults, ...userResults].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+
+    const toMigrate = guestResults.filter(r => r.textId);
+    if (toMigrate.length === 0) return true;
+
+    const results = await Promise.allSettled(
+      toMigrate.map(r =>
+        apiSaveResult({
+          textId: r.textId!,
+          finishedAt: new Date(r.date).toISOString(),
+          durationMs: r.duration * 1000,
+          timeConstraintMs: null,
+          wpm: r.wpm,
+          accuracy: r.accuracy,
+        })
+      )
     );
-    localStorage.setItem(userKey, JSON.stringify(merged));
-    localStorage.removeItem(GUEST_RESULTS_KEY);
-    return true;
+
+    const allSucceeded = results.every(r => r.status === 'fulfilled' && r.value.data !== null);
+
+    if (allSucceeded) {
+      localStorage.removeItem(GUEST_RESULTS_KEY);
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
