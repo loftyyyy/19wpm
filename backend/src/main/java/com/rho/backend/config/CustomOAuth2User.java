@@ -15,10 +15,12 @@ public class CustomOAuth2User implements OAuth2User {
     @Getter
     private final User user;
     private final Map<String, Object> attributes;
+    private final String roleName;
 
     public CustomOAuth2User(User user, Map<String, Object> attributes) {
         this.user = user;
         this.attributes = attributes;
+        this.roleName = user.getRole().getName();
     }
 
     @Override
@@ -28,7 +30,7 @@ public class CustomOAuth2User implements OAuth2User {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()));
+        return List.of(new SimpleGrantedAuthority("ROLE_" + roleName));
     }
 
     @Override

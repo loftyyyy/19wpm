@@ -68,6 +68,9 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
 
         User user = resolveUser(provider, providerId, email, oAuth2User.getAttributes());
 
+        user = userRepository.findByIdWithRole(user.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found after OAuth2 resolve"));
+
         return new CustomOAuth2User(user, oAuth2User.getAttributes());
     }
 
