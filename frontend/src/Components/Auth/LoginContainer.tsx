@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const EMAIL_PATTERN = "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}";
 
 export default function LoginContainer() {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -13,7 +14,7 @@ export default function LoginContainer() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(searchParams.get('oauth_error') || '');
   const [loading, setLoading] = useState(false);
   const { login, register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ export default function LoginContainer() {
       <div className="w-full max-w-md bg-card border border-line rounded-2xl shadow-sm transition-theme">
         <div className="flex border-b border-line">
           <button
-            onClick={() => { setActiveTab('login'); setError(''); }}
+            onClick={() => { setActiveTab('login'); setError(''); window.history.replaceState({}, '', '/login'); }}
             className={`flex-1 py-4 text-sm font-semibold font-sans transition-colors hover:cursor-pointer ${
               activeTab === 'login'
                 ? 'text-accent border-b-2 border-accent'
@@ -72,7 +73,7 @@ export default function LoginContainer() {
             LOGIN
           </button>
           <button
-            onClick={() => { setActiveTab('register'); setError(''); }}
+            onClick={() => { setActiveTab('register'); setError(''); window.history.replaceState({}, '', '/login'); }}
             className={`flex-1 py-4 text-sm font-semibold font-sans transition-colors hover:cursor-pointer ${
               activeTab === 'register'
                 ? 'text-accent border-b-2 border-accent'
@@ -203,7 +204,7 @@ export default function LoginContainer() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => setError('Google OAuth coming soon.')}
+              onClick={() => { window.location.href = 'http://localhost:8080/oauth2/authorization/google'; }}
               className="flex items-center justify-center gap-2 px-4 py-2.5 border border-line rounded-xl text-sm font-sans text-text-sub hover:bg-muted transition-colors hover:cursor-pointer"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -216,7 +217,7 @@ export default function LoginContainer() {
             </button>
             <button
               type="button"
-              onClick={() => setError('GitHub OAuth coming soon.')}
+              onClick={() => { window.location.href = 'http://localhost:8080/oauth2/authorization/github'; }}
               className="flex items-center justify-center gap-2 px-4 py-2.5 border border-line rounded-xl text-sm font-sans text-text-sub hover:bg-muted transition-colors hover:cursor-pointer"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
