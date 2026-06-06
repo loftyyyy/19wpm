@@ -663,6 +663,9 @@ export default function TestResults() {
 
           <div className="bg-muted rounded-xl p-4 mb-8 transition-theme">
             <p className="text-text-sub font-sans text-sm font-semibold mb-2 transition-theme">Passage</p>
+            {safeResult.title && (
+              <p className="text-text-main font-sans text-sm font-medium mb-1 transition-theme">{safeResult.title}</p>
+            )}
             <p className="text-text-dim font-sans text-sm leading-relaxed transition-theme">
               {safeResult.passage.length > 200
                 ? safeResult.passage.slice(0, 200) + '...'

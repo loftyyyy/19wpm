@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
-import type { Duration, Mode, WordCount, PhraseLength } from '../types';
+import type { Duration, Mode, WordCount, PhraseLength, TextDifficulty } from '../types';
 import English from '../assets/English.svg';
 import Type from '../assets/TYPEIMAGE.png';
 import Leaf from '../assets/LeafIcon.svg';
@@ -12,6 +12,7 @@ const durations: Duration[] = [15, 30, 60];
 const wordCounts: WordCount[] = [10, 25, 50, 100];
 const phraseLengths: PhraseLength[] = ['short', 'medium', 'long', 'thicc', 'all'];
 const DURATION_KEY = '19wpm-duration';
+const DIFFICULTY_KEY = '19wpm-difficulty';
 
 function getSavedDuration(): Duration {
   try {
@@ -21,10 +22,21 @@ function getSavedDuration(): Duration {
   return 30;
 }
 
-function buildQuery(mode: Mode, duration: Duration, wordCount: WordCount, phraseLength: PhraseLength): string {
+function getSavedDifficulty(): TextDifficulty {
+  try {
+    const saved = localStorage.getItem(DIFFICULTY_KEY);
+    if (saved === 'EASY' || saved === 'MEDIUM' || saved === 'HARD' || saved === 'EXPERT') return saved;
+  } catch {}
+  return 'EASY';
+}
+
+function buildQuery(mode: Mode, duration: Duration, wordCount: WordCount, phraseLength: PhraseLength, difficulty: TextDifficulty): string {
   const params = new URLSearchParams();
   params.set('mode', mode);
-  if (mode === 'words') params.set('count', String(wordCount));
+  if (mode === 'words') {
+    params.set('count', String(wordCount));
+    params.set('difficulty', difficulty);
+  }
   if (mode === 'time') params.set('time', String(duration));
   if (mode === 'phrases') params.set('length', phraseLength);
   return params.toString();
@@ -37,6 +49,7 @@ export default function LandingPage() {
   const [selectedDuration, setSelectedDuration] = useState<Duration>(getSavedDuration);
   const [wordCount, setWordCount] = useState<WordCount>(25);
   const [phraseLength, setPhraseLength] = useState<PhraseLength>('medium');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<TextDifficulty>(getSavedDifficulty);
 
   const handleDurationChange = (d: Duration) => {
     setSelectedDuration(d);
@@ -45,7 +58,8 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   const handleStart = () => {
-    navigate(`/solo?${buildQuery(mode, selectedDuration, wordCount, phraseLength)}`);
+    localStorage.setItem(DIFFICULTY_KEY, selectedDifficulty);
+    navigate(`/solo?${buildQuery(mode, selectedDuration, wordCount, phraseLength, selectedDifficulty)}`);
   };
 
   return (
@@ -99,6 +113,30 @@ export default function LandingPage() {
                 </span>
               ))}
             </div>
+
+            {/* Difficulty — only for words mode */}
+            {mode === 'words' && (
+              <div className="flex items-center gap-2 text-xs font-sans">
+                {(['EASY', 'MEDIUM', 'HARD', 'EXPERT'] as TextDifficulty[]).map((d, i, arr) => (
+                  <span key={d} className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedDifficulty(d);
+                        localStorage.setItem(DIFFICULTY_KEY, d);
+                      }}
+                      className={`transition-colors hover:cursor-pointer capitalize ${
+                        selectedDifficulty === d ? 'text-accent font-semibold' : 'text-text-dim hover:text-text-sub'
+                      }`}
+                    >
+                      {d.toLowerCase()}
+                    </button>
+                    {i < arr.length - 1 && (
+                      <span className="text-text-dim/40 font-light">·</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Group 2 — Context-sensitive options */}
             {mode === 'phrases' ? (

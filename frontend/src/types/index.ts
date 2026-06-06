@@ -31,6 +31,7 @@ export interface ReplayEvent {
 export interface TestResult {
   id: string;
   textId?: number;
+  title: string;
   passage: string;
   author: string;
   source: string;
@@ -48,13 +49,19 @@ export interface TestResult {
   wordCount: WordCount;
   contentType: ContentType;
   date: string;
+  difficulty?: TextDifficulty;
 }
+
+export type TextDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT';
+export type TextType = 'SHORT' | 'MEDIUM' | 'LONG' | 'THICC';
 
 export interface Passage {
   textId?: number;
+  title: string;
   text: string;
   author: string;
   source: string;
+  type?: TextType;
 }
 
 export type Duration = 15 | 30 | 60;

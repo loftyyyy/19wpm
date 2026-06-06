@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { generateTestPassage } from '../../services/passages';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
 import { useAuth } from '../../context/AuthContext';
-import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength } from '../../types';
+import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
 
 const wordCounts: WordCount[] = [10, 25, 50, 100];
 
@@ -30,6 +30,9 @@ export default function TypingTest() {
   const lengthParam = searchParams.get('length');
   const phraseLength: PhraseLength = lengthParam === 'short' || lengthParam === 'medium' || lengthParam === 'long' || lengthParam === 'thicc' || lengthParam === 'all' ? lengthParam : 'medium';
 
+  const difficultyParam = searchParams.get('difficulty');
+  const difficulty: TextDifficulty = difficultyParam === 'EASY' || difficultyParam === 'MEDIUM' || difficultyParam === 'HARD' || difficultyParam === 'EXPERT' ? difficultyParam : 'EASY';
+
   const { contentType, testMode } = useMemo(() => {
     if (mode === 'phrases') return { contentType: 'phrases' as ContentType, testMode: 'words' as TestMode };
     if (mode === 'words') return { contentType: 'words' as ContentType, testMode: 'words' as TestMode };
@@ -48,20 +51,20 @@ export default function TypingTest() {
         const stored = localStorage.getItem('19wpm-custom-passage');
         if (stored) {
           const p = JSON.parse(stored);
-          if (!cancelled) setPassage({ text: p.text, author: p.author, source: p.source });
+          if (!cancelled) setPassage({ title: p.title || '', text: p.text, author: p.author, source: p.source });
           return;
         }
       } catch {}
     }
 
-    generateTestPassage(mode, duration, wordCount, mode === 'phrases' ? phraseLength : undefined)
+    generateTestPassage(mode, duration, wordCount, mode === 'phrases' ? phraseLength : undefined, difficulty)
       .then(p => { if (!cancelled) setPassage(p); });
 
     return () => { cancelled = true; };
-  }, [mode, duration, wordCount, phraseLength]);
+  }, [mode, duration, wordCount, phraseLength, difficulty]);
 
   const { state, handleKeyDown, getResult, reset } = useTypingEngine(
-    passage ?? { text: '', author: '', source: '' },
+    passage ?? { title: '', text: '', author: '', source: '' },
     duration, testMode, wordCount, contentType
   );
 
@@ -242,7 +245,7 @@ export default function TypingTest() {
         {passage && (
           <div className="mt-6 text-center flex items-center justify-center gap-4">
             <p className="text-text-dim font-sans text-sm italic transition-theme">
-              &mdash; {passage.author}, <em>{passage.source}</em>
+              {passage.title ? `${passage.title} — ` : ''}&mdash; {passage.author}, <em>{passage.source}</em>
             </p>
             <button
               ref={restartBtnRef}

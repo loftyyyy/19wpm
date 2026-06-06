@@ -1,13 +1,25 @@
-import type { Passage, WordCount, PhraseLength, Mode } from '../types';
-import type { ApiTextResponse, ApiTextCreateRequest } from '../types/api';
+import type { Passage, WordCount, PhraseLength, Mode, TextType, TextDifficulty } from '../types';
+import type { ApiTextResponse, ApiTextCreateRequest, ApiWordResponse } from '../types/api';
 import { generateTestPassage as localGeneratePassage, getRandomPassage as localRandomPassage } from '../utils/passages';
 import { generateRandomWords as localRandomWords } from '../utils/words';
 import { api } from './api';
 
-// ── Existing localStorage-based functions (unchanged) ──
+function charLengthToType(charLength: number): TextType {
+  if (charLength < 100) return 'SHORT';
+  if (charLength < 300) return 'MEDIUM';
+  if (charLength < 500) return 'LONG';
+  return 'THICC';
+}
 
-export function getRandomPassage(): Passage {
-  return localRandomPassage();
+function mapTextToPassage(dto: ApiTextResponse): Passage {
+  return {
+    textId: dto.textId,
+    title: dto.title,
+    text: dto.content,
+    author: dto.author,
+    source: dto.source,
+    type: charLengthToType(dto.charLength),
+  };
 }
 
 export function generateRandomWords(count: number): string {
@@ -21,7 +33,16 @@ export async function generateTestPassage(
   duration: number,
   wordCount: WordCount,
   phraseLength?: PhraseLength,
+  difficulty?: TextDifficulty,
 ): Promise<Passage> {
+  if (mode === 'words') {
+    try {
+      const result = await apiFetchWords(difficulty ?? 'EASY', wordCount);
+      if (result.data) return result.data;
+    } catch {
+      // API unreachable — fall through to local
+    }
+  }
   if (mode === 'phrases' || mode === 'time') {
     try {
       const type = !phraseLength || phraseLength === 'all' ? undefined : phraseLength;
@@ -31,19 +52,20 @@ export async function generateTestPassage(
       // API unreachable — fall through to local
     }
   }
-  // mode === 'words' or API unavailable: fall back to local generation
   return localGeneratePassage(mode, duration, wordCount, phraseLength);
 }
 
 // ── New API-based functions ──
 
-function mapTextToPassage(dto: ApiTextResponse): Passage {
-  return {
-    textId: dto.textId,
-    text: dto.content,
-    author: dto.author,
-    source: dto.source,
-  };
+export async function apiFetchWords(difficulty: TextDifficulty, count: number): Promise<{ data: Passage | null; error: string | null }> {
+  try {
+    const data = await api.get<ApiWordResponse[]>(`/words?language=en&difficulty=${difficulty}&count=${count}`);
+    const text = data.map(w => w.word).join(' ');
+    return { data: { title: '', text, author: 'random', source: 'word list' }, error: null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to fetch words';
+    return { data: null, error: msg };
+  }
 }
 
 export async function apiFetchRandomText(type?: string): Promise<{ data: Passage | null; error: string | null }> {

@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           newResults.push({
             id: String(r.typingResultId),
             textId: r.textId,
+            title: '',
             passage: '',
             author: '',
             source: '',

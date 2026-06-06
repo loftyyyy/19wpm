@@ -120,3 +120,10 @@ export interface ApiUserUpdateRequest {
 export interface ApiUserDeactivateRequest {
   currentPassword: string;
 }
+
+export interface ApiWordResponse {
+  wordId: number;
+  word: string;
+  language: string;
+  difficulty: string;
+}
