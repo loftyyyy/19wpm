@@ -61,7 +61,14 @@ export async function apiFetchWords(difficulty: TextDifficulty, count: number): 
   try {
     const data = await api.get<ApiWordResponse[]>(`/words?language=en&difficulty=${difficulty}&count=${count}`);
     const text = data.map(w => w.word).join(' ');
-    return { data: { title: '', text, author: 'random', source: 'word list' }, error: null };
+    const passage: Passage = { title: '', text, author: 'random', source: 'word list' };
+    try {
+      const textData = await api.get<ApiTextResponse>('/texts/random');
+      passage.textId = textData.textId;
+    } catch {
+      // No text available — result will save to localStorage only
+    }
+    return { data: passage, error: null };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to fetch words';
     return { data: null, error: msg };
