@@ -33,37 +33,52 @@ export function clearAllResults() {
   toRemove.forEach(k => localStorage.removeItem(k));
 }
 
+let migrationPromise: Promise<boolean> | null = null;
+
 export async function migrateGuestResults(): Promise<boolean> {
-  try {
-    const guestResults: TestResult[] = JSON.parse(localStorage.getItem(GUEST_RESULTS_KEY) || '[]');
-    if (guestResults.length === 0) return true;
+  if (migrationPromise) return migrationPromise;
 
-    const toMigrate = guestResults.filter(r => r.textId);
-    if (toMigrate.length === 0) return true;
+  migrationPromise = (async (): Promise<boolean> => {
+    try {
+      const guestResults: TestResult[] = JSON.parse(localStorage.getItem(GUEST_RESULTS_KEY) || '[]');
+      if (guestResults.length === 0) return true;
 
-    const results = await Promise.allSettled(
-      toMigrate.map(r =>
-        apiSaveResult({
-          textId: r.textId!,
-          finishedAt: new Date(r.date).toISOString(),
-          durationMs: r.duration * 1000,
-          timeConstraintMs: null,
-          wpm: r.wpm,
-          accuracy: r.accuracy,
-        })
-      )
-    );
+      const toMigrate = guestResults.filter(r => r.textId);
+      if (toMigrate.length === 0) {
+        localStorage.removeItem(GUEST_RESULTS_KEY);
+        return true;
+      }
 
-    const allSucceeded = results.every(r => r.status === 'fulfilled' && r.value.data !== null);
+      const results = await Promise.allSettled(
+        toMigrate.map(r =>
+          apiSaveResult({
+            textId: r.textId!,
+            finishedAt: new Date(r.date).toISOString(),
+            durationMs: r.duration * 1000,
+            timeConstraintMs: null,
+            wpm: r.wpm,
+            accuracy: r.accuracy,
+          })
+        )
+      );
 
-    if (allSucceeded) {
-      localStorage.removeItem(GUEST_RESULTS_KEY);
-      return true;
+      const allSucceeded = results.every(r => r.status === 'fulfilled' && r.value.data !== null);
+
+      if (allSucceeded) {
+        localStorage.removeItem(GUEST_RESULTS_KEY);
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
     }
+  })();
 
-    return false;
-  } catch {
-    return false;
+  try {
+    return await migrationPromise;
+  } finally {
+    migrationPromise = null;
   }
 }
 

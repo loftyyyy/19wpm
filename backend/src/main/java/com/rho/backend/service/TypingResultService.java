@@ -2,6 +2,7 @@ package com.rho.backend.service;
 
 import com.rho.backend.dto.typingResult.request.TypingResultRequestDTO;
 import com.rho.backend.dto.typingResult.response.TypingResultResponseDTO;
+import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.model.TypingResult;
 import com.rho.backend.model.User;
@@ -34,6 +35,16 @@ public class TypingResultService {
         }
 
         User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (typingResultRepository.existsByUser_UserIdAndTextIdAndFinishedAtAndWpmAndAccuracy(
+                userId,
+                typingResultRequestDTO.textId(),
+                typingResultRequestDTO.finishedAt(),
+                typingResultRequestDTO.wpm(),
+                typingResultRequestDTO.accuracy()
+        )) {
+            throw new DuplicateResourceException("Result already exists");
+        }
 
         TypingResult typingResult = TypingResult.builder()
                 .user(user)

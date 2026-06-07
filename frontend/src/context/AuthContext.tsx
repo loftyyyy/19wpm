@@ -122,15 +122,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setUserAndMigrate = useCallback(async (u: User) => {
     setUser(u);
-    await migrateGuestResults();
-    clearGuestResults();
+    const migrated = await migrateGuestResults();
+    if (migrated) clearGuestResults();
     await fetchResults();
   }, [fetchResults]);
 
   const setupFromOAuth = useCallback(async (u: User) => {
     setUser(u);
-    await migrateGuestResults();
-    clearGuestResults();
+    const migrated = await migrateGuestResults();
+    if (migrated) clearGuestResults();
     await fetchResults();
   }, [fetchResults]);
 
