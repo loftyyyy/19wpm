@@ -9,6 +9,7 @@ import com.rho.backend.repository.TextRepository;
 import com.rho.backend.repository.TypingResultRepository;
 import com.rho.backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -26,6 +27,7 @@ public class TypingResultService {
         this.textRepository = textRepository;
     }
 
+    @Transactional
     public TypingResultResponseDTO saveTypingResult(TypingResultRequestDTO typingResultRequestDTO, long userId){
         if(!textRepository.existsById(typingResultRequestDTO.textId())){
             throw new ResourceNotFoundException("Text doesn't exist");

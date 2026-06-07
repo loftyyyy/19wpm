@@ -2,31 +2,38 @@ import type { TestResult } from '../types';
 import type { ApiTypingResultRequest, ApiTypingResultResponse } from '../types/api';
 import { api } from './api';
 
-// ── Existing localStorage-based functions (unchanged) ──
-
 const GUEST_RESULTS_KEY = '19wpm-guest-results';
 
-function userResultsKey(userId: string): string {
-  return `19wpm-results-${userId}`;
-}
-
-export function saveResult(result: TestResult, userId?: string) {
-  const key = userId ? userResultsKey(userId) : GUEST_RESULTS_KEY;
-  const existing: TestResult[] = JSON.parse(localStorage.getItem(key) || '[]');
+export function saveGuestResult(result: TestResult) {
+  const existing: TestResult[] = JSON.parse(localStorage.getItem(GUEST_RESULTS_KEY) || '[]');
   existing.unshift(result);
-  localStorage.setItem(key, JSON.stringify(existing));
+  localStorage.setItem(GUEST_RESULTS_KEY, JSON.stringify(existing));
 }
 
-export function getResults(userId?: string): TestResult[] {
-  const key = userId ? userResultsKey(userId) : GUEST_RESULTS_KEY;
+export function getGuestResults(): TestResult[] {
   try {
-    return JSON.parse(localStorage.getItem(key) || '[]');
+    return JSON.parse(localStorage.getItem(GUEST_RESULTS_KEY) || '[]');
   } catch {
     return [];
   }
 }
 
-export async function migrateGuestResults(_userId: string): Promise<boolean> {
+export function clearGuestResults() {
+  localStorage.removeItem(GUEST_RESULTS_KEY);
+}
+
+export function clearAllResults() {
+  const toRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.startsWith('19wpm-results-') || key === GUEST_RESULTS_KEY)) {
+      toRemove.push(key);
+    }
+  }
+  toRemove.forEach(k => localStorage.removeItem(k));
+}
+
+export async function migrateGuestResults(): Promise<boolean> {
   try {
     const guestResults: TestResult[] = JSON.parse(localStorage.getItem(GUEST_RESULTS_KEY) || '[]');
     if (guestResults.length === 0) return true;
@@ -59,8 +66,6 @@ export async function migrateGuestResults(_userId: string): Promise<boolean> {
     return false;
   }
 }
-
-// ── New API-based functions ──
 
 export async function apiSaveResult(result: ApiTypingResultRequest): Promise<{ data: ApiTypingResultResponse | null; error: string | null }> {
   try {

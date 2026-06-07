@@ -1,10 +1,34 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { User, TestResult } from '../types';
-import type { ApiAuthResponse, ApiAuthRequest, ApiRegisterRequest, ApiUserProfile, ApiTypingResultResponse } from '../types/api';
+import type { User, TestResult, TestMode, WordCount, ContentType } from '../types';
+import type { ApiAuthResponse, ApiAuthRequest, ApiRegisterRequest, ApiUserProfile } from '../types/api';
 import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile, mapProfileToUser, mapMinimalUserToUser } from '../services/auth';
-import { saveResult as localStorageSaveResult, getResults as localStorageGetResults, migrateGuestResults, apiGetResults } from '../services/results';
-import { apiSaveResult } from '../services/results';
-import { api, setTokens, clearTokens, getAccessToken, getStoredUserId, ApiError } from '../services/api';
+import { saveGuestResult, getGuestResults, clearGuestResults, clearAllResults, migrateGuestResults, apiGetResults, apiSaveResult } from '../services/results';
+import { api, setTokens, clearTokens, getAccessToken, setOnUnauthorizedHandler, clearOnUnauthorizedHandler, ApiError } from '../services/api';
+
+function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string }): TestResult {
+  return {
+    id: String(r.typingResultId),
+    textId: r.textId,
+    title: '',
+    passage: '',
+    author: '',
+    source: '',
+    wpm: r.wpm,
+    accuracy: r.accuracy,
+    duration: Math.round(r.durationMs / 1000),
+    correctChars: 0,
+    incorrectChars: 0,
+    totalCorrect: 0,
+    totalIncorrect: 0,
+    wpmHistory: [],
+    mistakeWords: [],
+    replayEvents: [],
+    testMode: 'timed' as TestMode,
+    wordCount: 10 as WordCount,
+    contentType: 'words' as ContentType,
+    date: r.finishedAt || r.createdAt,
+  };
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -16,13 +40,15 @@ interface AuthContextValue {
   updateUser: (updates: Partial<User>) => void;
   addResult: (result: TestResult) => void;
   getResults: () => TestResult[];
+  setupFromOAuth: (u: User) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(getSessionUser);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!getAccessToken());
+  const [serverResults, setServerResults] = useState<TestResult[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -32,64 +58,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  // On mount, if we have tokens but no local session user, validate them via the API
+  // Register the global 401 handler so any unrecoverable 401 clears auth state
   useEffect(() => {
-    if (getAccessToken() && !getSessionUser()) {
-      setIsLoading(true);
-      api.get<ApiUserProfile>('/auth/me')
-        .then(data => setUser(mapProfileToUser(data)))
-        .catch(() => clearTokens())
-        .finally(() => setIsLoading(false));
-    }
+    setOnUnauthorizedHandler(() => {
+      clearTokens();
+      serviceLogout();
+      setUser(null);
+      setServerResults([]);
+      window.location.href = '/login';
+    });
+    return () => clearOnUnauthorizedHandler();
   }, []);
 
-  // Sync server-side typing results into localStorage on mount
+  // On mount, validate the stored token against the server.
+  // Uses raw fetch to bypass the global 401 interceptor (which would redirect).
   useEffect(() => {
-    if (!getAccessToken()) return;
-    apiGetResults().then(({ data }) => {
-      if (!data || data.length === 0) return;
-      const storedUserId = String(getStoredUserId());
-      const key = `19wpm-results-${storedUserId}`;
-      const existing: TestResult[] = JSON.parse(localStorage.getItem(key) || '[]');
-      const existingKeys = new Set(existing.map(r => `${r.date}-${r.wpm}-${r.accuracy}`));
-      const newResults: TestResult[] = [];
-      for (const r of data) {
-        const dedupKey = `${r.finishedAt || r.createdAt}-${r.wpm}-${r.accuracy}`;
-        if (!existingKeys.has(dedupKey)) {
-          newResults.push({
-            id: String(r.typingResultId),
-            textId: r.textId,
-            title: '',
-            passage: '',
-            author: '',
-            source: '',
-            wpm: r.wpm,
-            accuracy: r.accuracy,
-            duration: Math.round(r.durationMs / 1000),
-            correctChars: 0,
-            incorrectChars: 0,
-            totalCorrect: 0,
-            totalIncorrect: 0,
-            wpmHistory: [],
-            mistakeWords: [],
-            replayEvents: [],
-            testMode: 'timed',
-            wordCount: 10,
-            contentType: 'words',
-            date: r.finishedAt || r.createdAt,
-          });
+    const token = getAccessToken();
+    if (!token) {
+      // No token — keep existing state (localStorage fallback mode)
+      return;
+    }
+
+    setIsLoading(true);
+
+    const validateToken = async () => {
+      try {
+        const res = await fetch('/api/v1/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (res.ok) {
+          const data: ApiUserProfile = await res.json();
+          setUser(mapProfileToUser(data));
+        } else if (res.status === 401) {
+          clearTokens();
+          serviceLogout();
+          setUser(null);
+          setServerResults([]);
         }
+      } catch {
+        // Network error — keep existing in-memory state for offline use
+      } finally {
+        setIsLoading(false);
       }
-      if (newResults.length > 0) {
-        localStorage.setItem(key, JSON.stringify([...newResults, ...existing]));
-      }
-    });
+    };
+
+    validateToken();
   }, []);
+
+  // Fetch results from the API when authenticated (on mount and after login/register)
+  const fetchResults = useCallback(async () => {
+    if (!getAccessToken()) return;
+    const { data } = await apiGetResults();
+    if (!data) return;
+    setServerResults(data.map(mapApiResultToTestResult));
+  }, []);
+
+  useEffect(() => {
+    if (getAccessToken()) {
+      fetchResults();
+    }
+  }, [fetchResults]);
 
   const setUserAndMigrate = useCallback(async (u: User) => {
     setUser(u);
-    await migrateGuestResults(u.id);
-  }, []);
+    await migrateGuestResults();
+    clearGuestResults();
+    await fetchResults();
+  }, [fetchResults]);
+
+  const setupFromOAuth = useCallback(async (u: User) => {
+    setUser(u);
+    await migrateGuestResults();
+    clearGuestResults();
+    await fetchResults();
+  }, [fetchResults]);
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     setIsLoading(true);
@@ -151,7 +194,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     clearTokens();
     serviceLogout();
+    clearAllResults();
     setUser(null);
+    setServerResults([]);
   }, []);
 
   const updateUser = useCallback((updates: Partial<User>) => {
@@ -162,7 +207,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addResult = useCallback((result: TestResult) => {
-    localStorageSaveResult(result, user?.id);
+    if (!user) {
+      saveGuestResult(result);
+      return;
+    }
+
+    setServerResults(prev => [result, ...prev]);
+
     if (result.textId) {
       apiSaveResult({
         textId: result.textId,
@@ -171,13 +222,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         timeConstraintMs: null,
         wpm: result.wpm,
         accuracy: result.accuracy,
+      }).then(({ error }) => {
+        if (error) {
+          console.error('Failed to save result to backend:', error);
+        }
+        fetchResults();
       });
+    } else {
+      fetchResults();
     }
-  }, [user]);
+  }, [user, fetchResults]);
 
   const getResults = useCallback((): TestResult[] => {
-    return localStorageGetResults(user?.id);
-  }, [user]);
+    if (user) return serverResults;
+    return getGuestResults();
+  }, [user, serverResults]);
 
   return (
     <AuthContext.Provider value={{
@@ -190,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUser,
       addResult,
       getResults,
+      setupFromOAuth,
     }}>
       {children}
     </AuthContext.Provider>

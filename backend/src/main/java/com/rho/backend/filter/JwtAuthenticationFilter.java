@@ -2,6 +2,7 @@ package com.rho.backend.filter;
 
 
 import com.rho.backend.redis.RedisTokenStore;
+import com.rho.backend.repository.UserRepository;
 import com.rho.backend.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -30,6 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
     private final RedisTokenStore redisTokenStore;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -71,7 +73,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 4. Authenticate if not already done for this request
+        // 4. Verify the user still exists in the database
+        if (userEmail != null && !userRepository.existsByEmail(userEmail)) {
+            logger.warn("JWT presented for deleted user: {}", userEmail);
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User account not found");
+            return;
+        }
+
+        // 5. Authenticate if not already done for this request
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 

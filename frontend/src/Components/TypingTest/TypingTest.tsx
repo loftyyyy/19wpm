@@ -122,13 +122,13 @@ export default function TypingTest() {
       navigatedRef.current = true;
       const result = getResult();
       sessionStorage.setItem('19wpm-last-result', JSON.stringify(result));
-      if (addResult) addResult(result);
+      addResult(result);
       navigate('/results', { state: { result } });
     }
     if (!state.isFinished) {
       navigatedRef.current = false;
     }
-  }, [state.isFinished]);
+  }, [state.isFinished, addResult]);
 
   useEffect(() => {
     containerRef.current?.focus();
@@ -137,6 +137,12 @@ export default function TypingTest() {
   const lineHeightRef = useRef(0);
 
   useLayoutEffect(() => {
+    if (mode === 'phrases') {
+      if (viewportRef.current) viewportRef.current.style.height = '';
+      if (contentRef.current) contentRef.current.style.transform = '';
+      return;
+    }
+
     const elements = wordRefs.current;
     if (!elements.length || !contentRef.current) return;
 
@@ -162,7 +168,7 @@ export default function TypingTest() {
 
     contentRef.current.style.transform = `translateY(${offset}px)`;
     contentRef.current.style.transition = 'transform 0.15s ease-out';
-  }, [currentWordIndex, passageWords.length]);
+  }, [currentWordIndex, passageWords.length, mode]);
 
   const progressPct = state.totalTime > 0 ? ((state.totalTime - state.timeLeft) / state.totalTime) * 100 : 0;
   const timerDisplay = `${Math.floor(state.timeLeft / 60)}:${String(Math.floor(state.timeLeft % 60)).padStart(2, '0')}`;
@@ -208,7 +214,7 @@ export default function TypingTest() {
             </div>
           ) : null}
           {passage && (
-            <div ref={viewportRef} className="overflow-hidden">
+            <div ref={viewportRef} className={mode === 'phrases' ? '' : 'overflow-hidden'}>
               <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
                 {passageWords.map((word, wi) => (
                   <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">

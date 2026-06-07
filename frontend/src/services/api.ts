@@ -31,6 +31,16 @@ export function clearTokens(): void {
   localStorage.removeItem(USER_ID_KEY);
 }
 
+let onUnauthorized: (() => void) | null = null;
+
+export function setOnUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler;
+}
+
+export function clearOnUnauthorizedHandler(): void {
+  onUnauthorized = null;
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -61,14 +71,12 @@ async function attemptTokenRefresh(): Promise<boolean> {
         body: JSON.stringify({ refreshToken }),
       });
       if (!res.ok) {
-        clearTokens();
         return false;
       }
       const data: ApiTokenRefreshResponse = await res.json();
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
       return true;
     } catch {
-      clearTokens();
       return false;
     } finally {
       isRefreshing = false;
@@ -84,6 +92,7 @@ async function request<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const token = getAccessToken();
+  const wasAuthenticated = !!token;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
@@ -98,15 +107,24 @@ async function request<T>(
     headers,
   });
 
-  if (response.status === 401 && getRefreshToken()) {
-    const refreshed = await attemptTokenRefresh();
-    if (refreshed) {
-      const newToken = getAccessToken();
-      headers['Authorization'] = `Bearer ${newToken}`;
-      response = await fetch(`/api/v1${endpoint}`, {
-        ...options,
-        headers,
-      });
+  if (response.status === 401) {
+    if (getRefreshToken()) {
+      const refreshed = await attemptTokenRefresh();
+      if (refreshed) {
+        const newToken = getAccessToken();
+        headers['Authorization'] = `Bearer ${newToken}`;
+        response = await fetch(`/api/v1${endpoint}`, {
+          ...options,
+          headers,
+        });
+      }
+    }
+
+    if (response.status === 401) {
+      clearTokens();
+      if (wasAuthenticated) {
+        onUnauthorized?.();
+      }
     }
   }
 

@@ -43,10 +43,20 @@ export async function generateTestPassage(
       // API unreachable — fall through to local
     }
   }
-  if (mode === 'phrases' || mode === 'time') {
+  if (mode === 'time') {
+    const count = Math.max(200, duration * 4);
+    for (const attempt of [count, 50]) {
+      try {
+        const result = await apiFetchWords(difficulty ?? 'EASY', attempt);
+        if (result.data) return result.data;
+      } catch {
+        // retry with smaller count or fall through
+      }
+    }
+  }
+  if (mode === 'phrases') {
     try {
-      const type = !phraseLength || phraseLength === 'all' ? undefined : phraseLength;
-      const result = await apiFetchRandomText(type);
+      const result = await apiFetchTextByPhraseLength(phraseLength ?? 'all');
       if (result.data) return result.data;
     } catch {
       // API unreachable — fall through to local
@@ -71,6 +81,25 @@ export async function apiFetchWords(difficulty: TextDifficulty, count: number): 
     return { data: passage, error: null };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to fetch words';
+    return { data: null, error: msg };
+  }
+}
+
+function pickRandom<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+export async function apiFetchTextByPhraseLength(length: PhraseLength): Promise<{ data: Passage | null; error: string | null }> {
+  try {
+    if (length === 'all') {
+      const data = await api.get<ApiTextResponse>('/texts/random');
+      return { data: mapTextToPassage(data), error: null };
+    }
+    const data = await api.get<ApiTextResponse[]>(`/texts/${length}`);
+    if (data.length === 0) return { data: null, error: 'No texts found for this type' };
+    return { data: mapTextToPassage(pickRandom(data)), error: null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to fetch text';
     return { data: null, error: msg };
   }
 }

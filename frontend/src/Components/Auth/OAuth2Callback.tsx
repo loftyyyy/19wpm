@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { setTokens, clearTokens } from '../../services/api';
 import { apiGetSessionUser } from '../../services/auth';
+import { useAuth } from '../../context/AuthContext';
 
 export default function OAuth2Callback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { setupFromOAuth } = useAuth();
 
   useEffect(() => {
     const accessToken = searchParams.get('accessToken');
@@ -24,9 +26,9 @@ export default function OAuth2Callback() {
 
     setTokens(accessToken, refreshToken);
 
-    apiGetSessionUser().then(user => {
+    apiGetSessionUser().then(async user => {
       if (user) {
-        localStorage.setItem('19wpm-session', JSON.stringify(user));
+        await setupFromOAuth(user);
         navigate('/dashboard', { replace: true });
       } else {
         clearTokens();

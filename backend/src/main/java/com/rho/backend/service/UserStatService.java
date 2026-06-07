@@ -37,14 +37,14 @@ public class UserStatService {
     }
 
     public UserStatResponseDTO getStat(long userId){
-        UserStat userStat = userStatRepository.findByUser(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        UserStat userStat = userStatRepository.findByUser_UserId(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return new UserStatResponseDTO(userStat);
     }
 
 
     @Transactional
     public void updateUserStats(long userId, BigDecimal newWpm){
-        UserStat userStat = userStatRepository.findByUser(userId).orElseThrow(() -> new ResourceNotFoundException("User Statistics not found"));
+        UserStat userStat = userStatRepository.findByUser_UserId(userId).orElseThrow(() -> new ResourceNotFoundException("User Statistics not found"));
         int oldCount = userStat.getTextCompleted();
         int newCount = oldCount + 1;
 
