@@ -28,6 +28,8 @@ public record TypingResultRequestDTO(
         @DecimalMin(value = "0.0", message = "accuracy cannot be negative")
         @DecimalMax(value = "100.0", message = "accuracy cannot exceed 100")
         @Digits(integer = 3, fraction = 2, message = "accuracy must have up to 3 integer digits and 2 decimal places")
-        BigDecimal accuracy
+        BigDecimal accuracy,
+
+        String textTitle
 
 ) {}

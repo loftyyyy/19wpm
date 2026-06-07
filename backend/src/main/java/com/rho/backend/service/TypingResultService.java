@@ -54,6 +54,7 @@ public class TypingResultService {
                 .timeConstraintMs(typingResultRequestDTO.timeConstraintMs())
                 .wpm(typingResultRequestDTO.wpm())
                 .accuracy(typingResultRequestDTO.accuracy())
+                .textTitle(typingResultRequestDTO.textTitle())
                 .build();
 
         typingResultRepository.save(typingResult);

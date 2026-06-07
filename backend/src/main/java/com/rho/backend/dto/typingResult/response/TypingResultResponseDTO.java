@@ -15,7 +15,8 @@ public record TypingResultResponseDTO(
         Integer timeConstraintMs,
         BigDecimal wpm,
         BigDecimal accuracy,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String textTitle
 ) {
     public TypingResultResponseDTO(TypingResult typingResult){
         this(
@@ -28,7 +29,8 @@ public record TypingResultResponseDTO(
                 typingResult.getTimeConstraintMs(),
                 typingResult.getWpm(),
                 typingResult.getAccuracy(),
-                typingResult.getCreatedAt()
+                typingResult.getCreatedAt(),
+                typingResult.getTextTitle()
         );
     }
 }

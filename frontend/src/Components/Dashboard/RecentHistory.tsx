@@ -15,7 +15,7 @@ export default function RecentHistory() {
     const q = search.toLowerCase();
     return results.filter(
       (r: TestResult) =>
-        r.passage.toLowerCase().includes(q) ||
+        (r.title || 'words').toLowerCase().includes(q) ||
         r.author.toLowerCase().includes(q) ||
         r.source.toLowerCase().includes(q)
     );
@@ -82,9 +82,11 @@ export default function RecentHistory() {
                     <tr key={r.id} className="border-b border-line hover:bg-muted transition-colors">
                       <td className="py-4 text-sm font-sans text-text-main">
                         <div className="font-medium">
-                          {r.passage.length > 50 ? r.passage.slice(0, 50) + '...' : r.passage}
+                          {r.title || 'words'}
                         </div>
-                        <div className="text-xs text-text-sub mt-0.5">{r.author} &middot; {r.source}</div>
+                        {r.author && r.source ? (
+                          <div className="text-xs text-text-sub mt-0.5">{r.author} &middot; {r.source}</div>
+                        ) : null}
                       </td>
                       <td className="py-4 text-sm font-semibold font-sans text-accent">{r.wpm}</td>
                       <td className="py-4 text-sm font-sans text-text-sub">{r.accuracy}%</td>

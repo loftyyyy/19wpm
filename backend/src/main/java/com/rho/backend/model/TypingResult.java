@@ -36,6 +36,9 @@ public class TypingResult {
     @Column(name = "time_constraint_ms")
     private Integer timeConstraintMs;
 
+    @Column(name = "text_title")
+    private String textTitle;
+
     @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal wpm;
 

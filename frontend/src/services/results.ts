@@ -58,6 +58,7 @@ export async function migrateGuestResults(): Promise<boolean> {
             timeConstraintMs: null,
             wpm: r.wpm,
             accuracy: r.accuracy,
+            textTitle: r.title || undefined,
           })
         )
       );

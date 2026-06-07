@@ -86,6 +86,7 @@ export interface ApiTypingResultRequest {
   timeConstraintMs: number | null;
   wpm: number;
   accuracy: number;
+  textTitle?: string;
 }
 
 export interface ApiTypingResultResponse {
@@ -99,6 +100,7 @@ export interface ApiTypingResultResponse {
   wpm: number;
   accuracy: number;
   createdAt: string;
+  textTitle?: string;
 }
 
 export interface ApiUserStatResponse {
