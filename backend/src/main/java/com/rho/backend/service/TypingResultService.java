@@ -55,6 +55,7 @@ public class TypingResultService {
                 .wpm(typingResultRequestDTO.wpm())
                 .accuracy(typingResultRequestDTO.accuracy())
                 .textTitle(typingResultRequestDTO.textTitle())
+                .textContent(typingResultRequestDTO.textContent())
                 .build();
 
         typingResultRepository.save(typingResult);

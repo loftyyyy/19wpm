@@ -59,6 +59,7 @@ export async function migrateGuestResults(): Promise<boolean> {
             wpm: r.wpm,
             accuracy: r.accuracy,
             textTitle: r.title || undefined,
+            textContent: r.passage || undefined,
           })
         )
       );

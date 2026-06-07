@@ -87,6 +87,7 @@ export interface ApiTypingResultRequest {
   wpm: number;
   accuracy: number;
   textTitle?: string;
+  textContent?: string;
 }
 
 export interface ApiTypingResultResponse {
@@ -101,6 +102,7 @@ export interface ApiTypingResultResponse {
   accuracy: number;
   createdAt: string;
   textTitle?: string;
+  textContent?: string;
 }
 
 export interface ApiUserStatResponse {

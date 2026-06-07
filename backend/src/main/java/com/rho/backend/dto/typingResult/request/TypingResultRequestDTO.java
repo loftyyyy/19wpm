@@ -30,6 +30,8 @@ public record TypingResultRequestDTO(
         @Digits(integer = 3, fraction = 2, message = "accuracy must have up to 3 integer digits and 2 decimal places")
         BigDecimal accuracy,
 
-        String textTitle
+        String textTitle,
+
+        String textContent
 
 ) {}

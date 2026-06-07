@@ -5,12 +5,12 @@ import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, u
 import { saveGuestResult, getGuestResults, clearGuestResults, clearAllResults, migrateGuestResults, apiGetResults, apiSaveResult } from '../services/results';
 import { api, setTokens, clearTokens, getAccessToken, setOnUnauthorizedHandler, clearOnUnauthorizedHandler, ApiError } from '../services/api';
 
-function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string; textTitle?: string }): TestResult {
+function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string; textTitle?: string; textContent?: string }): TestResult {
   return {
     id: String(r.typingResultId),
     textId: r.textId,
     title: r.textTitle ?? '',
-    passage: '',
+    passage: r.textContent ?? '',
     author: '',
     source: '',
     wpm: r.wpm,
@@ -223,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         wpm: result.wpm,
         accuracy: result.accuracy,
         textTitle: result.title || undefined,
+        textContent: result.passage || undefined,
       }).then(({ error }) => {
         if (error) {
           console.error('Failed to save result to backend:', error);

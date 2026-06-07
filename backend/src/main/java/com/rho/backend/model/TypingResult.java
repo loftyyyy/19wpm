@@ -27,6 +27,12 @@ public class TypingResult {
     @Column(name = "text_id", nullable = false)
     private Long textId;
 
+    @Column(name = "text_title")
+    private String textTitle;
+
+    @Column(name = "text_content", columnDefinition = "TEXT")
+    private String textContent;
+
     @Column(name = "finished_at")
     private LocalDateTime finishedAt;
 
@@ -35,9 +41,6 @@ public class TypingResult {
 
     @Column(name = "time_constraint_ms")
     private Integer timeConstraintMs;
-
-    @Column(name = "text_title")
-    private String textTitle;
 
     @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal wpm;

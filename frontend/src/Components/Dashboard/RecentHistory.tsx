@@ -15,7 +15,7 @@ export default function RecentHistory() {
     const q = search.toLowerCase();
     return results.filter(
       (r: TestResult) =>
-        (r.title || 'words').toLowerCase().includes(q) ||
+        (r.title || r.passage || '').toLowerCase().includes(q) ||
         r.author.toLowerCase().includes(q) ||
         r.source.toLowerCase().includes(q)
     );
@@ -35,7 +35,13 @@ export default function RecentHistory() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
-  function formatDuration(seconds: number) {
+  function truncatePassage(text: string): string {
+  const words = text.split(/\s+/);
+  if (words.length <= 5) return text;
+  return words.slice(0, 5).join(' ') + '...';
+}
+
+function formatDuration(seconds: number) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${String(s).padStart(2, '0')}`;
@@ -82,7 +88,7 @@ export default function RecentHistory() {
                     <tr key={r.id} className="border-b border-line hover:bg-muted transition-colors">
                       <td className="py-4 text-sm font-sans text-text-main">
                         <div className="font-medium">
-                          {r.title || 'words'}
+                          {r.title || truncatePassage(r.passage) || 'words'}
                         </div>
                         {r.author && r.source ? (
                           <div className="text-xs text-text-sub mt-0.5">{r.author} &middot; {r.source}</div>
