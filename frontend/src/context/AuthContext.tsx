@@ -1,11 +1,11 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { User, TestResult, TestMode, WordCount, ContentType } from '../types';
+import type { User, TestResult, TestMode, ContentType } from '../types';
 import type { ApiAuthResponse, ApiAuthRequest, ApiRegisterRequest, ApiUserProfile } from '../types/api';
 import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile, mapProfileToUser, mapMinimalUserToUser } from '../services/auth';
 import { saveGuestResult, getGuestResults, clearGuestResults, clearAllResults, migrateGuestResults, apiGetResults, apiSaveResult } from '../services/results';
 import { api, setTokens, clearTokens, getAccessToken, setOnUnauthorizedHandler, clearOnUnauthorizedHandler, ApiError } from '../services/api';
 
-function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string; textTitle?: string; textContent?: string }): TestResult {
+function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string; textTitle?: string; textContent?: string; wordCount: number }): TestResult {
   return {
     id: String(r.typingResultId),
     textId: r.textId,
@@ -24,7 +24,7 @@ function mapApiResultToTestResult(r: { typingResultId: number; textId: number; f
     mistakeWords: [],
     replayEvents: [],
     testMode: 'timed' as TestMode,
-    wordCount: 10 as WordCount,
+    wordCount: r.wordCount ?? r.textContent?.split(' ').length ?? 0,
     contentType: 'words' as ContentType,
     date: r.finishedAt || r.createdAt,
   };

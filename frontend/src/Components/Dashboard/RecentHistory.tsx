@@ -35,12 +35,6 @@ export default function RecentHistory() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
-  function truncatePassage(text: string): string {
-  const words = text.split(/\s+/);
-  if (words.length <= 5) return text;
-  return words.slice(0, 5).join(' ') + '...';
-}
-
 function formatDuration(seconds: number) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -77,6 +71,7 @@ function formatDuration(seconds: number) {
                 <thead>
                   <tr className="border-b border-line text-left">
                     <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">Text</th>
+                    <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">Words</th>
                     <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">WPM</th>
                     <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">Accuracy</th>
                     <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">Duration</th>
@@ -88,12 +83,13 @@ function formatDuration(seconds: number) {
                     <tr key={r.id} className="border-b border-line hover:bg-muted transition-colors">
                       <td className="py-4 text-sm font-sans text-text-main">
                         <div className="font-medium">
-                          {r.title || truncatePassage(r.passage) || 'words'}
+                          {r.title || 'words'}
                         </div>
                         {r.author && r.source ? (
                           <div className="text-xs text-text-sub mt-0.5">{r.author} &middot; {r.source}</div>
                         ) : null}
                       </td>
+                      <td className="py-4 text-sm font-sans text-text-sub">{r.wordCount}</td>
                       <td className="py-4 text-sm font-semibold font-sans text-accent">{r.wpm}</td>
                       <td className="py-4 text-sm font-sans text-text-sub">{r.accuracy}%</td>
                       <td className="py-4 text-sm font-sans text-text-sub">{formatDuration(r.duration)}</td>

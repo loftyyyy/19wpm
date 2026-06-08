@@ -17,7 +17,8 @@ public record TypingResultResponseDTO(
         BigDecimal accuracy,
         LocalDateTime createdAt,
         String textTitle,
-        String textContent
+        String textContent,
+        int wordCount
 ) {
     public TypingResultResponseDTO(TypingResult typingResult){
         this(
@@ -32,7 +33,8 @@ public record TypingResultResponseDTO(
                 typingResult.getAccuracy(),
                 typingResult.getCreatedAt(),
                 typingResult.getTextTitle(),
-                typingResult.getTextContent()
+                typingResult.getTextContent(),
+                typingResult.getTextContent() != null ? typingResult.getTextContent().split("\\s+").length : 0
         );
     }
 }

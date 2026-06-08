@@ -103,6 +103,7 @@ export interface ApiTypingResultResponse {
   createdAt: string;
   textTitle?: string;
   textContent?: string;
+  wordCount: number;
 }
 
 export interface ApiUserStatResponse {

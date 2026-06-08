@@ -46,7 +46,7 @@ export interface TestResult {
   mistakeWords: MistakeWord[];
   replayEvents: ReplayEvent[];
   testMode: TestMode;
-  wordCount: WordCount;
+  wordCount: number;
   contentType: ContentType;
   date: string;
   difficulty?: TextDifficulty;
