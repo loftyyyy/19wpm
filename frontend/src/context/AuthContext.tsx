@@ -5,10 +5,11 @@ import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, u
 import { saveGuestResult, getGuestResults, clearGuestResults, clearAllResults, migrateGuestResults, apiGetResults, apiSaveResult } from '../services/results';
 import { api, setTokens, clearTokens, getAccessToken, setOnUnauthorizedHandler, clearOnUnauthorizedHandler, ApiError } from '../services/api';
 
-function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string; textTitle?: string; textContent?: string; wordCount: number }): TestResult {
+function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string; textTitle?: string; textContent?: string; mode: 'TEXT' | 'WORDS'; wordCount: number }): TestResult {
+  const isTextMode = r.mode === 'TEXT';
   return {
     id: String(r.typingResultId),
-    textId: r.textId,
+    textId: isTextMode ? r.textId : undefined,
     title: r.textTitle ?? '',
     passage: r.textContent ?? '',
     author: '',
@@ -25,7 +26,7 @@ function mapApiResultToTestResult(r: { typingResultId: number; textId: number; f
     replayEvents: [],
     testMode: 'timed' as TestMode,
     wordCount: r.wordCount ?? r.textContent?.split(' ').length ?? 0,
-    contentType: 'words' as ContentType,
+    contentType: isTextMode ? 'phrases' as ContentType : 'words' as ContentType,
     date: r.finishedAt || r.createdAt,
   };
 }
@@ -214,25 +215,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setServerResults(prev => [result, ...prev]);
 
-    if (result.textId) {
-      apiSaveResult({
-        textId: result.textId,
-        finishedAt: new Date(result.date).toISOString(),
-        durationMs: result.duration * 1000,
-        timeConstraintMs: null,
-        wpm: result.wpm,
-        accuracy: result.accuracy,
-        textTitle: result.title || undefined,
-        textContent: result.passage || undefined,
-      }).then(({ error }) => {
-        if (error) {
-          console.error('Failed to save result to backend:', error);
-        }
-        fetchResults();
-      });
-    } else {
+    const isTextMode = result.contentType === 'phrases';
+
+    apiSaveResult({
+      mode: isTextMode ? 'TEXT' : 'WORDS',
+      ...(isTextMode ? { textId: result.textId! } : {}),
+      ...(isTextMode ? {} : { textContent: result.passage }),
+      finishedAt: new Date(result.date).toISOString(),
+      durationMs: result.duration * 1000,
+      timeConstraintMs: null,
+      wpm: result.wpm,
+      accuracy: result.accuracy,
+    }).then(({ error }) => {
+      if (error) {
+        console.error('Failed to save result to backend:', error);
+      }
       fetchResults();
-    }
+    });
   }, [user, fetchResults]);
 
   const getResults = useCallback((): TestResult[] => {

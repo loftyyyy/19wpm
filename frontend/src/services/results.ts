@@ -43,25 +43,26 @@ export async function migrateGuestResults(): Promise<boolean> {
       const guestResults: TestResult[] = JSON.parse(localStorage.getItem(GUEST_RESULTS_KEY) || '[]');
       if (guestResults.length === 0) return true;
 
-      const toMigrate = guestResults.filter(r => r.textId);
+      const toMigrate = guestResults.filter(r => r.passage);
       if (toMigrate.length === 0) {
         localStorage.removeItem(GUEST_RESULTS_KEY);
         return true;
       }
 
       const results = await Promise.allSettled(
-        toMigrate.map(r =>
-          apiSaveResult({
-            textId: r.textId!,
+        toMigrate.map(r => {
+          const isTextMode = r.contentType === 'phrases';
+          return apiSaveResult({
+            mode: isTextMode ? 'TEXT' : 'WORDS',
+            ...(isTextMode ? { textId: r.textId! } : {}),
+            ...(isTextMode ? {} : { textContent: r.passage }),
             finishedAt: new Date(r.date).toISOString(),
             durationMs: r.duration * 1000,
             timeConstraintMs: null,
             wpm: r.wpm,
             accuracy: r.accuracy,
-            textTitle: r.title || undefined,
-            textContent: r.passage || undefined,
-          })
-        )
+          });
+        })
       );
 
       const allSucceeded = results.every(r => r.status === 'fulfilled' && r.value.data !== null);

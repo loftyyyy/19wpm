@@ -1,13 +1,13 @@
 package com.rho.backend.dto.typingResult.request;
 
+import com.rho.backend.enums.Mode;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record TypingResultRequestDTO(
 
-        @Positive(message = "textId must be positive")
-        long textId,
+        Long textId,
 
         @NotNull(message = "finishedAt is required")
         LocalDateTime finishedAt,
@@ -30,8 +30,9 @@ public record TypingResultRequestDTO(
         @Digits(integer = 3, fraction = 2, message = "accuracy must have up to 3 integer digits and 2 decimal places")
         BigDecimal accuracy,
 
-        String textTitle,
+        String textContent,
 
-        String textContent
+        @NotNull(message = "Mode is required")
+        Mode mode
 
 ) {}

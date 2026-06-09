@@ -1,5 +1,6 @@
 package com.rho.backend.dto.typingResult.response;
 
+import com.rho.backend.enums.Mode;
 import com.rho.backend.model.TypingResult;
 
 import java.math.BigDecimal;
@@ -9,7 +10,7 @@ public record TypingResultResponseDTO(
         long typingResultId,
         long userId,
         String username,
-        long textId,
+        Long textId,
         LocalDateTime finishedAt,
         int durationMs,
         Integer timeConstraintMs,
@@ -18,6 +19,7 @@ public record TypingResultResponseDTO(
         LocalDateTime createdAt,
         String textTitle,
         String textContent,
+        Mode mode,
         int wordCount
 ) {
     public TypingResultResponseDTO(TypingResult typingResult){
@@ -34,6 +36,7 @@ public record TypingResultResponseDTO(
                 typingResult.getCreatedAt(),
                 typingResult.getTextTitle(),
                 typingResult.getTextContent(),
+                typingResult.getMode(),
                 typingResult.getTextContent() != null ? typingResult.getTextContent().split("\\s+").length : 0
         );
     }

@@ -170,7 +170,16 @@ export default function TypingTest() {
     contentRef.current.style.transition = 'transform 0.15s ease-out';
   }, [currentWordIndex, passageWords.length, mode]);
 
-  const progressPct = state.totalTime > 0 ? ((state.totalTime - state.timeLeft) / state.totalTime) * 100 : 0;
+  const totalWords = state.wordBoundaries.length;
+  const displayCompleted = state.isFinished ? totalWords : state.completedWords;
+
+  const progressPct = useMemo(() => {
+    if (state.testMode === 'timed') {
+      return state.totalTime > 0 ? ((state.totalTime - state.timeLeft) / state.totalTime) * 100 : 0;
+    }
+    return totalWords > 0 ? (displayCompleted / totalWords) * 100 : 0;
+  }, [state.testMode, state.totalTime, state.timeLeft, displayCompleted, totalWords]);
+
   const timerDisplay = `${Math.floor(state.timeLeft / 60)}:${String(Math.floor(state.timeLeft % 60)).padStart(2, '0')}`;
 
   return (
@@ -184,9 +193,15 @@ export default function TypingTest() {
             &larr; Exit
           </button>
           <div className="flex items-center gap-6">
-            <div className="text-3xl font-mono font-bold text-accent transition-theme">
-              {timerDisplay}
-            </div>
+            {state.testMode === 'timed' ? (
+              <div className="text-3xl font-mono font-bold text-accent transition-theme">
+                {timerDisplay}
+              </div>
+            ) : (
+              <div className="text-base font-mono text-accent transition-theme">
+                {displayCompleted} / {totalWords}
+              </div>
+            )}
             <div className="flex items-center gap-4 text-text-sub font-sans text-sm">
               <span><span className="text-accent font-semibold">{state.wpm}</span> wpm</span>
               <span className="w-px h-4 bg-line" />

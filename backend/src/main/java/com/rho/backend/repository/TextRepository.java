@@ -19,6 +19,8 @@ public interface TextRepository extends JpaRepository<Text, Long> {
     List<Text> findByLanguage(String language);
     List<Text> findByType(TextType type);
 
+    Optional<Text> findByTextId(Long textId);
+    
     @Query("SELECT MAX(t.textId) FROM Text t WHERE t.isCustom = false")
     Optional<Long> findMaxPresetId();
 
@@ -30,4 +32,5 @@ public interface TextRepository extends JpaRepository<Text, Long> {
 
     @Query("SELECT t FROM Text t WHERE t.textId >= :randId AND t.isCustom = false AND t.type = :type ORDER BY t.textId ASC")
     List<Text> findFirstPresetByIdGreaterThanEqualAndType(@Param("randId") Long randId, @Param("type") TextType type, Pageable pageable);
+    
 }

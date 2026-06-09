@@ -70,12 +70,13 @@ CREATE TABLE typing_results (
 
     typing_result_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    text_id BIGINT NOT NULL,
+    text_id BIGINT NULL,
     finished_at DATETIME NULL,
     duration_ms INT NOT NULL,
     time_constraint_ms INT NULL,
     wpm DECIMAL(5,2) NOT NULL,
     accuracy DECIMAL(5,2) NOT NULL,
+    mode ENUM('TEXT', 'WORDS') NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_tr_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,

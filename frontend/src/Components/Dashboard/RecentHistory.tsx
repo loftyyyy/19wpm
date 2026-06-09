@@ -70,6 +70,7 @@ function formatDuration(seconds: number) {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-line text-left">
+                    <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">Title</th>
                     <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">Text</th>
                     <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">Words</th>
                     <th className="pb-3 text-xs font-semibold text-text-dim font-sans uppercase tracking-wider">WPM</th>
@@ -88,6 +89,9 @@ function formatDuration(seconds: number) {
                         {r.author && r.source ? (
                           <div className="text-xs text-text-sub mt-0.5">{r.author} &middot; {r.source}</div>
                         ) : null}
+                      </td>
+                      <td className="py-4 text-sm font-sans text-text-sub max-w-[240px] truncate" title={r.passage}>
+                        {r.passage}
                       </td>
                       <td className="py-4 text-sm font-sans text-text-sub">{r.wordCount}</td>
                       <td className="py-4 text-sm font-semibold font-sans text-accent">{r.wpm}</td>

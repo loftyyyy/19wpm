@@ -49,6 +49,7 @@ interface TypingState {
   wordBoundaries: WordBoundary[];
   startTime: number | null;
   lockedIndex: number;
+  completedWords: number;
   testMode: TestMode;
   wordCount: WordCount;
   contentType: ContentType;
@@ -84,6 +85,7 @@ function initialState(passage: Passage, duration: Duration, testMode: TestMode, 
     wordBoundaries: getWordBoundaries(passage.text),
     startTime: null,
     lockedIndex: 0,
+    completedWords: 0,
     testMode,
     wordCount,
     contentType,
@@ -137,6 +139,7 @@ function reducer(state: TypingState, action: Action): TypingState {
         isRunning: true,
         startTime: state.startTime ?? Date.now(),
         lockedIndex: action.key === ' ' ? newIndex : state.lockedIndex,
+        completedWords: action.key === ' ' ? state.completedWords + 1 : state.completedWords,
         extraChars: action.key === ' ' ? [] : state.extraChars,
       };
     }

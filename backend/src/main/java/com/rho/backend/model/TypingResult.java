@@ -1,5 +1,6 @@
 package com.rho.backend.model;
 
+import com.rho.backend.enums.Mode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -24,7 +25,7 @@ public class TypingResult {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "text_id", nullable = false)
+    @Column(name = "text_id")
     private Long textId;
 
     @Column(name = "text_title")
@@ -47,6 +48,10 @@ public class TypingResult {
 
     @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal accuracy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Mode mode;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)

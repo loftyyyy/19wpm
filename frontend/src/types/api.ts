@@ -80,13 +80,13 @@ export interface ApiTextCreateRequest {
 }
 
 export interface ApiTypingResultRequest {
-  textId: number;
+  mode: 'TEXT' | 'WORDS';
+  textId?: number;
   finishedAt: string;
   durationMs: number;
   timeConstraintMs: number | null;
   wpm: number;
   accuracy: number;
-  textTitle?: string;
   textContent?: string;
 }
 
@@ -103,6 +103,7 @@ export interface ApiTypingResultResponse {
   createdAt: string;
   textTitle?: string;
   textContent?: string;
+  mode: 'TEXT' | 'WORDS';
   wordCount: number;
 }
 

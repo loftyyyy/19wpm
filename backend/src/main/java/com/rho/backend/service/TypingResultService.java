@@ -2,8 +2,10 @@ package com.rho.backend.service;
 
 import com.rho.backend.dto.typingResult.request.TypingResultRequestDTO;
 import com.rho.backend.dto.typingResult.response.TypingResultResponseDTO;
+import com.rho.backend.enums.Mode;
 import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
+import com.rho.backend.model.Text;
 import com.rho.backend.model.TypingResult;
 import com.rho.backend.model.User;
 import com.rho.backend.repository.TextRepository;
@@ -29,12 +31,14 @@ public class TypingResultService {
     }
 
     @Transactional
-    public TypingResultResponseDTO saveTypingResult(TypingResultRequestDTO typingResultRequestDTO, long userId){
-        if(!textRepository.existsById(typingResultRequestDTO.textId())){
-            throw new ResourceNotFoundException("Text doesn't exist");
-        }
+    public TypingResultResponseDTO saveTypingResult(TypingResultRequestDTO typingResultRequestDTO, long userId) {
+        User user = userRepository.findByIdWithRole(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        boolean isWordsMode = typingResultRequestDTO.mode() == Mode.WORDS;
+
+        Text text = isWordsMode ? null : textRepository.findByTextId(typingResultRequestDTO.textId())
+                .orElseThrow(() -> new ResourceNotFoundException("Text doesn't exist"));
 
         if (typingResultRepository.existsByUser_UserIdAndTextIdAndFinishedAtAndWpmAndAccuracy(
                 userId,
@@ -48,19 +52,19 @@ public class TypingResultService {
 
         TypingResult typingResult = TypingResult.builder()
                 .user(user)
-                .textId(typingResultRequestDTO.textId())
+                .textId(isWordsMode ? null : text.getTextId())
                 .finishedAt(typingResultRequestDTO.finishedAt())
                 .durationMs(typingResultRequestDTO.durationMs())
                 .timeConstraintMs(typingResultRequestDTO.timeConstraintMs())
                 .wpm(typingResultRequestDTO.wpm())
                 .accuracy(typingResultRequestDTO.accuracy())
-                .textTitle(typingResultRequestDTO.textTitle())
-                .textContent(typingResultRequestDTO.textContent())
+                .textTitle(isWordsMode ? "Generated Words" : text.getTitle())
+                .textContent(isWordsMode ? typingResultRequestDTO.textContent() : text.getContent())
+                .mode(typingResultRequestDTO.mode())
                 .build();
 
         typingResultRepository.save(typingResult);
         userStatService.updateUserStats(userId, typingResultRequestDTO.wpm());
-
         return new TypingResultResponseDTO(typingResult);
     }
 
