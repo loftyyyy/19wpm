@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
@@ -11,23 +11,30 @@ import Notebook from '../assets/Notebook.svg';
 const durations: Duration[] = [15, 30, 60];
 const wordCounts: WordCount[] = [10, 25, 50, 100];
 const phraseLengths: PhraseLength[] = ['short', 'medium', 'long', 'thicc', 'all'];
-const DURATION_KEY = '19wpm-duration';
-const DIFFICULTY_KEY = '19wpm-difficulty';
+const PREFERENCES_KEY = 'typing_preferences';
 
-function getSavedDuration(): Duration {
-  try {
-    const saved = localStorage.getItem(DURATION_KEY);
-    if (saved === '15' || saved === '60') return parseInt(saved) as Duration;
-  } catch {}
-  return 30;
-}
+const DEFAULT_PREFERENCES = {
+  mode: 'words' as Mode,
+  duration: 30 as Duration,
+  wordCount: 10 as WordCount,
+  phraseLength: 'medium' as PhraseLength,
+  difficulty: 'EASY' as TextDifficulty,
+};
 
-function getSavedDifficulty(): TextDifficulty {
+function loadPreferences() {
   try {
-    const saved = localStorage.getItem(DIFFICULTY_KEY);
-    if (saved === 'EASY' || saved === 'MEDIUM' || saved === 'HARD' || saved === 'EXPERT') return saved;
+    const saved = localStorage.getItem(PREFERENCES_KEY);
+    if (saved) {
+      const p = JSON.parse(saved);
+      const mode: Mode = p.mode === 'words' || p.mode === 'phrases' || p.mode === 'time' ? p.mode : DEFAULT_PREFERENCES.mode;
+      const duration: Duration = p.duration === 15 || p.duration === 30 || p.duration === 60 ? p.duration : DEFAULT_PREFERENCES.duration;
+      const wordCount: WordCount = p.wordCount === 10 || p.wordCount === 25 || p.wordCount === 50 || p.wordCount === 100 ? p.wordCount : DEFAULT_PREFERENCES.wordCount;
+      const phraseLength: PhraseLength = p.phraseLength === 'short' || p.phraseLength === 'medium' || p.phraseLength === 'long' || p.phraseLength === 'thicc' || p.phraseLength === 'all' ? p.phraseLength : DEFAULT_PREFERENCES.phraseLength;
+      const difficulty: TextDifficulty = p.difficulty === 'EASY' || p.difficulty === 'MEDIUM' || p.difficulty === 'HARD' || p.difficulty === 'EXPERT' ? p.difficulty : DEFAULT_PREFERENCES.difficulty;
+      return { mode, duration, wordCount, phraseLength, difficulty };
+    }
   } catch {}
-  return 'EASY';
+  return { ...DEFAULT_PREFERENCES };
 }
 
 function buildQuery(mode: Mode, duration: Duration, wordCount: WordCount, phraseLength: PhraseLength, difficulty: TextDifficulty): string {
@@ -45,20 +52,26 @@ function buildQuery(mode: Mode, duration: Duration, wordCount: WordCount, phrase
 const modes: Mode[] = ['words', 'phrases', 'time'];
 
 export default function LandingPage() {
-  const [mode, setMode] = useState<Mode>('time');
-  const [selectedDuration, setSelectedDuration] = useState<Duration>(getSavedDuration);
-  const [wordCount, setWordCount] = useState<WordCount>(25);
-  const [phraseLength, setPhraseLength] = useState<PhraseLength>('medium');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<TextDifficulty>(getSavedDifficulty);
+  const initial = loadPreferences();
+  const [mode, setMode] = useState<Mode>(initial.mode);
+  const [selectedDuration, setSelectedDuration] = useState<Duration>(initial.duration);
+  const [wordCount, setWordCount] = useState<WordCount>(initial.wordCount);
+  const [phraseLength, setPhraseLength] = useState<PhraseLength>(initial.phraseLength);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<TextDifficulty>(initial.difficulty);
 
-  const handleDurationChange = (d: Duration) => {
-    setSelectedDuration(d);
-    localStorage.setItem(DURATION_KEY, String(d));
-  };
+  useEffect(() => {
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
+      mode,
+      duration: selectedDuration,
+      wordCount,
+      phraseLength,
+      difficulty: selectedDifficulty,
+    }));
+  }, [mode, selectedDuration, wordCount, phraseLength, selectedDifficulty]);
+
   const navigate = useNavigate();
 
   const handleStart = () => {
-    localStorage.setItem(DIFFICULTY_KEY, selectedDifficulty);
     navigate(`/solo?${buildQuery(mode, selectedDuration, wordCount, phraseLength, selectedDifficulty)}`);
   };
 
@@ -120,10 +133,7 @@ export default function LandingPage() {
                 {(['EASY', 'MEDIUM', 'HARD', 'EXPERT'] as TextDifficulty[]).map((d, i, arr) => (
                   <span key={d} className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        setSelectedDifficulty(d);
-                        localStorage.setItem(DIFFICULTY_KEY, d);
-                      }}
+                      onClick={() => setSelectedDifficulty(d)}
                       className={`transition-colors hover:cursor-pointer capitalize ${
                         selectedDifficulty === d ? 'text-accent font-semibold' : 'text-text-dim hover:text-text-sub'
                       }`}
@@ -163,7 +173,7 @@ export default function LandingPage() {
                   <span key={v} className="flex items-center gap-2">
                     <button
                       onClick={() => {
-                        if (mode === 'time') handleDurationChange(v as Duration);
+                        if (mode === 'time') setSelectedDuration(v as Duration);
                         else setWordCount(v as WordCount);
                       }}
                       className={`transition-colors hover:cursor-pointer ${
