@@ -573,6 +573,18 @@ export default function TestResults() {
 
   const fallback = sessionStorage.getItem('19wpm-last-result');
   const safeResult: TestResult | null = result ?? (fallback ? JSON.parse(fallback) : null);
+  const retryBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Tab' && document.activeElement === document.body) {
+        e.preventDefault();
+        retryBtnRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   if (!safeResult) {
     return (
@@ -678,6 +690,7 @@ export default function TestResults() {
 
           <div className="flex gap-4">
             <button
+              ref={retryBtnRef}
               onClick={() => navigate('/solo')}
               className="flex-1 px-6 py-3 bg-accent text-white rounded-xl font-sans font-semibold hover:bg-accent-hover transition-colors hover:cursor-pointer"
             >
