@@ -6,6 +6,24 @@ import { useAuth } from '../../context/AuthContext';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
 
 const wordCounts: WordCount[] = [10, 25, 50, 100];
+const PREFERENCES_KEY = 'typing_preferences';
+
+function loadPreferences() {
+  try {
+    const saved = localStorage.getItem(PREFERENCES_KEY);
+    if (saved) {
+      const p = JSON.parse(saved);
+      return {
+        mode: p.mode === 'words' || p.mode === 'phrases' || p.mode === 'time' ? p.mode : 'time' as Mode,
+        duration: p.duration === 15 || p.duration === 30 || p.duration === 60 ? p.duration : 30 as Duration,
+        wordCount: p.wordCount === 10 || p.wordCount === 25 || p.wordCount === 50 || p.wordCount === 100 ? p.wordCount : 25 as WordCount,
+        phraseLength: p.phraseLength === 'short' || p.phraseLength === 'medium' || p.phraseLength === 'long' || p.phraseLength === 'thicc' || p.phraseLength === 'all' ? p.phraseLength : 'medium' as PhraseLength,
+        difficulty: p.difficulty === 'EASY' || p.difficulty === 'MEDIUM' || p.difficulty === 'HARD' || p.difficulty === 'EXPERT' ? p.difficulty : 'EASY' as TextDifficulty,
+      };
+    }
+  } catch {}
+  return { mode: 'time' as Mode, duration: 30 as Duration, wordCount: 25 as WordCount, phraseLength: 'medium' as PhraseLength, difficulty: 'EASY' as TextDifficulty };
+}
 
 export default function TypingTest() {
   const [searchParams] = useSearchParams();
@@ -18,20 +36,22 @@ export default function TypingTest() {
   const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
 
+  const saved = useMemo(loadPreferences, []);
+
   const modeParam = searchParams.get('mode');
-  const mode: Mode = modeParam === 'words' || modeParam === 'phrases' ? modeParam : 'time';
+  const mode: Mode = modeParam === 'words' || modeParam === 'phrases' ? modeParam : saved.mode;
 
   const durationParam = searchParams.get('time');
-  const duration: Duration = (durationParam === '15' || durationParam === '60') ? parseInt(durationParam) as Duration : 30;
+  const duration: Duration = (durationParam === '15' || durationParam === '60') ? parseInt(durationParam) as Duration : saved.duration;
 
   const countParam = searchParams.get('count');
-  const wordCount: WordCount = wordCounts.includes(Number(countParam) as WordCount) ? Number(countParam) as WordCount : 25;
+  const wordCount: WordCount = wordCounts.includes(Number(countParam) as WordCount) ? Number(countParam) as WordCount : saved.wordCount;
 
   const lengthParam = searchParams.get('length');
-  const phraseLength: PhraseLength = lengthParam === 'short' || lengthParam === 'medium' || lengthParam === 'long' || lengthParam === 'thicc' || lengthParam === 'all' ? lengthParam : 'medium';
+  const phraseLength: PhraseLength = lengthParam === 'short' || lengthParam === 'medium' || lengthParam === 'long' || lengthParam === 'thicc' || lengthParam === 'all' ? lengthParam : saved.phraseLength;
 
   const difficultyParam = searchParams.get('difficulty');
-  const difficulty: TextDifficulty = difficultyParam === 'EASY' || difficultyParam === 'MEDIUM' || difficultyParam === 'HARD' || difficultyParam === 'EXPERT' ? difficultyParam : 'EASY';
+  const difficulty: TextDifficulty = difficultyParam === 'EASY' || difficultyParam === 'MEDIUM' || difficultyParam === 'HARD' || difficultyParam === 'EXPERT' ? difficultyParam : saved.difficulty;
 
   const { contentType, testMode } = useMemo(() => {
     if (mode === 'phrases') return { contentType: 'phrases' as ContentType, testMode: 'words' as TestMode };
@@ -137,12 +157,6 @@ export default function TypingTest() {
   const lineHeightRef = useRef(0);
 
   useLayoutEffect(() => {
-    if (mode === 'phrases') {
-      if (viewportRef.current) viewportRef.current.style.height = '';
-      if (contentRef.current) contentRef.current.style.transform = '';
-      return;
-    }
-
     const elements = wordRefs.current;
     if (!elements.length || !contentRef.current) return;
 
@@ -229,7 +243,7 @@ export default function TypingTest() {
             </div>
           ) : null}
           {passage && (
-            <div ref={viewportRef} className={mode === 'phrases' ? '' : 'overflow-hidden'}>
+            <div ref={viewportRef} className="overflow-hidden">
               <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
                 {passageWords.map((word, wi) => (
                   <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">
