@@ -3,5 +3,5 @@
 - Frontend: React
 - Backend: SpringBoot (Java)
 
-- WIP, paused because of TECHNO
+TODO: Implement multiplayer typing battle
 
