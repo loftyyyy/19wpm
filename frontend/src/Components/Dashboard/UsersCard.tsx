@@ -2,7 +2,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useMemo } from 'react';
 import type { TestResult } from '../../types';
 import { userDisplayName } from '../../types';
-import UserProfile from '../../assets/User-Avatar.png';
+
 import FireIcon from '../../assets/FireIcon.svg';
 import AverageWPM from '../../assets/AverageIcon.svg';
 import BestWPM from '../../assets/BestIcon.svg';
@@ -33,8 +33,8 @@ export default function UsersCard() {
   return (
     <div className="flex flex-col xl:flex-row gap-6 px-4 md:px-20 py-8">
       <div className="flex flex-col items-center bg-card border border-line rounded-2xl shadow-sm p-8 w-full xl:w-72 transition-theme">
-        <div className="w-20 h-20 rounded-full bg-muted overflow-hidden">
-          <img src={UserProfile} alt="Profile" className="w-full h-full object-cover" />
+        <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-white text-2xl font-display font-bold">
+          {user ? ((user.firstName?.[0] ?? '') + (user.lastName?.[0] ?? '') || user.username?.[0]?.toUpperCase() || '?') : '?'}
         </div>
         <h2 className="mt-4 text-xl font-display font-semibold text-text-main transition-theme">
           {user ? userDisplayName(user) : 'Guest'}
