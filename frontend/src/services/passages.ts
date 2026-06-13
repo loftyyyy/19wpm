@@ -1,6 +1,6 @@
 import type { Passage, WordCount, PhraseLength, Mode, TextType, TextDifficulty } from '../types';
 import type { ApiTextResponse, ApiTextCreateRequest, ApiWordResponse } from '../types/api';
-import { generateTestPassage as localGeneratePassage, getRandomPassage as localRandomPassage } from '../utils/passages';
+import { generateTestPassage as localGeneratePassage } from '../utils/passages';
 import { generateRandomWords as localRandomWords } from '../utils/words';
 import { api } from './api';
 

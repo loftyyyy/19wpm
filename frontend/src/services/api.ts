@@ -1,5 +1,7 @@
 import type { ApiTokenRefreshResponse } from '../types/api';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
 const TOKEN_KEY = '19wpm-access-token';
 const REFRESH_KEY = '19wpm-refresh-token';
 const USER_ID_KEY = '19wpm-user-id';
@@ -65,7 +67,7 @@ async function attemptTokenRefresh(): Promise<boolean> {
   isRefreshing = true;
   refreshPromise = (async () => {
     try {
-      const res = await fetch('/api/v1/auth/refresh', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
@@ -102,7 +104,7 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  let response = await fetch(`/api/v1${endpoint}`, {
+  let response = await fetch(`${API_BASE_URL}/api/v1${endpoint}`, {
     ...options,
     headers,
   });
@@ -113,7 +115,7 @@ async function request<T>(
       if (refreshed) {
         const newToken = getAccessToken();
         headers['Authorization'] = `Bearer ${newToken}`;
-        response = await fetch(`/api/v1${endpoint}`, {
+        response = await fetch(`${API_BASE_URL}/api/v1${endpoint}`, {
           ...options,
           headers,
         });
