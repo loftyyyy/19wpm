@@ -21,7 +21,8 @@ public class DataSourceConfig {
 
         String username = dbUri.getUserInfo().split(":")[0];
         String password = dbUri.getUserInfo().split(":")[1];
-        String jdbcUrl = "jdbc:mysql://" + dbUri.getHost() + ":" + dbUri.getPort() + dbUri.getPath() + "?useSSL=false";
+        String jdbcUrl = "jdbc:mysql://" + dbUri.getHost() + ":" + dbUri.getPort()
+                + dbUri.getPath() + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
 
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(jdbcUrl);
