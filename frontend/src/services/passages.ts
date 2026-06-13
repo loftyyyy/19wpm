@@ -79,19 +79,11 @@ export async function apiFetchWords(difficulty: TextDifficulty, count: number): 
   }
 }
 
-function pickRandom<T>(items: T[]): T {
-  return items[Math.floor(Math.random() * items.length)];
-}
-
 export async function apiFetchTextByPhraseLength(length: PhraseLength): Promise<{ data: Passage | null; error: string | null }> {
   try {
-    if (length === 'all') {
-      const data = await api.get<ApiTextResponse>('/texts/random');
-      return { data: mapTextToPassage(data), error: null };
-    }
-    const data = await api.get<ApiTextResponse[]>(`/texts/${length}`);
-    if (data.length === 0) return { data: null, error: 'No texts found for this type' };
-    return { data: mapTextToPassage(pickRandom(data)), error: null };
+    const type = length === 'all' ? undefined : length.toUpperCase();
+    const data = await api.get<ApiTextResponse>(`/texts/random${type ? `?type=${type}` : ''}`);
+    return { data: mapTextToPassage(data), error: null };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to fetch text';
     return { data: null, error: msg };
