@@ -274,7 +274,7 @@ export default function TypingTest() {
           {passage && (
             <div ref={viewportRef} className="overflow-hidden">
               <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
-                {!state.isFinished && <div ref={cursorRef} className="typing-cursor" />}
+                <div ref={cursorRef} className={`typing-cursor${state.isFinished ? ' typing-cursor-hidden' : ''}`} />
                 {passageWords.map((word, wi) => (
                   <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">
                     {word.chars.map(({ char, globalIdx }) => {

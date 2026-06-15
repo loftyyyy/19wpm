@@ -67,8 +67,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .typing-cursor {
@@ -81,7 +81,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   pointer-events: none;
   will-change: transform;
   transition: transform 0.06s ease-out;
-  animation: blink 1s step-end infinite;
+  animation: blink 1s steps(2, end) infinite;
+}
+
+.typing-cursor-hidden {
+  opacity: 0;
+  animation: none;
 }
 
 .typed-correct {
