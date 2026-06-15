@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useCallback, useLayoutEffect, useState } fr
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { generateTestPassage } from '../../services/passages';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
+import { useCapsLock } from '../../hooks/useCapsLock';
 import { useAuth } from '../../context/AuthContext';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
 
@@ -82,6 +83,8 @@ export default function TypingTest() {
 
     return () => { cancelled = true; };
   }, [mode, duration, wordCount, phraseLength, difficulty]);
+
+  const isCapsLockOn = useCapsLock();
 
   const { state, handleKeyDown, getResult, reset } = useTypingEngine(
     passage ?? { title: '', text: '', author: '', source: '' },
@@ -227,6 +230,16 @@ export default function TypingTest() {
         <div className="w-full h-1.5 bg-muted rounded-full mb-8 transition-theme">
           <div className="h-full bg-accent rounded-full transition-all duration-100" style={{ width: `${progressPct}%` }} />
         </div>
+
+        {isCapsLockOn && (
+          <div className="flex items-center justify-center gap-2 mb-4 text-sm transition-theme" aria-live="polite">
+            <svg className="w-4 h-4 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span className="text-yellow-600 font-sans font-medium">Caps Lock is on</span>
+          </div>
+        )}
 
         <div
           ref={containerRef}
