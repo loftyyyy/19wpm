@@ -36,6 +36,8 @@ export default function TypingTest() {
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const currentCharRef = useRef<HTMLSpanElement | null>(null);
 
   const saved = useMemo(loadPreferences, []);
 
@@ -157,23 +159,23 @@ export default function TypingTest() {
     containerRef.current?.focus();
   }, []);
 
-  const lineHeightRef = useRef(0);
+  const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
 
   useLayoutEffect(() => {
     const elements = wordRefs.current;
-    if (!elements.length || !contentRef.current) return;
+    if (!elements.length || !contentRef.current || !viewportRef.current) return;
 
-    const tops = new Set<number>();
-    elements.forEach(el => { if (el) tops.add(el.offsetTop); });
-    const sortedTops = [...tops].sort((a, b) => a - b);
-    if (sortedTops.length < 2) return;
-
-    const lineHeight = sortedTops[1] - sortedTops[0];
-    if (!lineHeightRef.current && viewportRef.current) {
-      lineHeightRef.current = lineHeight;
+    if (!lineCacheRef.current) {
+      const tops = new Set<number>();
+      elements.forEach(el => { if (el) tops.add(el.offsetTop); });
+      const sortedTops = [...tops].sort((a, b) => a - b);
+      if (sortedTops.length < 2) return;
+      const lineHeight = sortedTops[1] - sortedTops[0];
       viewportRef.current.style.height = `${lineHeight * 3}px`;
+      lineCacheRef.current = { sortedTops, lineHeight };
     }
 
+    const { sortedTops } = lineCacheRef.current;
     const currentEl = elements[currentWordIndex];
     if (!currentEl) return;
 
@@ -183,9 +185,23 @@ export default function TypingTest() {
     const startLine = Math.max(0, Math.min(lineIdx - 1, sortedTops.length - 3));
     const offset = -sortedTops[startLine];
 
-    contentRef.current.style.transform = `translateY(${offset}px)`;
-    contentRef.current.style.transition = 'transform 0.15s ease-out';
+    if (contentRef.current.style.transform !== `translateY(${offset}px)`) {
+      contentRef.current.style.transform = `translateY(${offset}px)`;
+      contentRef.current.style.transition = 'transform 0.15s ease-out';
+    }
   }, [currentWordIndex, passageWords.length, mode]);
+
+  useLayoutEffect(() => {
+    const cursorEl = cursorRef.current;
+    const charEl = currentCharRef.current;
+    const containerEl = contentRef.current;
+    if (!cursorEl || !charEl || !containerEl) return;
+
+    const containerRect = containerEl.getBoundingClientRect();
+    const charRect = charEl.getBoundingClientRect();
+
+    cursorEl.style.transform = `translate(${charRect.left - containerRect.left}px, ${charRect.top - containerRect.top}px)`;
+  }, [state.currentIndex, passage]);
 
   const totalWords = state.wordBoundaries.length;
   const displayCompleted = state.isFinished ? totalWords : state.completedWords;
@@ -258,6 +274,7 @@ export default function TypingTest() {
           {passage && (
             <div ref={viewportRef} className="overflow-hidden">
               <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
+                {!state.isFinished && <div ref={cursorRef} className="typing-cursor" />}
                 {passageWords.map((word, wi) => (
                   <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">
                     {word.chars.map(({ char, globalIdx }) => {
@@ -269,10 +286,9 @@ export default function TypingTest() {
                       let cls = 'char-untyped transition-colors';
                       if (isCorrect) cls = 'char-correct';
                       if (isIncorrect) cls = 'char-incorrect';
-                      if (isCurrent) cls = 'char-current text-text-main';
 
                       return (
-                        <span key={globalIdx} className={cls}>
+                        <span key={globalIdx} ref={isCurrent ? currentCharRef : undefined} className={cls}>
                           {char}
                         </span>
                       );

@@ -71,23 +71,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   51%, 100% { opacity: 0; }
 }
 
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
-}
-
-@keyframes pulse-caret {
-  0%, 100% { border-color: var(--accent); }
-  50% { border-color: transparent; }
-}
-
-.animate-blink {
+.typing-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 1.2em;
+  background-color: var(--accent);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 0.06s ease-out;
   animation: blink 1s step-end infinite;
-}
-
-.char-current {
-  border-left: 2px solid var(--accent);
-  animation: pulse-caret 1s step-end infinite;
 }
 
 .typed-correct {
