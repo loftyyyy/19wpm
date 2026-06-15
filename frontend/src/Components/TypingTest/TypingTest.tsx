@@ -38,6 +38,8 @@ export default function TypingTest() {
   const navigatedRef = useRef(false);
   const cursorRef = useRef<HTMLDivElement>(null);
   const currentCharRef = useRef<HTMLSpanElement | null>(null);
+  const [isTypingActive, setIsTypingActive] = useState(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const saved = useMemo(loadPreferences, []);
 
@@ -139,6 +141,9 @@ export default function TypingTest() {
       }
       return;
     }
+    setIsTypingActive(true);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => setIsTypingActive(false), 500);
     handleKeyDown(e);
   }, [handleKeyDown]);
 
@@ -157,6 +162,9 @@ export default function TypingTest() {
 
   useEffect(() => {
     containerRef.current?.focus();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
   }, []);
 
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
@@ -274,7 +282,7 @@ export default function TypingTest() {
           {passage && (
             <div ref={viewportRef} className="overflow-hidden">
               <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
-                <div ref={cursorRef} className={`typing-cursor${state.isFinished ? ' typing-cursor-hidden' : ''}`} />
+                <div ref={cursorRef} className={`typing-cursor${state.isFinished ? ' typing-cursor-hidden' : isTypingActive ? ' typing-cursor-active' : ''}`} />
                 {passageWords.map((word, wi) => (
                   <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">
                     {word.chars.map(({ char, globalIdx }) => {

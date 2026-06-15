@@ -89,6 +89,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   animation: none;
 }
 
+.typing-cursor-active {
+  animation: none;
+  opacity: 1;
+}
+
 .typed-correct {
   color: var(--success);
 }
