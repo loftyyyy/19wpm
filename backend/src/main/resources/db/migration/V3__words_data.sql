@@ -1,4 +1,4 @@
-INSERT IGNORE INTO words (word, language, difficulty) VALUES
+INSERT INTO words (word, language, difficulty) VALUES
   ('the', 'en', 'EASY'),
   ('to', 'en', 'EASY'),
   ('and', 'en', 'EASY'),
@@ -13898,5 +13898,5 @@ INSERT IGNORE INTO words (word, language, difficulty) VALUES
   ('yuletide', 'en', 'EXPERT'),
   ('zagged', 'en', 'EXPERT'),
   ('zenana', 'en', 'EXPERT'),
-  ('zwitterionic', 'en', 'EXPERT');
+  ('zwitterionic', 'en', 'EXPERT') ON CONFLICT DO NOTHING;
 
