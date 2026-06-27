@@ -1,9 +1,9 @@
-package com.rho.backend.race.model;
+package com.rho.backend.race;
 
 
 import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.enums.TextType;
-import com.rho.backend.race.enums.RaceState;
+import com.rho.backend.enums.RaceState;
 import lombok.Getter;
 import lombok.Setter;
 

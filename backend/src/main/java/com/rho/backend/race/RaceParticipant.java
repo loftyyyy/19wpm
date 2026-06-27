@@ -1,4 +1,4 @@
-package com.rho.backend.race.model;
+package com.rho.backend.race;
 
 import lombok.Getter;
 import lombok.Setter;

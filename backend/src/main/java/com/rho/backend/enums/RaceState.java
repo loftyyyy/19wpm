@@ -1,4 +1,4 @@
-package com.rho.backend.race.enums;
+package com.rho.backend.enums;
 
 public enum RaceState {
     LOBBY,
