@@ -1,10 +1,12 @@
 package com.rho.backend.race;
 
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.io.Serializable;
 
+@NoArgsConstructor
 @Getter
 @Setter
 public class RaceParticipant implements Serializable {
@@ -19,8 +21,6 @@ public class RaceParticipant implements Serializable {
     private int currentWpm;
     private int errors;
     private int finishRank;
-
-    public RaceParticipant() {}
 
     public RaceParticipant(Long userId, String username) {
         this.userId = userId;
