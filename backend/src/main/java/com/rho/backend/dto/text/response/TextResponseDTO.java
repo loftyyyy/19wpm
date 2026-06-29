@@ -1,10 +1,12 @@
 package com.rho.backend.dto.text.response;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.rho.backend.model.Text;
 
 import java.time.LocalDateTime;
 
 public record TextResponseDTO(
+        @JsonCreator
         long textId,
         boolean isCustom,
         Long createdBy,
