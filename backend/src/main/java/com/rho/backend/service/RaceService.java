@@ -1,7 +1,10 @@
 package com.rho.backend.service;
 
 import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.enums.RaceState;
 import com.rho.backend.enums.TextType;
+import com.rho.backend.exception.InvalidResourceException;
+import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.race.RaceRoom;
 import com.rho.backend.repository.RaceRoomRepository;
@@ -55,6 +58,14 @@ public class RaceService {
         }
 
         RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        if(!raceRoom.getState().equals(RaceState.LOBBY)){
+            throw new InvalidResourceException("Race already started");
+        }
+
+        if(raceRoom.findParticipant(userId) != null){
+            throw new DuplicateResourceException("Participant already exists");
+        }
+
 
 
 
