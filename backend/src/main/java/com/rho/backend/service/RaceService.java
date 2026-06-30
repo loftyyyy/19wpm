@@ -2,6 +2,7 @@ package com.rho.backend.service;
 
 import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.enums.TextType;
+import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.race.RaceRoom;
 import com.rho.backend.repository.RaceRoomRepository;
 import org.slf4j.Logger;
@@ -45,6 +46,17 @@ public class RaceService {
 
         }
         throw new RuntimeException();
+
+    }
+
+    public void joinRoom(String roomCode, Long userId){
+        if(!raceRoomRepository.exists(roomCode)){
+            throw new ResourceNotFoundException("Room code not found");
+        }
+
+        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+
+
 
     }
 
