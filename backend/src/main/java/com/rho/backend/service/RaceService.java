@@ -6,6 +6,7 @@ import com.rho.backend.enums.TextType;
 import com.rho.backend.exception.InvalidResourceException;
 import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
+import com.rho.backend.race.RaceParticipant;
 import com.rho.backend.race.RaceRoom;
 import com.rho.backend.repository.RaceRoomRepository;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,12 +54,9 @@ public class RaceService {
 
     }
 
-    public void joinRoom(String roomCode, Long userId){
-        if(!raceRoomRepository.exists(roomCode)){
-            throw new ResourceNotFoundException("Room code not found");
-        }
-
+    public RaceRoom joinRoom(String roomCode, Long userId, String username){
         RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+
         if(!raceRoom.getState().equals(RaceState.LOBBY)){
             throw new InvalidResourceException("Race already started");
         }
@@ -66,9 +65,16 @@ public class RaceService {
             throw new DuplicateResourceException("Participant already exists");
         }
 
+        if (raceRoom.getParticipants().size() >= 8){
+            throw new InvalidResourceException("Race room is already full");
+        }
 
+        RaceParticipant raceParticipant = new RaceParticipant(userId, username);
+        raceRoom.getParticipants().add(raceParticipant);
 
+        raceRoomRepository.save(raceRoom);
 
+        return raceRoom;
     }
 
     public String generateRoomCode(){
