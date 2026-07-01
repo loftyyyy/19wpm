@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -93,6 +94,19 @@ public class RaceService {
         }
 
         raceRoom.setState(RaceState.COUNTDOWN);
+        raceRoomRepository.save(raceRoom);
+        return raceRoom;
+    }
+
+    public RaceRoom transitionToRacing(String roomCode){
+        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+
+        if (!raceRoom.getState().equals(RaceState.COUNTDOWN)) {
+            throw new InvalidResourceException("Cannot start race");
+        }
+
+        raceRoom.setState(RaceState.RACING);
+        raceRoom.setStartTime(Instant.now());
         raceRoomRepository.save(raceRoom);
         return raceRoom;
     }
