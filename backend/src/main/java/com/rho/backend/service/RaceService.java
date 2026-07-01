@@ -4,6 +4,7 @@ import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.enums.RaceState;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.exception.InvalidResourceException;
+import com.rho.backend.exception.UnauthorizedResourceException;
 import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.race.RaceParticipant;
@@ -74,6 +75,25 @@ public class RaceService {
 
         raceRoomRepository.save(raceRoom);
 
+        return raceRoom;
+    }
+
+    public RaceRoom startRoom(String roomCode, Long userId){
+        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        if(!raceRoom.isHost(userId)){
+            throw new UnauthorizedResourceException("Only the room creator can start the race");
+        }
+
+        if(!raceRoom.getState().equals(RaceState.LOBBY)){
+            throw new InvalidResourceException("Race already started");
+        }
+
+        if(raceRoom.getParticipants().size() < 2){
+            throw new InvalidResourceException("Must have at least 2 participants to start the race");
+        }
+
+        raceRoom.setState(RaceState.COUNTDOWN);
+        raceRoomRepository.save(raceRoom);
         return raceRoom;
     }
 
