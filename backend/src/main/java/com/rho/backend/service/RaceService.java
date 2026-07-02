@@ -7,16 +7,17 @@ import com.rho.backend.exception.InvalidResourceException;
 import com.rho.backend.exception.UnauthorizedResourceException;
 import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
+import com.rho.backend.model.User;
 import com.rho.backend.race.RaceParticipant;
 import com.rho.backend.race.RaceRoom;
 import com.rho.backend.repository.RaceRoomRepository;
+import com.rho.backend.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,10 +28,12 @@ public class RaceService {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int CODE_LENGTH = 6;
     private static final Logger logger = LoggerFactory.getLogger(RaceService.class);
+    private final UserRepository userRepository;
 
-    public RaceService(TextService textService, RaceRoomRepository raceRoomRepository){
+    public RaceService(TextService textService, RaceRoomRepository raceRoomRepository, UserRepository userRepository){
         this.textService = textService;
         this.raceRoomRepository = raceRoomRepository;
+        this.userRepository = userRepository;
     }
 
     public String createRoom(Long hostUserId, TextType textType, boolean isPrivate){
@@ -111,7 +114,38 @@ public class RaceService {
         return raceRoom;
     }
 
-    public String generateRoomCode(){
+    public RaceRoom updateProgress(String roomCode, Long userId, double progressPercent, int currentWpm, String typedContent){
+        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        if (!raceRoom.getState().equals(RaceState.RACING)) {
+            throw new InvalidResourceException("Race is not in progress");
+        }
+
+        RaceParticipant raceParticipant = raceRoom.findParticipant(userId);
+        if (raceParticipant == null) {
+            throw new ResourceNotFoundException("Participant not found in room");
+        }
+
+        raceParticipant.setProgressPercent(progressPercent);
+        raceParticipant.setCurrentWpm(currentWpm);
+        raceParticipant.setErrors(calculateErrors(typedContent, raceRoom.getText().content()));
+
+        raceRoomRepository.save(raceRoom);
+
+        return raceRoom;
+    }
+
+    private int calculateErrors(String typed, String passage) {
+        int errors = 0;
+        for (int i = 0; i < typed.length(); i++) {
+            if (i >= passage.length() || typed.charAt(i) != passage.charAt(i)) {
+                errors++;
+            }
+        }
+        return errors;
+    }
+
+
+    private String generateRoomCode(){
 
         return RANDOM.ints(CODE_LENGTH, 0, ALPHANUMERIC.length())
                 .mapToObj(ALPHANUMERIC::charAt)
@@ -119,4 +153,5 @@ public class RaceService {
                 .collect(Collectors.joining());
 
     }
+
 }
