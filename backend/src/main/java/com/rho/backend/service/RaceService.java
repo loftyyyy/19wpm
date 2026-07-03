@@ -134,6 +134,40 @@ public class RaceService {
         return raceRoom;
     }
 
+    public RaceRoom finishRace(String roomCode, Long userId, int finalWpm){
+        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        if(!raceRoom.getState().equals(RaceState.RACING)){
+            throw new InvalidResourceException("Can't finish a not started race");
+        }
+
+        RaceParticipant raceParticipant = raceRoom.findParticipant(userId);
+        if(raceParticipant == null){
+            throw new ResourceNotFoundException("Participant not found in room");
+        }
+
+        if(raceParticipant.isFinished()){
+            throw new InvalidResourceException("Participant already finished");
+        }
+
+        raceParticipant.setFinishRank(raceRoom.getFinishCount() + 1);
+        raceRoom.setFinishCount(raceRoom.getFinishCount() + 1);
+        raceParticipant.setFinished(true);
+        raceParticipant.setCurrentWpm(finalWpm);
+        raceRoomRepository.save(raceRoom);
+
+        if(raceRoom.allActiveFinished()){
+            raceRoom.setState(RaceState.FINISHED);
+            raceRoomRepository.save(raceRoom);
+            persistRace(raceRoom);
+        }
+
+        return raceRoom;
+    }
+
+    private void persistRace(RaceRoom raceRoom){
+
+    }
+
     private int calculateErrors(String typed, String passage) {
         int errors = 0;
         for (int i = 0; i < typed.length(); i++) {
