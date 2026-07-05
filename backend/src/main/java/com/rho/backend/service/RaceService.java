@@ -200,7 +200,6 @@ public class RaceService {
 
     }
 
-
     private int calculateErrors(String typed, String passage) {
         int errors = 0;
         for (int i = 0; i < typed.length(); i++) {
