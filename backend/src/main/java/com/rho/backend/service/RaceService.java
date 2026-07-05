@@ -68,8 +68,9 @@ public class RaceService {
 
     }
 
-    public RaceRoom joinRoom(String roomCode, Long userId, String username) {
+    public RaceRoom joinRoom(String roomCode, Long userId) {
         RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!raceRoom.getState().equals(RaceState.LOBBY)) {
             throw new InvalidResourceException("Race already started");
@@ -83,7 +84,8 @@ public class RaceService {
             throw new InvalidResourceException("Race room is already full");
         }
 
-        RaceParticipant raceParticipant = new RaceParticipant(userId, username);
+
+        RaceParticipant raceParticipant = new RaceParticipant(userId, user.getUsername());
         raceRoom.getParticipants().add(raceParticipant);
 
         raceRoomRepository.save(raceRoom);
