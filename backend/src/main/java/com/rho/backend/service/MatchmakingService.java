@@ -15,8 +15,8 @@ public class MatchmakingService {
     }
 
     public void joinQueue(Long userId, TextType textType){
-        String playerKey = PLAYER_KEY_PREFIX + userId.toString();
-        String queueKey =  QUEUE_KEY_PREFIX + textType.name();
+        String playerKey = playerKey(userId);
+        String queueKey =  queueKey(textType);
 
         Boolean hasKey = redisTemplate.hasKey(playerKey);
         if(Boolean.TRUE.equals(hasKey)){
@@ -27,8 +27,18 @@ public class MatchmakingService {
         redisTemplate.opsForValue().set(playerKey, textType.name(), Duration.ofSeconds(60));
     }
 
-    public void leaveQueue(){
+    public void leaveQueue(Long userId){
+        String playerKey = playerKey(userId);
 
+
+        Boolean hasKey = redisTemplate.hasKey(playerKey);
+        if(!Boolean.TRUE.equals(hasKey)){
+            return;
+        }
+
+        TextType textType = TextType.valueOf(redisTemplate.opsForValue().get(playerKey));
+        redisTemplate.opsForList().remove(queueKey(textType),1, userId.toString());
+        redisTemplate.delete(playerKey);
     }
 
     public void pollQueues(){
