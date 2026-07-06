@@ -212,9 +212,7 @@ public class RaceService {
         return errors;
     }
 
-
     private String generateRoomCode(){
-
         return RANDOM.ints(CODE_LENGTH, 0, ALPHANUMERIC.length())
                 .mapToObj(ALPHANUMERIC::charAt)
                 .map(Object::toString)
