@@ -19,7 +19,7 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain }
       <h2 className="text-xl font-display font-semibold text-text-main text-center mb-6">Race Results</h2>
 
       <div className="space-y-2 mb-6">
-        {sorted.map((p, i) => {
+        {sorted.map((p) => {
           const isMe = p.userId === currentUserId;
           const isDnf = p.finishRank === 0;
 

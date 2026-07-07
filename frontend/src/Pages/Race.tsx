@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
 import Lobby from '../Components/Race/Lobby';
@@ -8,8 +7,8 @@ import RaceTrack from '../Components/Race/RaceTrack';
 import RaceResults from '../Components/Race/RaceResults';
 import { useAuth } from '../context/AuthContext';
 import { useRaceSocket } from '../hooks/useRaceSocket';
-import { createRoom, joinRoomByCode, joinMatchmaking, leaveMatchmaking } from '../services/race';
-import type { RaceRoom, TextType } from '../types/race';
+import { createRoom, joinMatchmaking } from '../services/race';
+import type { TextType } from '../types/race';
 
 const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
 
@@ -21,14 +20,11 @@ function calcWpm(typed: string, startTime: string): number {
 }
 
 export default function Race() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { user } = useAuth();
 
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [phase, setPhase] = useState<'setup' | 'lobby' | 'countdown' | 'racing' | 'finished'>('setup');
   const [selectedTextType, setSelectedTextType] = useState<TextType>('SHORT');
-  const [isPrivate, setIsPrivate] = useState(false);
   const [isMatchmaking, setIsMatchmaking] = useState(false);
   const [typedContent, setTypedContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -89,7 +85,6 @@ export default function Race() {
     setPhase('setup');
     setTypedContent('');
     setIsMatchmaking(false);
-    setIsPrivate(false);
   }, []);
 
   const handleTyping = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -155,7 +150,7 @@ export default function Race() {
       return (
         <Lobby
           room={socket.room}
-          currentUserId={user?.id ?? 0}
+          currentUserId={Number(user?.id ?? 0)}
           onStart={handleStart}
         />
       );
@@ -170,7 +165,7 @@ export default function Race() {
         <div className="space-y-4 max-w-2xl mx-auto">
           <RaceTrack
             participants={socket.room.participants}
-            currentUserId={user?.id ?? 0}
+            currentUserId={Number(user?.id ?? 0)}
           />
           {socket.room.text && (
             <div className="bg-card border border-line rounded-2xl shadow-sm p-4 transition-theme">
@@ -197,7 +192,7 @@ export default function Race() {
       return (
         <RaceResults
           participants={socket.room.participants}
-          currentUserId={user?.id ?? 0}
+          currentUserId={Number(user?.id ?? 0)}
           onPlayAgain={handlePlayAgain}
         />
       );
