@@ -99,9 +99,8 @@ export default function LandingPage() {
               Start Typing
             </button>
             <button
-              title="Coming soon!"
-              disabled
-              className="px-8 py-4 border border-line text-text-dim rounded-xl font-sans font-semibold text-sm line-through cursor-not-allowed select-none"
+              onClick={() => navigate('/race')}
+              className="px-8 py-4 border border-line text-text-sub rounded-xl font-sans font-semibold text-sm hover:bg-accent hover:text-white hover:border-accent transition-colors hover:cursor-pointer"
             >
               Join a Race
             </button>
