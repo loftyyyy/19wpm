@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 import { getAccessToken } from '../services/api';
 import type { RaceRoom } from '../types/race';
 
@@ -15,7 +16,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   useEffect(() => {
     const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:8080';
     const client = new Client({
-      brokerURL: `ws://${wsHost}/ws`,
+      webSocketFactory: () => new SockJS(`http://${wsHost}/ws`),
       connectHeaders: { token: getAccessToken() ?? '' },
       reconnectDelay: 5000,
     });
@@ -28,10 +29,12 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           const raceRoom: RaceRoom = JSON.parse(message.body);
           setRoom(raceRoom);
         });
-      } else if (opts?.onMatchmakingRoomCode) {
+      }
+
+      if (opts?.onMatchmakingRoomCode) {
         client.subscribe('/user/queue/matchmaking', (message) => {
-          const code: string = JSON.parse(message.body);
-          opts.onMatchmakingRoomCode!(code);
+          const code: string = message.body;
+          opts!.onMatchmakingRoomCode!(code);
         });
       }
     };
