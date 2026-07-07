@@ -50,7 +50,7 @@ public class SecurityFilterChainConfig {
                                 "/api/v1/auth/logout",
                                 "/api/v1/texts/**",
                                 "/api/v1/words/**",
-                                "ws/**"
+                                "/ws/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

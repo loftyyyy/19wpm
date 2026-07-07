@@ -4,11 +4,13 @@ import com.rho.backend.enums.TextType;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+@Service
 public class MatchmakingService {
     private final RedisTemplate<String, String> redisTemplate;
     private static final String QUEUE_KEY_PREFIX  = "matchmaking:queue:";

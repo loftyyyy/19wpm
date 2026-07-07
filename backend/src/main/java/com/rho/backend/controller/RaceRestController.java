@@ -4,6 +4,7 @@ import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.race.CreateRoomRequestDTO;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.race.RaceRoom;
+import com.rho.backend.service.MatchmakingService;
 import com.rho.backend.service.RaceService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +16,11 @@ import org.springframework.web.bind.annotation.*;
 public class RaceRestController {
 
     private final RaceService raceService;
+    private final MatchmakingService matchmakingService;
 
-    public RaceRestController(RaceService raceService) {
+    public RaceRestController(RaceService raceService, MatchmakingService matchmakingService) {
         this.raceService = raceService;
+        this.matchmakingService = matchmakingService;
     }
 
     @PostMapping("/rooms")
@@ -34,13 +37,13 @@ public class RaceRestController {
 
     @PostMapping("/matchmaking/join")
     public ResponseEntity<?> joinMatchmaking(@AuthenticationPrincipal CustomUserDetails customUserDetails, @RequestBody CreateRoomRequestDTO createRoomRequestDTO) {
-        raceService.joinMatchmaking(customUserDetails.getUserId(), createRoomRequestDTO.textType());
+        matchmakingService.joinQueue(customUserDetails.getUserId(), createRoomRequestDTO.textType());
         return ResponseEntity.status(HttpStatus.OK).body("Searching...");
     }
 
     @PostMapping("/matchmaking/leave")
     public ResponseEntity<?> leaveMatchmaking(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
-        raceService.leaveMatchmaking(customUserDetails.getUserId());
+        matchmakingService.leaveQueue(customUserDetails.getUserId());
         return ResponseEntity.ok().build();
     }
 }
