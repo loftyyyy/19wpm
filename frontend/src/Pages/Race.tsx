@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
 import Lobby from '../Components/Race/Lobby';
@@ -20,7 +21,8 @@ function calcWpm(typed: string, startTime: string): number {
 }
 
 export default function Race() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [phase, setPhase] = useState<'setup' | 'lobby' | 'countdown' | 'racing' | 'finished'>('setup');
@@ -200,6 +202,45 @@ export default function Race() {
 
     return null;
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-surface transition-theme flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-text-dim font-sans text-sm">Loading...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-surface transition-theme flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="bg-card border border-line rounded-2xl p-8 max-w-sm w-full text-center">
+            <h1 className="text-xl font-display font-semibold text-text-main mb-2">Sign in to compete</h1>
+            <p className="text-sm font-sans text-text-dim mb-6">You need an account to join or create a race.</p>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-accent text-white hover:bg-accent-hover transition-colors hover:cursor-pointer mb-3"
+            >
+              Sign in
+            </button>
+            <button
+              onClick={() => navigate('/login')}
+              className="text-sm font-sans text-text-sub underline hover:text-text-main transition-colors hover:cursor-pointer"
+            >
+              Create account
+            </button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface transition-theme flex flex-col">
