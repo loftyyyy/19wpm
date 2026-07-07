@@ -2,7 +2,6 @@ package com.rho.backend.controller;
 
 import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.race.CreateRoomRequestDTO;
-import com.rho.backend.enums.TextType;
 import com.rho.backend.race.RaceRoom;
 import com.rho.backend.service.MatchmakingService;
 import com.rho.backend.service.RaceService;
