@@ -3,14 +3,16 @@ import { Client } from '@stomp/stompjs';
 import { getAccessToken } from '../services/api';
 import type { RaceRoom } from '../types/race';
 
-export function useRaceSocket(roomCode: string | null) {
+interface UseRaceSocketOpts {
+  onMatchmakingRoomCode?: (code: string) => void;
+}
+
+export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts) {
   const [room, setRoom] = useState<RaceRoom | null>(null);
   const [connected, setConnected] = useState(false);
   const clientRef = useRef<Client | null>(null);
 
   useEffect(() => {
-    if (!roomCode) return;
-
     const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:8080';
     const client = new Client({
       brokerURL: `ws://${wsHost}/ws`,
@@ -20,10 +22,18 @@ export function useRaceSocket(roomCode: string | null) {
 
     client.onConnect = () => {
       setConnected(true);
-      client.subscribe(`/topic/room/${roomCode}`, (message) => {
-        const raceRoom: RaceRoom = JSON.parse(message.body);
-        setRoom(raceRoom);
-      });
+
+      if (roomCode) {
+        client.subscribe(`/topic/room/${roomCode}`, (message) => {
+          const raceRoom: RaceRoom = JSON.parse(message.body);
+          setRoom(raceRoom);
+        });
+      } else if (opts?.onMatchmakingRoomCode) {
+        client.subscribe('/user/queue/matchmaking', (message) => {
+          const code: string = JSON.parse(message.body);
+          opts.onMatchmakingRoomCode!(code);
+        });
+      }
     };
 
     client.onDisconnect = () => {
@@ -37,10 +47,10 @@ export function useRaceSocket(roomCode: string | null) {
       client.deactivate();
       clientRef.current = null;
     };
-  }, [roomCode]);
+  }, [roomCode, opts?.onMatchmakingRoomCode]);
 
   const sendProgress = useCallback((progressPercent: number, currentWpm: number, typedContent: string) => {
-    if (!clientRef.current?.connected) return;
+    if (!clientRef.current?.connected || !roomCode) return;
     clientRef.current.publish({
       destination: `/app/room/${roomCode}/progress`,
       body: JSON.stringify({ progressPercent, currentWpm, typedContent }),
@@ -48,7 +58,7 @@ export function useRaceSocket(roomCode: string | null) {
   }, [roomCode]);
 
   const sendFinish = useCallback((finalWpm: number) => {
-    if (!clientRef.current?.connected) return;
+    if (!clientRef.current?.connected || !roomCode) return;
     clientRef.current.publish({
       destination: `/app/room/${roomCode}/finish`,
       body: JSON.stringify({ finalWpm }),
@@ -56,7 +66,7 @@ export function useRaceSocket(roomCode: string | null) {
   }, [roomCode]);
 
   const sendStart = useCallback(() => {
-    if (!clientRef.current?.connected) return;
+    if (!clientRef.current?.connected || !roomCode) return;
     clientRef.current.publish({
       destination: `/app/room/${roomCode}/start`,
       body: JSON.stringify({}),

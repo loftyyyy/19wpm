@@ -9,6 +9,7 @@ import ContentCreation from './Components/Content/ContentCreation';
 import Compete from './Pages/Compete';
 import Leaderboard from './Pages/Leaderboard';
 import About from './Pages/About';
+import Race from './Pages/Race';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/compete" element={<Compete />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/about" element={<About />} />
+        <Route path="/race" element={<Race />} />
       </Routes>
     </Router>
   );
