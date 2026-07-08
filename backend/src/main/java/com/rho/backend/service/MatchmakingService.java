@@ -31,7 +31,7 @@ public class MatchmakingService {
 
         Boolean hasKey = redisTemplate.hasKey(playerKey);
         if(Boolean.TRUE.equals(hasKey)){
-            throw new IllegalStateException("Player " + userId + " is already in a matchmaking queue.");
+            return;
         }
 
         redisTemplate.opsForList().leftPush(queueKey, userId.toString());

@@ -28,6 +28,7 @@ export default function Race() {
   const [phase, setPhase] = useState<'setup' | 'lobby' | 'countdown' | 'racing' | 'finished'>('setup');
   const [selectedTextType, setSelectedTextType] = useState<TextType>('SHORT');
   const [isMatchmaking, setIsMatchmaking] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
   const [typedContent, setTypedContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -56,23 +57,31 @@ export default function Race() {
   }, [phase]);
 
   const handleCreateRoom = useCallback(async () => {
+    if (isRequesting) return;
+    setIsRequesting(true);
     try {
       const code = await createRoom(selectedTextType, true);
       setRoomCode(code);
       setPhase('lobby');
     } catch {
       console.error('Failed to create room');
+    } finally {
+      setIsRequesting(false);
     }
-  }, [selectedTextType]);
+  }, [selectedTextType, isRequesting]);
 
   const handleJoinMatchmaking = useCallback(async () => {
+    if (isRequesting) return;
+    setIsRequesting(true);
     try {
       await joinMatchmaking(selectedTextType);
       setIsMatchmaking(true);
     } catch {
       console.error('Failed to join matchmaking');
+    } finally {
+      setIsRequesting(false);
     }
-  }, [selectedTextType]);
+  }, [selectedTextType, isRequesting]);
 
   const handleStart = useCallback(() => {
     socket.sendStart();
@@ -132,13 +141,14 @@ export default function Race() {
           <div className="space-y-3">
             <button
               onClick={handleCreateRoom}
-              className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-accent text-white hover:bg-accent-hover transition-colors hover:cursor-pointer"
+              disabled={isRequesting}
+              className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-accent text-white hover:bg-accent-hover transition-colors hover:cursor-pointer disabled:opacity-40"
             >
               Create Private Room
             </button>
             <button
               onClick={handleJoinMatchmaking}
-              disabled={isMatchmaking}
+              disabled={isMatchmaking || isRequesting}
               className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-muted text-text-main border border-line hover:bg-muted/80 transition-colors hover:cursor-pointer disabled:opacity-40"
             >
               {isMatchmaking ? 'Searching...' : 'Find Public Match'}
