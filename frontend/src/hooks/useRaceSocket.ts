@@ -15,8 +15,10 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
 
   useEffect(() => {
     const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:8080';
+    const wsProtocol = import.meta.env.VITE_WS_HOST ? 'https' : 'http';
+    const wsUrl = `${wsProtocol}://${wsHost}/ws`;
     const client = new Client({
-      webSocketFactory: () => new SockJS(`http://${wsHost}/ws`),
+      webSocketFactory: () => new SockJS(wsUrl),
       connectHeaders: { token: getAccessToken() ?? '' },
       reconnectDelay: 5000,
     });
