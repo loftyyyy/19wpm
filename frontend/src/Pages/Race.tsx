@@ -158,7 +158,16 @@ export default function Race() {
       );
     }
 
-    if (phase === 'lobby' && socket.room) {
+    if (phase === 'lobby') {
+      if (!socket.room) {
+        return (
+          <div className="flex items-center justify-center min-h-40">
+            <p className="text-text-dim font-sans text-sm">
+              Connecting to room...
+            </p>
+          </div>
+        );
+      }
       return (
         <Lobby
           room={socket.room}
