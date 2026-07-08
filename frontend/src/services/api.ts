@@ -1,6 +1,6 @@
 import type { ApiTokenRefreshResponse } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const TOKEN_KEY = '19wpm-access-token';
 const REFRESH_KEY = '19wpm-refresh-token';

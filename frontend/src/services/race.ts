@@ -1,9 +1,17 @@
-import { api } from './api';
+import { api, getAccessToken, API_BASE_URL } from './api';
 import type { RaceRoom, TextType } from '../types/race';
 
 export async function createRoom(textType: TextType | null, isPrivate: boolean): Promise<string> {
-  const data = await api.post<{ roomCode: string }>('/race/rooms', { textType, isPrivate });
-  return data.roomCode;
+  const response = await fetch(`${API_BASE_URL}/api/v1/race/rooms`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getAccessToken() ?? ''}`,
+    },
+    body: JSON.stringify({ textType, isPrivate }),
+  });
+  if (!response.ok) throw new Error('Failed to create room');
+  return response.text();
 }
 
 export async function joinRoomByCode(code: string): Promise<RaceRoom> {
