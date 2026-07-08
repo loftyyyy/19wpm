@@ -14,9 +14,11 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const clientRef = useRef<Client | null>(null);
 
   useEffect(() => {
-    const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:8080';
-    const wsProtocol = import.meta.env.VITE_WS_HOST ? 'https' : 'http';
-    const wsUrl = `${wsProtocol}://${wsHost}/ws`;
+    const wsHost = import.meta.env.VITE_WS_HOST as string | undefined;
+    const wsUrl = wsHost
+      ? `https://${wsHost}/ws`
+      : `http://localhost:8080/ws`;
+
     const client = new Client({
       webSocketFactory: () => new SockJS(wsUrl),
       connectHeaders: { token: getAccessToken() ?? '' },
