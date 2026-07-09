@@ -14,13 +14,11 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const clientRef = useRef<Client | null>(null);
 
   useEffect(() => {
-    const wsHost = import.meta.env.VITE_WS_HOST as string | undefined;
-    const wsUrl = wsHost
-      ? `https://${wsHost}/ws`
-      : `http://localhost:8080/ws`;
-
+    const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
     const client = new Client({
-      webSocketFactory: () => new SockJS(wsUrl),
+      webSocketFactory: () => new SockJS(
+        apiBase ? apiBase + '/ws' : 'http://localhost:8080/ws'
+      ),
       connectHeaders: { token: getAccessToken() ?? '' },
       reconnectDelay: 5000,
     });
