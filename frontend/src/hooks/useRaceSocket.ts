@@ -17,7 +17,9 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
     const client = new Client({
       webSocketFactory: () => new SockJS(
-        apiBase ? apiBase + '/ws' : 'http://localhost:8080/ws'
+        apiBase ? apiBase + '/ws' : 'http://localhost:8080/ws',
+        null,
+        { transports: ['websocket', 'xhr-streaming', 'xhr-polling'] }
       ),
       connectHeaders: { token: getAccessToken() ?? '' },
       reconnectDelay: 5000,
