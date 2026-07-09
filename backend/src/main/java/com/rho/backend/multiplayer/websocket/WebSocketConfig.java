@@ -42,7 +42,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer { // 2.
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
                 .addInterceptors(jwtHandshakeInterceptor)
-                .withSockJS();
+                .withSockJS()
+                .setHeartbeatTime(25000);
     }
 
     // 5. Override configureClientInboundChannel()
