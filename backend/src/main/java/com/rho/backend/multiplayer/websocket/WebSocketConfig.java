@@ -40,11 +40,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer { // 2.
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                // Allowed frontend origins
-                .setAllowedOrigins("http://localhost:5173", "https://19wpm.vercel.app")
-                // Handshake interceptor to validate JWT and extract userId
+                .setAllowedOriginPatterns("*")
                 .addInterceptors(jwtHandshakeInterceptor)
-                // Enable SockJS fallback options
                 .withSockJS();
     }
 
