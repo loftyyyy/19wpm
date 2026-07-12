@@ -1,5 +1,5 @@
 import { api, getAccessToken, API_BASE_URL } from './api';
-import type { RaceRoom, TextType } from '../types/race';
+import type { TextType } from '../types/race';
 
 export async function createRoom(textType: TextType | null, isPrivate: boolean): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/api/v1/race/rooms`, {
@@ -14,8 +14,8 @@ export async function createRoom(textType: TextType | null, isPrivate: boolean):
   return response.text();
 }
 
-export async function joinRoomByCode(code: string): Promise<RaceRoom> {
-  return api.post<RaceRoom>(`/race/rooms/${code}/join`);
+export async function joinRoomByCode(code: string): Promise<string> {
+  return code;
 }
 
 export async function joinMatchmaking(textType: TextType | null): Promise<void> {
