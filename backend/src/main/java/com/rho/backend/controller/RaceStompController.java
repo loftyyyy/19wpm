@@ -4,6 +4,8 @@ import com.rho.backend.dto.race.FinishMessageDTO;
 import com.rho.backend.dto.race.ProgressUpdateDTO;
 import com.rho.backend.race.RaceRoom;
 import com.rho.backend.service.RaceService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -15,6 +17,8 @@ import java.security.Principal;
 @Controller
 public class RaceStompController {
 
+    private static final Logger logger = LoggerFactory.getLogger(RaceStompController.class);
+
     private final RaceService raceService;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -25,6 +29,7 @@ public class RaceStompController {
 
     @MessageMapping("/room/{code}/join")
     public void joinRoom(@DestinationVariable String code, Principal principal){
+        logger.info("joinRoom called - code: {}, principal: {}", code, principal != null ? principal.getName() : "null");
         Long userId = Long.parseLong(principal.getName());
         RaceRoom raceRoom = raceService.joinRoom(code, userId);
         messagingTemplate.convertAndSend("/topic/room/" + code, raceRoom);

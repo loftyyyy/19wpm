@@ -3,6 +3,8 @@ package com.rho.backend.multiplayer.jwt;
 import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.service.JwtService;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
@@ -17,6 +19,8 @@ import java.util.Map;
 
 @Component
 public class JwtChannelInterceptor implements ChannelInterceptor {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtChannelInterceptor.class);
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
@@ -34,7 +38,10 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
             String token = accessor.getFirstNativeHeader("token");
 
+            logger.info("STOMP CONNECT - token present: {}", token != null);
+
             if (token == null || !jwtService.isAccessToken(token)) {
+                logger.warn("STOMP CONNECT - rejected: invalid token");
                 throw new MessagingException("Invalid or missing token");
             }
 
@@ -44,6 +51,7 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
                 if (userDetails instanceof CustomUserDetails customUser) {
                     Long userId = customUser.getUserId();
                     accessor.setUser(() -> userId.toString());
+                    logger.info("STOMP CONNECT - principal set to userId: {}", userId);
                     Map<String, Object> attrs = accessor.getSessionAttributes();
                     if (attrs != null) attrs.put("userId", userId);
                 } else {
