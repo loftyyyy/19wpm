@@ -33,6 +33,11 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           const raceRoom: RaceRoom = JSON.parse(message.body);
           setRoom(raceRoom);
         });
+
+        client.publish({
+          destination: `/app/room/${roomCode}/join`,
+          body: JSON.stringify({}),
+        });
       }
 
       if (opts?.onMatchmakingRoomCode) {
