@@ -8,7 +8,7 @@ import RaceTrack from '../Components/Race/RaceTrack';
 import RaceResults from '../Components/Race/RaceResults';
 import { useAuth } from '../context/AuthContext';
 import { useRaceSocket } from '../hooks/useRaceSocket';
-import { createRoom, joinMatchmaking } from '../services/race';
+import { createRoom, joinRoomByCode, joinMatchmaking } from '../services/race';
 import type { TextType } from '../types/race';
 
 const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
@@ -30,6 +30,8 @@ export default function Race() {
   const [isMatchmaking, setIsMatchmaking] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
   const [typedContent, setTypedContent] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [joinError, setJoinError] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleMatchmakingCode = useCallback((code: string) => {
@@ -83,6 +85,21 @@ export default function Race() {
     }
   }, [selectedTextType, isRequesting]);
 
+  const handleJoinByCode = useCallback(async () => {
+    if (!joinCode.trim() || isRequesting) return;
+    setJoinError('');
+    setIsRequesting(true);
+    try {
+      await joinRoomByCode(joinCode.trim().toUpperCase());
+      setRoomCode(joinCode.trim().toUpperCase());
+      setPhase('lobby');
+    } catch {
+      setJoinError('Room not found or already started.');
+    } finally {
+      setIsRequesting(false);
+    }
+  }, [joinCode, isRequesting]);
+
   const handleStart = useCallback(() => {
     socket.sendStart();
   }, [socket]);
@@ -96,6 +113,8 @@ export default function Race() {
     setPhase('setup');
     setTypedContent('');
     setIsMatchmaking(false);
+    setJoinCode('');
+    setJoinError('');
   }, []);
 
   const handleTyping = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -154,6 +173,42 @@ export default function Race() {
               {isMatchmaking ? 'Searching...' : 'Find Public Match'}
             </button>
           </div>
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-line" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-card px-3 text-xs text-text-dim font-sans">
+                or join existing
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && handleJoinByCode()}
+              placeholder="Enter room code"
+              maxLength={6}
+              className="flex-1 px-4 py-3 rounded-xl bg-muted border border-line text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 uppercase tracking-widest"
+            />
+            <button
+              onClick={handleJoinByCode}
+              disabled={!joinCode.trim() || isRequesting}
+              className="px-5 py-3 rounded-xl font-sans font-semibold text-sm bg-muted border border-line text-text-main hover:bg-accent hover:text-white hover:border-accent transition-colors disabled:opacity-40 hover:cursor-pointer"
+            >
+              Join
+            </button>
+          </div>
+
+          {joinError && (
+            <p className="text-red-400 text-xs font-sans mt-2 text-center">
+              {joinError}
+            </p>
+          )}
         </div>
       );
     }
