@@ -1,57 +1,60 @@
 package com.rho.backend.multiplayer.jwt;
 
+import com.rho.backend.config.CustomUserDetails;
+import com.rho.backend.service.JwtService;
 import org.jspecify.annotations.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
-
-import java.security.Principal;
 import java.util.Map;
 
 @Component
 public class JwtChannelInterceptor implements ChannelInterceptor {
 
-    @Override
-    public @Nullable Message<?> preSend(Message<?> message, MessageChannel channel) {
-        // 1. Intercept only the CONNECT frame — ignore all others
-        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+    private final JwtService jwtService;
+    private final UserDetailsService userDetailsService;
 
-        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-
-            // 2. Read userId from the handshake attributes
-            Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
-
-            if (sessionAttributes != null && sessionAttributes.containsKey("userId")) {
-                Object userIdObj = sessionAttributes.get("userId");
-                String userId = String.valueOf(userIdObj);
-
-                // 3. Wrap it in a Principal and set it on the message headers
-                // Note: You can use a custom Principal implementation or SimplePrincipal
-                Principal principal = new SimplePrincipal(userId);
-                accessor.setUser(principal);
-            }
-        }
-
-        // 4. Return the modified message
-        return message;
+    public JwtChannelInterceptor(JwtService jwtService, UserDetailsService userDetailsService) {
+        this.jwtService = jwtService;
+        this.userDetailsService = userDetailsService;
     }
 
-    // Quick internal implementation of Principal for simplicity
-    private static class SimplePrincipal implements Principal {
-        private final String name;
+    @Override
+    public @Nullable Message<?> preSend(Message<?> message, MessageChannel channel) {
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
+                message, StompHeaderAccessor.class);
 
-        public SimplePrincipal(String name) {
-            this.name = name;
-        }
+        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+            String token = accessor.getFirstNativeHeader("token");
 
-        @Override
-        public String getName() {
-            return this.name;
+            if (token == null || !jwtService.isAccessToken(token)) {
+                throw new MessagingException("Invalid or missing token");
+            }
+
+            try {
+                String email = jwtService.extractSubject(token);
+                var userDetails = userDetailsService.loadUserByUsername(email);
+                if (userDetails instanceof CustomUserDetails customUser) {
+                    Long userId = customUser.getUserId();
+                    accessor.setUser(() -> userId.toString());
+                    Map<String, Object> attrs = accessor.getSessionAttributes();
+                    if (attrs != null) attrs.put("userId", userId);
+                } else {
+                    throw new MessagingException("Invalid user details");
+                }
+            } catch (MessagingException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new MessagingException("Authentication failed: " + e.getMessage());
+            }
         }
+        return message;
     }
 }

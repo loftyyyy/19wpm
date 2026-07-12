@@ -33,55 +33,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                    WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
-
-        logger.info("Handshake attempt - request type: {}", request.getClass().getSimpleName());
-
-        if (request instanceof ServletServerHttpRequest) {
-            ServletServerHttpRequest servletRequest = (ServletServerHttpRequest) request;
-            HttpServletRequest httpRequest = servletRequest.getServletRequest();
-
-            // 1. Get the token from the query string
-            String token = httpRequest.getParameter("token");
-
-            logger.info("Token present: {}", token != null);
-            logger.info("Token valid: {}", token != null && jwtService.isAccessToken(token));
-
-            // 2. Validate it
-            if (token == null || !jwtService.isAccessToken(token)) {
-                logger.warn("Rejecting handshake - reason: token null or invalid");
-                return false; // Reject the connection
-            }
-
-            try {
-                // 3. Extract the email
-                String email = jwtService.extractSubject(token);
-
-                // 4. Load the user from the database
-                var userDetails = userDetailsService.loadUserByUsername(email);
-
-                if (userDetails instanceof CustomUserDetails) {
-                    Long userId = ((CustomUserDetails) userDetails).getUserId();
-
-                    logger.info("UserId stored in attributes: {}", userId);
-
-                    // 5. Store userId in handshake attributes
-                    attributes.put("userId", userId);
-                } else {
-                    logger.warn("Rejecting handshake - reason: user details not CustomUserDetails");
-                    return false; // Reject if user details don't match expected type
-                }
-
-            } catch (Exception e) {
-                logger.warn("Rejecting handshake - reason: exception during token parsing or user loading", e);
-                return false;
-            }
-
-            // 6. Return true (allow connection)
-            return true;
-        }
-
-        logger.warn("Rejecting handshake - reason: not a servlet-based request");
-        return false; // Reject if it's not a servlet-based request
+        return true;
     }
 
     @Override
