@@ -12,8 +12,10 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const [room, setRoom] = useState<RaceRoom | null>(null);
   const [connected, setConnected] = useState(false);
   const clientRef = useRef<Client | null>(null);
+  const hasJoinedRef = useRef(false);
 
   useEffect(() => {
+    hasJoinedRef.current = false;
     const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
     const client = new Client({
       webSocketFactory: () => new SockJS(
@@ -34,10 +36,13 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           setRoom(raceRoom);
         });
 
-        client.publish({
-          destination: `/app/room/${roomCode}/join`,
-          body: JSON.stringify({}),
-        });
+        if (!hasJoinedRef.current) {
+          hasJoinedRef.current = true;
+          client.publish({
+            destination: `/app/room/${roomCode}/join`,
+            body: JSON.stringify({}),
+          });
+        }
       }
 
       if (opts?.onMatchmakingRoomCode) {
@@ -56,6 +61,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     clientRef.current = client;
 
     return () => {
+      hasJoinedRef.current = false;
       client.deactivate();
       clientRef.current = null;
     };

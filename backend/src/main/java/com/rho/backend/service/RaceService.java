@@ -77,7 +77,7 @@ public class RaceService {
         }
 
         if (raceRoom.findParticipant(userId) != null) {
-            throw new DuplicateResourceException("Participant already exists");
+            return raceRoom;
         }
 
         if (raceRoom.getParticipants().size() >= 8) {
