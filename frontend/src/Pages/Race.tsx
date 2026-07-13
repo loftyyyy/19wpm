@@ -331,7 +331,6 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       if (e.ctrlKey || e.metaKey) {
         const lastSpace = typedChars.join('').lastIndexOf(' ', (currentIndex - lockedIndex > 0 ? currentIndex - 1 : currentIndex));
         const wordStart = lastSpace >= lockedIndex ? lastSpace + 1 : lockedIndex;
-        const deleteCount = currentIndex - wordStart;
         setTypedChars(prev => prev.slice(0, wordStart));
         setCurrentIndex(wordStart);
         reportProgress(typedChars.slice(0, wordStart), wordStart);
