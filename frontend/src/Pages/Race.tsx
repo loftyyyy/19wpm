@@ -13,13 +13,6 @@ import type { TextType } from '../types/race';
 
 const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
 
-function calcWpm(typed: string, startTime: string): number {
-  const minutes = (Date.now() - new Date(startTime).getTime()) / 60000;
-  if (minutes <= 0) return 0;
-  const words = typed.trim().split(/\s+/).filter(Boolean).length;
-  return Math.round(words / minutes);
-}
-
 export default function Race() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -29,10 +22,8 @@ export default function Race() {
   const [selectedTextType, setSelectedTextType] = useState<TextType>('SHORT');
   const [isMatchmaking, setIsMatchmaking] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
-  const [typedContent, setTypedContent] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleMatchmakingCode = useCallback((code: string) => {
     setRoomCode(code);
@@ -51,12 +42,6 @@ export default function Race() {
     if (!socket.room || phase !== 'racing') return;
     if (socket.room.state === 'FINISHED') setPhase('finished');
   }, [socket.room, phase]);
-
-  useEffect(() => {
-    if (phase === 'racing' && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [phase]);
 
   const handleCreateRoom = useCallback(async () => {
     if (isRequesting) return;
@@ -111,26 +96,10 @@ export default function Race() {
   const handlePlayAgain = useCallback(() => {
     setRoomCode(null);
     setPhase('setup');
-    setTypedContent('');
     setIsMatchmaking(false);
     setJoinCode('');
     setJoinError('');
   }, []);
-
-  const handleTyping = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    setTypedContent(text);
-
-    if (!socket.room?.text || !socket.room?.startTime) return;
-    const progress = text.length / socket.room.text.charLength;
-    const wpm = calcWpm(text, socket.room.startTime);
-
-    socket.sendProgress(Math.min(progress, 1), wpm, text);
-
-    if (text.length >= socket.room.text.charLength) {
-      socket.sendFinish(wpm);
-    }
-  }, [socket]);
 
   const renderContent = () => {
     if (phase === 'setup') {
@@ -245,18 +214,14 @@ export default function Race() {
           />
           {socket.room.text && (
             <div className="bg-card border border-line rounded-2xl shadow-sm p-4 transition-theme">
-              <p className="text-xs font-sans text-text-dim mb-2">
-                {socket.room.text.title} &middot; {socket.room.text.author}
+              <p className="text-xs font-sans text-text-dim mb-3">
+                {socket.room.text.title} · {socket.room.text.author}
               </p>
-              <p className="text-sm font-sans text-text-sub mb-3 leading-relaxed">
-                {socket.room.text.content}
-              </p>
-              <textarea
-                ref={textareaRef}
-                value={typedContent}
-                onChange={handleTyping}
-                className="w-full h-32 p-3 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim resize-none focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
-                placeholder="Start typing here..."
+              <RaceTypingInput
+                passage={socket.room.text.content}
+                onProgress={(p, w, t) => socket.sendProgress(p, w, t)}
+                onFinish={(wpm) => socket.sendFinish(wpm)}
+                startTime={socket.room.startTime!}
               />
             </div>
           )}
@@ -323,6 +288,152 @@ export default function Race() {
         {renderContent()}
       </main>
       <Footer />
+    </div>
+  );
+}
+
+interface RaceTypingInputProps {
+  passage: string;
+  onProgress: (progressPercent: number, currentWpm: number, typedContent: string) => void;
+  onFinish: (finalWpm: number) => void;
+  startTime: string;
+}
+
+function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypingInputProps) {
+  const [typedChars, setTypedChars] = useState<string[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [lockedIndex, setLockedIndex] = useState(0);
+  const [extraChars, setExtraChars] = useState<string[]>([]);
+  const [finished, setFinished] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const calcWpm = (typed: string) => {
+    const minutes = (Date.now() - new Date(startTime).getTime()) / 60000;
+    if (minutes <= 0) return 0;
+    const words = typed.trim().split(/\s+/).filter(Boolean).length;
+    return Math.round(words / minutes);
+  };
+
+  const reportProgress = (chars: string[], index: number) => {
+    const typed = chars.join('');
+    onProgress(Math.min(index / passage.length, 1), calcWpm(typed), typed);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (finished) return;
+
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const lastSpace = typedChars.join('').lastIndexOf(' ', (currentIndex - lockedIndex > 0 ? currentIndex - 1 : currentIndex));
+        const wordStart = lastSpace >= lockedIndex ? lastSpace + 1 : lockedIndex;
+        const deleteCount = currentIndex - wordStart;
+        setTypedChars(prev => prev.slice(0, wordStart));
+        setCurrentIndex(wordStart);
+        reportProgress(typedChars.slice(0, wordStart), wordStart);
+        return;
+      }
+      if (extraChars.length > 0) {
+        setExtraChars(prev => prev.slice(0, -1));
+      } else if (currentIndex > lockedIndex) {
+        const newIndex = currentIndex - 1;
+        setTypedChars(prev => prev.slice(0, -1));
+        setCurrentIndex(newIndex);
+        reportProgress(typedChars.slice(0, -1), newIndex);
+      }
+      return;
+    }
+
+    if (e.key.length !== 1) return;
+    e.preventDefault();
+
+    const passageChar = passage[currentIndex];
+
+    if (e.key === ' ') {
+      if (passageChar === ' ' && extraChars.length === 0) {
+        const newChars = [...typedChars, ' '];
+        const newIndex = currentIndex + 1;
+        setTypedChars(newChars);
+        setCurrentIndex(newIndex);
+        setExtraChars([]);
+        setLockedIndex(newIndex);
+        reportProgress(newChars, newIndex);
+        if (newIndex >= passage.length) {
+          setFinished(true);
+          onFinish(calcWpm(newChars.join('')));
+        }
+      } else {
+        setExtraChars(prev => [...prev, ' ']);
+      }
+    } else {
+      if (passageChar === ' ') {
+        setExtraChars(prev => [...prev, e.key]);
+      } else {
+        const newChars = [...typedChars, e.key];
+        const newIndex = currentIndex + 1;
+        setTypedChars(newChars);
+        setCurrentIndex(newIndex);
+        reportProgress(newChars, newIndex);
+        if (newIndex >= passage.length) {
+          setFinished(true);
+          onFinish(calcWpm(newChars.join('')));
+        }
+      }
+    }
+  };
+
+  const chars = passage.split('');
+
+  return (
+    <div onClick={() => inputRef.current?.focus()} onCopy={e => e.preventDefault()}>
+      <div className="font-mono text-lg leading-relaxed select-none">
+        {chars.map((char, i) => {
+          if (i < typedChars.length) {
+            const isCorrect = typedChars[i] === char;
+            return (
+              <span
+                key={i}
+                className={isCorrect ? 'text-text-main' : 'text-red-400 line-through'}
+              >
+                {char}
+              </span>
+            );
+          }
+          if (i === currentIndex) {
+            return (
+              <span key={i} className="border-l-2 border-accent animate-pulse">
+                {char}
+              </span>
+            );
+          }
+          return (
+            <span key={i} className="text-text-dim">
+              {char}
+            </span>
+          );
+        })}
+        {extraChars.length > 0 && (
+          <span className="text-red-400">{extraChars.join('')}</span>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="text"
+        value=""
+        onChange={() => {}}
+        onKeyDown={handleKeyDown}
+        onPaste={e => e.preventDefault()}
+        className="opacity-0 absolute w-0 h-0 pointer-events-none"
+        readOnly={false}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+      />
     </div>
   );
 }
