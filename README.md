@@ -1,6 +1,6 @@
 # 19wpm
 
-A minimalist typing test web application. Tests are single-player only: choose a mode, type the presented text, and receive a WPM/accuracy score with per-character replay. Sessions are stateless for guests and persistent for authenticated users.
+A typing test web application with single-player practice modes and real-time multiplayer races. Sessions are stateless for guests and persistent for authenticated users.
 
 ## Features
 
@@ -13,6 +13,7 @@ A minimalist typing test web application. Tests are single-player only: choose a
 - OAuth2 authentication via GitHub and Google
 - Dashboard with result history, WPM progression chart, and per-user stats
 - Light and dark themes
+- Real-time multiplayer races via WebSocket (STOMP over SockJS): create or join rooms, matchmaking queue, live progress tracking per participant, and ranked results
 
 ## Tech Stack
 
@@ -23,6 +24,7 @@ A minimalist typing test web application. Tests are single-player only: choose a
 | Tailwind CSS (v4) | Flyway (schema migrations) |
 | Vite | Redis (token blacklisting) |
 | Recharts | Bucket4j (rate limiting) |
+| | STOMP / SockJS (WebSocket) |
 
 ## Getting Started
 
@@ -77,7 +79,6 @@ The dev server starts on `http://localhost:5173`. Vite proxies `/api` requests t
 
 ## Scope and Limitations
 
-- Compete and Leaderboard features exist as placeholders but are not implemented. There is no real-time multiplayer.
 - Guest results are stored in localStorage only and are not synced across devices or browsers. Clearing site data will permanently remove them.
 - The mobile experience is functional but the keyboard-based shortcuts (Tab to focus restart, Enter to confirm) depend on a physical keyboard.
 - Word lists and phrase content are seeded at deploy time and cannot be modified or extended through the UI.
