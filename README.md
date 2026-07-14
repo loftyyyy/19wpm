@@ -1,60 +1,50 @@
 # 19wpm
 
-A typing test web application with single-player practice modes and real-time multiplayer races. Sessions are stateless for guests and persistent for authenticated users.
+Typing test app with solo practice modes and real-time multiplayer races. Guest sessions use localStorage; authenticated users sync results to the backend.
 
-## Features
+## Routes
 
-- Three test modes: words (N-word random sample from a difficulty-graded word list), phrases (full sentences from a curated text corpus), time (timed duration with a continuous word feed)
-- Four difficulty tiers for words mode: Easy, Medium, Hard, Expert
-- WPM burst chart showing speed across each second of the test
-- Per-key replay with error highlighting and backspace tracking
-- Mistake-word review showing expected vs. typed text
-- Guest play with localStorage persistence; results migrate to the backend on signup or login
-- OAuth2 authentication via GitHub and Google
-- Dashboard with result history, WPM progression chart, and per-user stats
-- Light and dark themes
-- Real-time multiplayer races via WebSocket (STOMP over SockJS): create or join rooms, matchmaking queue, live progress tracking per participant, and ranked results
+| Path | Page |
+|---|---|
+| `/` | Landing |
+| `/solo` | Typing test (words, phrases, time) |
+| `/results` | Post-test results (WPM chart, replay, mistakes) |
+| `/login` | Login / signup with OAuth2 (GitHub, Google) |
+| `/oauth2/callback` | OAuth2 redirect handler |
+| `/dashboard` | History, progression chart, stats |
+| `/create` | Content creation |
+| `/compete` | Matchmaking lobby |
+| `/leaderboard` | Leaderboard |
+| `/about` | About |
+| `/race` | Active race |
 
 ## Tech Stack
 
 | Frontend | Backend |
 |---|---|
-| React | Spring Boot |
-| TypeScript | PostgreSQL |
-| Tailwind CSS (v4) | Flyway (schema migrations) |
-| Vite | Redis (token blacklisting) |
-| Recharts | Bucket4j (rate limiting) |
-| | STOMP / SockJS (WebSocket) |
+| React 19 | Spring Boot 4.0.2 (Java 17) |
+| TypeScript | PostgreSQL + Flyway |
+| Tailwind CSS v4 | Redis (token blacklist) |
+| Vite | Bucket4j (rate limiting) |
+| Recharts | STOMP / SockJS (WebSocket) |
 
 ## Getting Started
 
-### Prerequisites
-
-- Java 17
-- Node.js 20
-- PostgreSQL 14+
-- Redis 6+
-- Maven (wrapped via `mvnw`)
-
-### Backend
+**Prerequisites:** Java 17, Node.js 20, PostgreSQL 14+, Redis 6+.
 
 ```sh
+# Backend
 cd backend
-cp .env.example .env       # fill in secrets
-./mvnw spring-boot:run
-```
+cp .env.example .env
+./mvnw spring-boot:run        # starts on :8080
 
-The API starts on `http://localhost:8080`. Flyway runs migrations on startup and the application seeds initial word lists and preset texts via `spring.sql.init.mode=always`.
-
-### Frontend
-
-```sh
+# Frontend
 cd frontend
 npm install
-npm run dev
+npm run dev                   # starts on :5173, proxies /api to :8080
 ```
 
-The dev server starts on `http://localhost:5173`. Vite proxies `/api` requests to `http://localhost:8080`.
+Flyway runs migrations on startup. Word lists and preset texts are seeded at deploy time.
 
 ## Environment Variables
 
@@ -62,28 +52,28 @@ The dev server starts on `http://localhost:5173`. Vite proxies `/api` requests t
 
 | Variable | Description |
 |---|---|
-| `DB_URL` | JDBC URL for PostgreSQL |
+| `DB_URL` | PostgreSQL JDBC URL |
 | `DB_USERNAME` | PostgreSQL user |
 | `DB_PASSWORD` | PostgreSQL password |
-| `JWT_SECRET` | HMAC key for signing access and refresh tokens |
-| `GITHUB_CLIENT_ID` | OAuth2 client ID for GitHub login |
-| `GITHUB_CLIENT_SECRET` | OAuth2 client secret for GitHub login |
-| `GOOGLE_CLIENT_ID` | OAuth2 client ID for Google login |
-| `GOOGLE_CLIENT_SECRET` | OAuth2 client secret for Google login |
+| `JWT_SECRET` | HMAC key for access/refresh tokens |
+| `GITHUB_CLIENT_ID` | GitHub OAuth2 client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth2 client secret |
+| `GOOGLE_CLIENT_ID` | Google OAuth2 client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret |
 
 ### Frontend (`frontend/.env.production`)
 
 | Variable | Description |
 |---|---|
-| `VITE_API_BASE_URL` | Base URL of the backend API for production builds |
+| `VITE_API_BASE_URL` | Backend API URL (production builds) |
 
-## Scope and Limitations
+## Limitations
 
-- Guest results are stored in localStorage only and are not synced across devices or browsers. Clearing site data will permanently remove them.
-- The mobile experience is functional but the keyboard-based shortcuts (Tab to focus restart, Enter to confirm) depend on a physical keyboard.
-- Word lists and phrase content are seeded at deploy time and cannot be modified or extended through the UI.
-- The application has no offline support. Both the frontend and backend must be reachable for authenticated sessions.
-- Token refresh is attempted once on a 401 response; concurrent refresh requests are coalesced but a second simultaneous failure is not retried.
+- Guest results live in localStorage only. Clearing site data removes them permanently.
+- Mobile works for typing but keyboard shortcuts (Tab, Enter) require a physical keyboard.
+- Word lists and phrase content are seeded at deploy time and cannot be edited through the UI.
+- No offline support. Both frontend and backend must be reachable for authenticated sessions.
+- Token refresh is attempted once on 401. A second consecutive failure is not retried.
 
 ## License
 
