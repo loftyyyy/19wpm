@@ -306,10 +306,19 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
   const [extraChars, setExtraChars] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const currentCharRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (cursorRef.current && currentCharRef.current) {
+      const { offsetLeft, offsetTop } = currentCharRef.current;
+      cursorRef.current.style.transform = `translate(${offsetLeft}px, ${offsetTop}px)`;
+    }
+  }, [currentIndex, typedChars.length]);
 
   const calcWpm = (typed: string) => {
     const minutes = (Date.now() - new Date(startTime).getTime()) / 60000;
@@ -389,7 +398,11 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
 
   return (
     <div onClick={() => inputRef.current?.focus()} onCopy={e => e.preventDefault()}>
-      <div className="font-mono text-lg leading-relaxed select-none">
+      <div className="font-mono text-lg leading-relaxed select-none relative">
+        <div
+          ref={cursorRef}
+          className={`typing-cursor${finished ? ' typing-cursor-hidden' : ''}`}
+        />
         {chars.map((char, i) => {
           if (i < typedChars.length) {
             const isCorrect = typedChars[i] === char;
@@ -404,7 +417,7 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
           }
           if (i === currentIndex) {
             return (
-              <span key={i} className="char-current char-untyped">
+              <span key={i} ref={currentCharRef} className="char-untyped">
                 {char}
               </span>
             );
