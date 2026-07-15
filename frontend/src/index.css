@@ -71,6 +71,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   50% { opacity: 0; }
 }
 
+.animate-blink {
+  animation: blink 1s steps(2, end) infinite;
+}
+
 .typing-cursor {
   position: absolute;
   top: 0;
