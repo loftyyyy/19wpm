@@ -13,7 +13,7 @@ export default function Navbar() {
 
   const navLinks: { label: string; path: string; disabled?: boolean }[] = [
     { label: 'Practice', path: '/solo' },
-    { label: 'Compete', path: '/compete' },
+    { label: 'Compete', path: '/race' },
     { label: 'Leaderboard', path: '/leaderboard', disabled: true },
     { label: 'About', path: '/about' },
   ];
