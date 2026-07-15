@@ -396,7 +396,7 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
             return (
               <span
                 key={i}
-                className={isCorrect ? 'text-text-main' : 'text-red-400 line-through'}
+                className={isCorrect ? 'char-correct' : 'char-incorrect'}
               >
                 {char}
               </span>
@@ -404,13 +404,13 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
           }
           if (i === currentIndex) {
             return (
-              <span key={i} className="border-l-2 border-accent animate-pulse">
+              <span key={i} className="char-current char-untyped">
                 {char}
               </span>
             );
           }
           return (
-            <span key={i} className="text-text-dim">
+            <span key={i} className="char-untyped">
               {char}
             </span>
           );
