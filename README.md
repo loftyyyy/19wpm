@@ -16,7 +16,7 @@ Typing test app with solo practice modes and real-time multiplayer races. Guest 
 | `/compete` | Matchmaking lobby |
 | `/leaderboard` | Leaderboard |
 | `/about` | About |
-| `/race` | Active race |
+| `/race` | Matchmaking lobby |
 
 ## Tech Stack
 
