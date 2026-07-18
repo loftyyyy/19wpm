@@ -24,6 +24,7 @@ export default function Race() {
   const [isRequesting, setIsRequesting] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
+  const [matchmakingSeconds, setMatchmakingSeconds] = useState(0);
 
   const handleMatchmakingCode = useCallback((code: string) => {
     setRoomCode(code);
@@ -42,6 +43,34 @@ export default function Race() {
     if (!socket.room || phase !== 'racing') return;
     if (socket.room.state === 'FINISHED') setPhase('finished');
   }, [socket.room, phase]);
+
+  useEffect(() => {
+    if (!isMatchmaking) {
+      setMatchmakingSeconds(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setMatchmakingSeconds(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isMatchmaking]);
+
+  const handleCancelMatchmaking = useCallback(async () => {
+    try {
+      await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/race/matchmaking/leave`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('19wpm-access-token') ?? ''}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    } catch { /* ignore */ }
+    setIsMatchmaking(false);
+    setMatchmakingSeconds(0);
+  }, []);
 
   const handleCreateRoom = useCallback(async () => {
     if (isRequesting) return;
@@ -99,9 +128,41 @@ export default function Race() {
     setIsMatchmaking(false);
     setJoinCode('');
     setJoinError('');
+    setMatchmakingSeconds(0);
   }, []);
 
   const renderContent = () => {
+    if (isMatchmaking) {
+      return (
+        <div className="bg-card border border-line rounded-2xl shadow-sm p-8 transition-theme max-w-lg mx-auto text-center">
+          <div className="mb-6">
+            <div className="w-12 h-12 rounded-full border-4 border-accent border-t-transparent animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-display font-semibold text-text-main mb-2">Finding a match...</h2>
+            <p className="text-text-dim font-sans text-sm">
+              Searching for {selectedTextType.toLowerCase()} race
+            </p>
+          </div>
+          <p className="text-text-dim font-sans text-xs mb-6">
+            {matchmakingSeconds}s elapsed &middot; waiting for opponents
+          </p>
+          {matchmakingSeconds >= 30 && (
+            <p className="text-text-dim font-sans text-xs mb-4 bg-muted rounded-xl p-3">
+              Taking longer than usual. Ask a friend to join at{' '}
+              <span className="text-accent font-semibold">
+                19wpm.vercel.app/race
+              </span>
+            </p>
+          )}
+          <button
+            onClick={handleCancelMatchmaking}
+            className="px-6 py-2 rounded-xl font-sans font-semibold text-sm bg-muted border border-line text-text-sub hover:text-text-main transition-colors hover:cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      );
+    }
+
     if (phase === 'setup') {
       return (
         <div className="bg-card border border-line rounded-2xl shadow-sm p-6 transition-theme max-w-lg mx-auto">
@@ -136,10 +197,10 @@ export default function Race() {
             </button>
             <button
               onClick={handleJoinMatchmaking}
-              disabled={isMatchmaking || isRequesting}
+              disabled={isRequesting}
               className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-muted text-text-main border border-line hover:bg-muted/80 transition-colors hover:cursor-pointer disabled:opacity-40"
             >
-              {isMatchmaking ? 'Searching...' : 'Find Public Match'}
+              Find Public Match
             </button>
           </div>
 
