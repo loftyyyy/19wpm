@@ -12,8 +12,9 @@ export default function Lobby({ room, currentUserId, onStart }: Props) {
     navigator.clipboard.writeText(room.roomCode);
   }, [room.roomCode]);
 
-  const isHost = currentUserId === room.hostUserId;
+  const isHost = room.hostUserId !== null && currentUserId === room.hostUserId;
   const canStart = room.participants.length >= 2;
+  const isPublic = room.hostUserId === null;
 
   return (
     <div className="bg-card border border-line rounded-2xl shadow-sm p-6 transition-theme max-w-lg mx-auto">
@@ -60,7 +61,18 @@ export default function Lobby({ room, currentUserId, onStart }: Props) {
         </div>
       </div>
 
-      {isHost ? (
+      {isPublic ? (
+        <>
+          <p className="text-center text-sm font-sans text-text-dim mb-3">
+            Race starts automatically when enough players have joined.
+          </p>
+          {canStart && (
+            <p className="text-center text-xs font-sans text-accent">
+              Starting in a moment...
+            </p>
+          )}
+        </>
+      ) : isHost ? (
         <button
           onClick={onStart}
           disabled={!canStart}

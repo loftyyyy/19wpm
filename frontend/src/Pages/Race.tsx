@@ -25,6 +25,7 @@ export default function Race() {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [matchmakingSeconds, setMatchmakingSeconds] = useState(0);
+  const startTriggeredRef = useRef(false);
 
   const handleMatchmakingCode = useCallback((code: string) => {
     setRoomCode(code);
@@ -43,6 +44,16 @@ export default function Race() {
     if (!socket.room || phase !== 'racing') return;
     if (socket.room.state === 'FINISHED') setPhase('finished');
   }, [socket.room, phase]);
+
+  useEffect(() => {
+    if (!socket.room) return;
+    if (socket.room.hostUserId !== null) return;
+    if (socket.room.state !== 'LOBBY') return;
+    if (socket.room.participants.length < 2) return;
+    if (startTriggeredRef.current) return;
+    startTriggeredRef.current = true;
+    socket.sendStart();
+  }, [socket.room]);
 
   useEffect(() => {
     if (!isMatchmaking) {
@@ -140,6 +151,7 @@ export default function Race() {
     setJoinCode('');
     setJoinError('');
     setMatchmakingSeconds(0);
+    startTriggeredRef.current = false;
   }, []);
 
   const renderContent = () => {
