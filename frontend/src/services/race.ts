@@ -19,7 +19,16 @@ export async function joinRoomByCode(code: string): Promise<string> {
 }
 
 export async function joinMatchmaking(textType: TextType | null): Promise<void> {
-  await api.post('/race/matchmaking/join', { textType });
+  const token = localStorage.getItem('19wpm-access-token') ?? '';
+  const response = await fetch(`${API_BASE_URL}/api/v1/race/matchmaking/join`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ textType })
+  });
+  if (!response.ok) throw new Error('Failed to join matchmaking');
 }
 
 export async function leaveMatchmaking(): Promise<void> {
