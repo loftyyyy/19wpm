@@ -95,12 +95,13 @@ public class RaceService {
 
     public RaceRoom startRoom(String roomCode, Long userId) {
         RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
-        if (!raceRoom.isHost(userId)) {
+        boolean isPublicRoom = raceRoom.getHostUserId() == null;
+        if (!isPublicRoom && !raceRoom.isHost(userId)) {
             throw new UnauthorizedResourceException("Only the room creator can start the race");
         }
 
         if (!raceRoom.getState().equals(RaceState.LOBBY)) {
-            throw new InvalidResourceException("Race already started");
+            return raceRoom;
         }
 
         if (raceRoom.getParticipants().size() < 2) {

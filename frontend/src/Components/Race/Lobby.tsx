@@ -5,9 +5,10 @@ interface Props {
   room: RaceRoom;
   currentUserId: number;
   onStart: () => void;
+  autoStartCountdown?: number | null;
 }
 
-export default function Lobby({ room, currentUserId, onStart }: Props) {
+export default function Lobby({ room, currentUserId, onStart, autoStartCountdown }: Props) {
   const handleCopyCode = useCallback(() => {
     navigator.clipboard.writeText(room.roomCode);
   }, [room.roomCode]);
@@ -66,9 +67,17 @@ export default function Lobby({ room, currentUserId, onStart }: Props) {
           <p className="text-center text-sm font-sans text-text-dim mb-3">
             Race starts automatically when enough players have joined.
           </p>
-          {canStart && (
-            <p className="text-center text-xs font-sans text-accent">
-              Starting in a moment...
+          {autoStartCountdown !== null && autoStartCountdown !== undefined && autoStartCountdown > 0 ? (
+            <p className="text-accent font-sans text-sm font-semibold">
+              Starting in {autoStartCountdown}s...
+            </p>
+          ) : autoStartCountdown === 0 ? (
+            <p className="text-accent font-sans text-sm font-semibold">
+              Starting...
+            </p>
+          ) : (
+            <p className="text-text-dim font-sans text-sm">
+              Waiting for more players...
             </p>
           )}
         </>

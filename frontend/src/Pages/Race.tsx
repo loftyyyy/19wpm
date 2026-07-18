@@ -25,7 +25,9 @@ export default function Race() {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [matchmakingSeconds, setMatchmakingSeconds] = useState(0);
-  const startTriggeredRef = useRef(false);
+  const [autoStartCountdown, setAutoStartCountdown] = useState<number | null>(null);
+  const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoStartIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleMatchmakingCode = useCallback((code: string) => {
     setRoomCode(code);
@@ -49,11 +51,35 @@ export default function Race() {
     if (!socket.room) return;
     if (socket.room.hostUserId !== null) return;
     if (socket.room.state !== 'LOBBY') return;
-    if (socket.room.participants.length < 2) return;
-    if (startTriggeredRef.current) return;
-    startTriggeredRef.current = true;
-    socket.sendStart();
-  }, [socket.room]);
+
+    const count = socket.room.participants.filter(p => !p.disconnected).length;
+
+    if (autoStartTimerRef.current) clearTimeout(autoStartTimerRef.current);
+    if (autoStartIntervalRef.current) clearInterval(autoStartIntervalRef.current);
+
+    if (count >= 2) {
+      setAutoStartCountdown(5);
+      let remaining = 5;
+      autoStartIntervalRef.current = setInterval(() => {
+        remaining -= 1;
+        setAutoStartCountdown(remaining);
+        if (remaining <= 0) {
+          clearInterval(autoStartIntervalRef.current!);
+        }
+      }, 1000);
+      autoStartTimerRef.current = setTimeout(() => {
+        socket.sendStart();
+        setAutoStartCountdown(null);
+      }, 5000);
+    } else {
+      setAutoStartCountdown(null);
+    }
+
+    return () => {
+      if (autoStartTimerRef.current) clearTimeout(autoStartTimerRef.current);
+      if (autoStartIntervalRef.current) clearInterval(autoStartIntervalRef.current);
+    };
+  }, [socket.room?.participants.length, socket.room?.state, socket.room?.hostUserId]);
 
   useEffect(() => {
     if (!isMatchmaking) {
@@ -151,7 +177,7 @@ export default function Race() {
     setJoinCode('');
     setJoinError('');
     setMatchmakingSeconds(0);
-    startTriggeredRef.current = false;
+    setAutoStartCountdown(null);
   }, []);
 
   const renderContent = () => {
@@ -281,6 +307,7 @@ export default function Race() {
           room={socket.room}
           currentUserId={Number(user?.id ?? 0)}
           onStart={handleStart}
+          autoStartCountdown={autoStartCountdown}
         />
       );
     }
