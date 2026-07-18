@@ -11,10 +11,45 @@ interface UseRaceSocketOpts {
 export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts) {
   const [room, setRoom] = useState<RaceRoom | null>(null);
   const [connected, setConnected] = useState(false);
+  const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const hasJoinedRef = useRef(false);
 
   useEffect(() => {
+    const token = getAccessToken();
+    if (!token) {
+      setIsTokenReady(false);
+      return;
+    }
+    const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
+    fetch(`${apiBase}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(async res => {
+      if (res.ok) {
+        setIsTokenReady(true);
+      } else if (res.status === 401) {
+        const refreshToken = localStorage.getItem('19wpm-refresh-token');
+        if (!refreshToken) { setIsTokenReady(false); return; }
+        const refreshRes = await fetch(`${apiBase}/api/v1/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          localStorage.setItem('19wpm-access-token', data.accessToken);
+          localStorage.setItem('19wpm-refresh-token', data.refreshToken);
+          setIsTokenReady(true);
+        } else {
+          setIsTokenReady(false);
+        }
+      }
+    }).catch(() => setIsTokenReady(false));
+  }, []);
+
+  useEffect(() => {
+    if (!isTokenReady) return;
+
     hasJoinedRef.current = false;
     const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
     const client = new Client({
@@ -65,7 +100,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
       client.deactivate();
       clientRef.current = null;
     };
-  }, [roomCode, opts?.onMatchmakingRoomCode]);
+  }, [roomCode, opts?.onMatchmakingRoomCode, isTokenReady]);
 
   const sendProgress = useCallback((progressPercent: number, currentWpm: number, typedContent: string) => {
     if (!clientRef.current?.connected || !roomCode) return;
