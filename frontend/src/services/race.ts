@@ -34,3 +34,15 @@ export async function joinMatchmaking(textType: TextType | null): Promise<void> 
 export async function leaveMatchmaking(): Promise<void> {
   await api.post('/race/matchmaking/leave');
 }
+
+export async function getPendingMatch(): Promise<string | null> {
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
+  const token = localStorage.getItem('19wpm-access-token') ?? '';
+  const response = await fetch(
+    `${apiBase}/api/v1/race/matchmaking/pending`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (response.status === 204) return null;
+  if (!response.ok) return null;
+  return response.text();
+}

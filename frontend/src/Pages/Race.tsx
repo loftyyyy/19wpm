@@ -8,7 +8,7 @@ import RaceTrack from '../Components/Race/RaceTrack';
 import RaceResults from '../Components/Race/RaceResults';
 import { useAuth } from '../context/AuthContext';
 import { useRaceSocket } from '../hooks/useRaceSocket';
-import { createRoom, joinRoomByCode, joinMatchmaking } from '../services/race';
+import { createRoom, joinRoomByCode, joinMatchmaking, getPendingMatch } from '../services/race';
 import type { TextType } from '../types/race';
 
 const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
@@ -54,6 +54,17 @@ export default function Race() {
     }, 1000);
     return () => clearInterval(interval);
   }, [isMatchmaking]);
+
+  useEffect(() => {
+    if (!isMatchmaking) return;
+    const interval = setInterval(async () => {
+      const code = await getPendingMatch();
+      if (code) {
+        handleMatchmakingCode(code);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [isMatchmaking, handleMatchmakingCode]);
 
   const handleCancelMatchmaking = useCallback(async () => {
     try {

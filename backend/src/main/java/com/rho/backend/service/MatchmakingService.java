@@ -85,6 +85,11 @@ public class MatchmakingService {
                 redisTemplate.delete(playerKey(userId));
                 raceService.joinRoom(roomCode, userId);
                 simpMessagingTemplate.convertAndSendToUser(userId.toString(), "/queue/matchmaking", roomCode);
+                redisTemplate.opsForValue().set(
+                        "matchmaking:pending:" + userId,
+                        roomCode,
+                        Duration.ofMinutes(2)
+                );
             }
         }
     }
