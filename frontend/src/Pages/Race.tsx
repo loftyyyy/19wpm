@@ -346,6 +346,7 @@ export default function Race() {
           participants={socket.room.participants}
           currentUserId={Number(user?.id ?? 0)}
           onPlayAgain={handlePlayAgain}
+          room={socket.room}
         />
       );
     }

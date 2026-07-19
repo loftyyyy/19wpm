@@ -1,12 +1,13 @@
-import type { RaceParticipant } from '../../types/race';
+import type { RaceParticipant, RaceRoom } from '../../types/race';
 
 interface Props {
   participants: RaceParticipant[];
   currentUserId: number;
   onPlayAgain: () => void;
+  room?: RaceRoom;
 }
 
-export default function RaceResults({ participants, currentUserId, onPlayAgain }: Props) {
+export default function RaceResults({ participants, currentUserId, onPlayAgain, room }: Props) {
   const sorted = [...participants].sort((a, b) => {
     if (a.finishRank > 0 && b.finishRank > 0) return a.finishRank - b.finishRank;
     if (a.finishRank > 0) return -1;
@@ -14,33 +15,66 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain }
     return 0;
   });
 
+  const winner = sorted.find(p => p.finishRank === 1 && p.finished);
+  const myResult = participants.find(p => p.userId === currentUserId);
+
   return (
     <div className="bg-card border border-line rounded-2xl shadow-sm p-6 transition-theme max-w-lg mx-auto">
-      <h2 className="text-xl font-display font-semibold text-text-main text-center mb-6">Race Results</h2>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-display font-bold text-text-main mb-1">Race Results</h2>
+        {room?.text && (
+          <p className="text-xs font-sans text-text-dim">
+            {room.text.title} · {room.text.author} · {room.text.wordCount} words
+          </p>
+        )}
+      </div>
 
-      <div className="space-y-2 mb-6">
+      {winner && (
+        <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 mb-4 text-center">
+          <p className="text-3xl mb-1">🏆</p>
+          <p className="text-lg font-display font-bold text-accent">{winner.username}</p>
+          <p className="text-xs font-sans text-text-dim mt-1">
+            {winner.userId === currentUserId ? 'You won!' : 'Wins this race'}
+          </p>
+          <div className="flex justify-center gap-6 mt-3">
+            <div className="text-center">
+              <p className="text-2xl font-display font-bold text-text-main">{winner.currentWpm}</p>
+              <p className="text-xs font-sans text-text-dim">WPM</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-display font-bold text-text-main">{winner.errors}</p>
+              <p className="text-xs font-sans text-text-dim">Errors</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-1 mb-4">
         {sorted.map((p) => {
           const isMe = p.userId === currentUserId;
-          const isDnf = p.finishRank === 0;
+          const isDnf = !p.finished || p.disconnected;
 
           return (
             <div
               key={p.userId}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-theme ${
-                isMe ? 'bg-muted border-l-4 border-accent' : ''
-              }`}
+                isMe && !isDnf ? 'bg-muted border-l-4 border-accent' : ''
+              } ${isDnf ? 'opacity-50' : ''}`}
             >
-              <span className="w-8 shrink-0 text-center">
+              <span className="w-8 shrink-0 text-center text-sm font-sans font-bold">
                 {isDnf ? (
-                  <span className="text-xs font-sans font-semibold text-red-500">DNF</span>
-                ) : p.finishRank === 1 ? (
-                  <span className="text-lg">🏆</span>
+                  <span className="text-error">DNF</span>
                 ) : (
-                  <span className="text-sm font-sans font-bold text-text-dim">#{p.finishRank}</span>
+                  <span className={p.finishRank === 1 ? 'text-accent' : 'text-text-dim'}>
+                    #{p.finishRank}
+                  </span>
                 )}
               </span>
 
-              <span className="text-sm font-sans text-text-main flex-1 truncate">{p.username}</span>
+              <span className="text-sm font-sans text-text-main flex-1 truncate">
+                {p.username}
+                {isMe && ' (You)'}
+              </span>
 
               {!isDnf && (
                 <>
@@ -48,14 +82,40 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain }
                   <span className="text-sm font-sans text-text-dim w-10 text-right">{p.errors}</span>
                 </>
               )}
+
+              {isDnf && (
+                <span className="text-xs font-sans text-text-dim w-28 text-right">
+                  {Math.round(p.progressPercent * 100)}%
+                </span>
+              )}
             </div>
           );
         })}
       </div>
 
+      {myResult && (
+        <div className="bg-muted rounded-2xl p-4 mt-4">
+          <p className="text-xs font-sans font-semibold text-text-dim uppercase tracking-wider mb-3">Your Performance</p>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-xl font-display font-bold text-accent">{myResult.currentWpm}</p>
+              <p className="text-xs font-sans text-text-dim">WPM</p>
+            </div>
+            <div>
+              <p className="text-xl font-display font-bold text-text-main">#{myResult.finishRank || 'DNF'}</p>
+              <p className="text-xs font-sans text-text-dim">Rank</p>
+            </div>
+            <div>
+              <p className="text-xl font-display font-bold text-text-main">{myResult.errors}</p>
+              <p className="text-xs font-sans text-text-dim">Errors</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <button
         onClick={onPlayAgain}
-        className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-accent text-white hover:bg-accent-hover transition-colors hover:cursor-pointer"
+        className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-accent text-white hover:bg-accent-hover transition-colors hover:cursor-pointer mt-4"
       >
         Play Again
       </button>
