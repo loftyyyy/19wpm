@@ -170,13 +170,13 @@ public class RaceService {
         if (raceRoom.allActiveFinished()) {
             raceRoom.setState(RaceState.FINISHED);
             raceRoomRepository.save(raceRoom);
-            persistRace(raceRoom);
+            persistRacePublic(raceRoom);
         }
 
         return raceRoom;
     }
 
-    private void persistRace(RaceRoom raceRoom) {
+    public void persistRacePublic(RaceRoom raceRoom) {
         RaceSession raceSession = RaceSession.builder()
                 .roomCode(raceRoom.getRoomCode())
                 .textId(raceRoom.getText().textId())

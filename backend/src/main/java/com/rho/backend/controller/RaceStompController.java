@@ -9,10 +9,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
+import java.util.Map;
 
 @Controller
 public class RaceStompController {
@@ -28,10 +30,14 @@ public class RaceStompController {
     }
 
     @MessageMapping("/room/{code}/join")
-    public void joinRoom(@DestinationVariable String code, Principal principal){
+    public void joinRoom(@DestinationVariable String code, Principal principal, SimpMessageHeaderAccessor headerAccessor){
         logger.info("joinRoom called - code: {}, principal: {}", code, principal != null ? principal.getName() : "null");
         Long userId = Long.parseLong(principal.getName());
         RaceRoom raceRoom = raceService.joinRoom(code, userId);
+        Map<String, Object> attrs = headerAccessor.getSessionAttributes();
+        if (attrs != null) {
+            attrs.put("roomCode", code);
+        }
         messagingTemplate.convertAndSend("/topic/room/" + code, raceRoom);
 
     }
