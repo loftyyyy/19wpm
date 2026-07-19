@@ -484,6 +484,7 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
         reportProgress(newChars, newIndex);
         if (newIndex >= passage.length) {
           setFinished(true);
+          onProgress(1, calcWpm(newChars.join('')), newChars.join(''));
           onFinish(calcWpm(newChars.join('')));
         }
       } else {
@@ -500,6 +501,7 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
         reportProgress(newChars, newIndex);
         if (newIndex >= passage.length) {
           setFinished(true);
+          onProgress(1, calcWpm(newChars.join('')), newChars.join(''));
           onFinish(calcWpm(newChars.join('')));
         }
       }
