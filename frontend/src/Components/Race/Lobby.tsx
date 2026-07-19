@@ -37,21 +37,30 @@ export default function Lobby({ room, currentUserId, onStart, autoStartCountdown
 
       <div className="mb-6">
         <p className="text-xs font-sans font-semibold text-text-dim uppercase tracking-wider mb-3">
-          Participants ({room.participants.length})
+          Participants ({room.participants.filter(p => !p.disconnected).length})
         </p>
         <div className="space-y-2">
           {room.participants.map((p) => (
             <div
               key={p.userId}
-              className="flex items-center justify-between bg-muted rounded-xl px-4 py-3 transition-theme"
+              className={`flex items-center justify-between rounded-xl px-4 py-3 transition-theme ${
+                p.disconnected ? 'bg-muted opacity-40' : 'bg-muted'
+              }`}
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm font-sans text-text-main">{p.username}</span>
-                {p.userId === currentUserId && (
+                <span className={`text-sm font-sans ${
+                  p.disconnected ? 'line-through text-text-dim' : 'text-text-main'
+                }`}>
+                  {p.username}
+                </span>
+                {p.userId === currentUserId && !p.disconnected && (
                   <span className="text-[10px] font-sans font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded">You</span>
                 )}
-                {p.userId === room.hostUserId && (
+                {p.userId === room.hostUserId && !p.disconnected && (
                   <span className="text-[10px] font-sans font-semibold text-text-dim bg-muted border border-line px-1.5 py-0.5 rounded">Host</span>
+                )}
+                {p.disconnected && (
+                  <span className="text-[10px] font-sans font-semibold text-error bg-error/10 px-1.5 py-0.5 rounded">Left</span>
                 )}
               </div>
               {p.ready && (
