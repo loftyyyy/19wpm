@@ -515,33 +515,43 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
           className={`typing-cursor${finished ? ' typing-cursor-hidden' : ''}`}
         />
         {chars.map((char, i) => {
-          if (i < typedChars.length) {
-            const isCorrect = typedChars[i] === char;
+          const charSpan = (() => {
+            if (i < typedChars.length) {
+              const isCorrect = typedChars[i] === char;
+              return (
+                <span key={i} className={isCorrect ? 'char-correct' : 'char-incorrect'}>
+                  {char}
+                </span>
+              );
+            }
+            if (i === currentIndex) {
+              return (
+                <span key={i} ref={currentCharRef} className="char-untyped">
+                  {char}
+                </span>
+              );
+            }
             return (
-              <span
-                key={i}
-                className={isCorrect ? 'char-correct' : 'char-incorrect'}
-              >
+              <span key={i} className="char-untyped">
                 {char}
               </span>
             );
-          }
-          if (i === currentIndex) {
-            return (
-              <span key={i} ref={currentCharRef} className="char-untyped">
-                {char}
-              </span>
-            );
-          }
+          })();
+
+          const shouldRenderExtra =
+            extraChars.length > 0 &&
+            i === currentIndex &&
+            passage[currentIndex] === ' ';
+
           return (
-            <span key={i} className="char-untyped">
-              {char}
+            <span key={`wrapper-${i}`}>
+              {charSpan}
+              {shouldRenderExtra && (
+                <span className="char-incorrect">{extraChars.join('')}</span>
+              )}
             </span>
           );
         })}
-        {extraChars.length > 0 && (
-          <span className="text-red-400">{extraChars.join('')}</span>
-        )}
       </div>
       <input
         ref={inputRef}
