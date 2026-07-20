@@ -4,6 +4,7 @@ import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.text.request.TextRequestDTO;
 import com.rho.backend.dto.text.request.TextUpdateRequestDTO;
 import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.enums.TextDifficulty;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.service.TextService;
 import jakarta.validation.Valid;
@@ -29,6 +30,18 @@ public class TextController {
             @PathVariable long textId,
             @AuthenticationPrincipal CustomUserDetails customUserDetails){
         return ResponseEntity.ok(textService.getTextById(textId, customUserDetails.getUserId()));
+    }
+
+    @GetMapping("/bulk")
+    public ResponseEntity<List<TextResponseDTO>> getTexts(
+            @RequestParam String language,
+            @RequestParam TextType textType,
+            @RequestParam int count){
+    {
+        return ResponseEntity.ok(textService.getRandomTexts(language, textType, count));
+    }
+
+
     }
 
     @GetMapping("/preset-texts")

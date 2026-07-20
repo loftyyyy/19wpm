@@ -3,6 +3,7 @@ package com.rho.backend.service;
 import com.rho.backend.dto.text.request.TextRequestDTO;
 import com.rho.backend.dto.text.request.TextUpdateRequestDTO;
 import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.enums.TextDifficulty;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.exception.InvalidResourceException;
 import com.rho.backend.exception.UnauthorizedResourceException;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.awt.print.Pageable;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -139,6 +141,34 @@ public class TextService {
         return new TextResponseDTO(textRepository.save(text));
     }
 
+
+    public List<TextResponseDTO> getRandomTexts(String language, TextType textType , int count){
+        if(language == null || language.isBlank()){
+            throw new InvalidResourceException("Language cannot be empty");
+        }
+        if(textType == null){
+            throw new InvalidResourceException("Text type cannot be null");
+        }
+        if(count <= 0){
+            throw new InvalidResourceException("Count must be greater than 0");
+        }
+
+        List<Text> words = textRepository.findByLanguageAndType(language.trim().toLowerCase(), textType);
+
+        if(words.isEmpty()){
+            throw new ResourceNotFoundException("No words found for language: " + language + " and difficulty: " + textType);
+        }
+        if(count > words.size()){
+            throw new InvalidResourceException("Count exceeds available words");
+        }
+
+        Collections.shuffle(words);
+
+        return words.stream()
+                .limit(count)
+                .map(TextResponseDTO::new)
+                .toList();
+    }
     public TextResponseDTO getTextById(Long textId, Long id){
         Text text = textRepository.findById(textId).orElseThrow(() -> new ResourceNotFoundException("Text not found"));
 
