@@ -22,7 +22,7 @@ export default function RaceTrack({ participants, currentUserId }: Props) {
         <span className="text-[10px] font-sans font-semibold text-text-dim uppercase tracking-wider w-28 shrink-0">
           Player
         </span>
-        <span className="text-[10px] font-sans font-semibold text-text-dim uppercase tracking-wider w-14 shrink-0 text-right">
+        <span className="text-[10px] font-sans font-semibold text-text-sub uppercase tracking-wider w-14 shrink-0 text-right">
           WPM
         </span>
         <span className="text-[10px] font-sans font-semibold text-text-dim uppercase tracking-wider flex-1">
@@ -62,7 +62,7 @@ export default function RaceTrack({ participants, currentUserId }: Props) {
                 <span className="text-sm font-sans font-semibold text-accent">
                   {p.currentWpm}
                 </span>
-                <span className="text-[9px] font-sans text-text-dim block leading-none">
+                <span className="text-[9px] font-sans text-text-sub block leading-none">
                   {p.finishRank > 0 ? 'finished' : 'wpm'}
                 </span>
               </div>
