@@ -32,17 +32,16 @@ public class TextController {
         return ResponseEntity.ok(textService.getTextById(textId, customUserDetails.getUserId()));
     }
 
-    @GetMapping("/bulk")
+    @GetMapping
     public ResponseEntity<List<TextResponseDTO>> getTexts(
             @RequestParam String language,
             @RequestParam TextType textType,
-            @RequestParam int count){
+            @RequestParam int count)
     {
         return ResponseEntity.ok(textService.getRandomTexts(language, textType, count));
     }
 
 
-    }
 
     @GetMapping("/preset-texts")
     public ResponseEntity<List<TextResponseDTO>> getPresetTexts(){
