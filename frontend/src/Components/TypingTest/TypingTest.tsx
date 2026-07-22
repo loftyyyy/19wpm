@@ -1,8 +1,8 @@
 import { useEffect, useRef, useMemo, useCallback, useLayoutEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { generateTestPassage } from '../../services/passages';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
 import { useCapsLock } from '../../hooks/useCapsLock';
+import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
 
@@ -64,29 +64,29 @@ export default function TypingTest() {
     return { contentType: 'words' as ContentType, testMode: 'timed' as TestMode };
   }, [mode]);
 
-  // Async passage loading: API first, local fallback
   const [passage, setPassage] = useState<Passage | null>(null);
+  const { next, isLoading, peek } = usePassageQueue(mode, duration, wordCount, phraseLength, difficulty);
 
+  // Custom passage from ?custom query param
   useEffect(() => {
-    let cancelled = false;
     const isCustom = searchParams.get('custom');
-
     if (isCustom) {
       try {
         const stored = localStorage.getItem('19wpm-custom-passage');
         if (stored) {
           const p = JSON.parse(stored);
-          if (!cancelled) setPassage({ title: p.title || '', text: p.text, author: p.author, source: p.source });
-          return;
+          setPassage({ title: p.title || '', text: p.text, author: p.author, source: p.source });
         }
       } catch {}
     }
+  }, [searchParams]);
 
-    generateTestPassage(mode, duration, wordCount, mode === 'phrases' ? phraseLength : undefined, difficulty)
-      .then(p => { if (!cancelled) setPassage(p); });
-
-    return () => { cancelled = true; };
-  }, [mode, duration, wordCount, phraseLength, difficulty]);
+  // Initialize passage from queue once loading completes
+  useEffect(() => {
+    if (!isLoading && passage === null) {
+      setPassage(peek());
+    }
+  }, [isLoading]);
 
   const isCapsLockOn = useCapsLock();
 
@@ -128,10 +128,14 @@ export default function TypingTest() {
   }, [state.currentIndex, passageWords]);
 
   const handleRestart = useCallback(() => {
+    const nextPassage = next();
+    if (nextPassage) {
+      setPassage(nextPassage);
+    }
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
-  }, [reset]);
+  }, [next, reset]);
 
   const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
@@ -317,7 +321,7 @@ export default function TypingTest() {
         {passage && (
           <div className="mt-6 text-center flex items-center justify-center gap-4">
             <p className="text-text-dim font-sans text-sm italic transition-theme">
-              {passage.title ? `${passage.title} â€” ` : ''}&mdash; {passage.author}, <em>{passage.source}</em>
+              {passage.title ? `${passage.title} — ` : ''}&mdash; {passage.author}, <em>{passage.source}</em>
             </p>
             <button
               ref={restartBtnRef}
