@@ -1,10 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import type { Passage, Mode, WordCount, PhraseLength, TextDifficulty } from '../types';
+import type { Passage, Mode, WordCount, PhraseLength, TextDifficulty, TextType } from '../types';
 import type { ApiTextResponse, ApiWordResponse } from '../types/api';
 import { api } from '../services/api';
 import { generateTestPassage } from '../services/passages';
 
-function charLengthToType(charLength: number): string {
+function charLengthToType(charLength: number): TextType {
   if (charLength < 100) return 'SHORT';
   if (charLength < 300) return 'MEDIUM';
   if (charLength < 500) return 'LONG';
