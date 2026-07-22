@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type { RaceRoom } from '../../types/race';
 
 interface Props {
@@ -9,8 +9,12 @@ interface Props {
 }
 
 export default function Lobby({ room, currentUserId, onStart, autoStartCountdown }: Props) {
+  const [copied, setCopied] = useState(false);
+
   const handleCopyCode = useCallback(() => {
     navigator.clipboard.writeText(room.roomCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   }, [room.roomCode]);
 
   const isHost = room.hostUserId !== null && currentUserId === room.hostUserId;
@@ -25,11 +29,23 @@ export default function Lobby({ room, currentUserId, onStart, autoStartCountdown
           <span className="text-3xl font-display font-bold text-accent tracking-widest">{room.roomCode}</span>
           <button
             onClick={handleCopyCode}
-            className="p-2 text-text-dim hover:text-accent transition-colors hover:cursor-pointer"
+            className="p-2 transition-all hover:cursor-pointer"
             title="Copy room code"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            <svg
+              className={`w-5 h-5 transition-all duration-200 ${
+                copied ? 'scale-110 text-green-500' : 'scale-100 text-text-dim hover:text-accent'
+              }`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              {copied ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              )}
             </svg>
           </button>
         </div>
