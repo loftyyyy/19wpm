@@ -17,6 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/words")
 public class WordController {
+
     private final WordService wordService;
 
     public WordController(WordService wordService){
@@ -50,4 +51,5 @@ public class WordController {
         wordService.deleteWord(wordId, userDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
+
 }
