@@ -99,6 +99,7 @@ function reducer(state: TypingState, action: Action): TypingState {
       const expected = state.passage.text[state.currentIndex];
 
       if (expected === ' ' && action.key !== ' ') {
+        if (state.extraChars.length >= 20) return state;
         return {
           ...state,
           extraChars: [...state.extraChars, action.key],
