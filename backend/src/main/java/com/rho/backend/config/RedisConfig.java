@@ -40,10 +40,10 @@ public class RedisConfig {
         if (!password.isBlank()) {
             config.setPassword(password);
         }
-        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-                .useSsl()
-                .build();
-        return new LettuceConnectionFactory(config, clientConfig);
+//        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+//                .useSsl()
+//                .build();
+        return new LettuceConnectionFactory(config);
     }
 
     /**
