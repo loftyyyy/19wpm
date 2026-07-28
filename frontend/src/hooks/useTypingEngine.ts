@@ -111,7 +111,19 @@ function reducer(state: TypingState, action: Action): TypingState {
         };
       }
 
-      if (expected === ' ' && state.extraChars.length > 0) return state;
+      if (expected === ' ' && state.extraChars.length > 0) {
+        const newIndex = state.currentIndex + 1;
+        return {
+          ...state,
+          typedChars: [...state.typedChars, ' '],
+          currentIndex: newIndex,
+          extraChars: [],
+          lockedIndex: newIndex,
+          completedWords: state.completedWords + 1,
+          isRunning: true,
+          startTime: state.startTime ?? Date.now(),
+        };
+      }
 
       const isCorrect = action.key === expected;
       const newCorrect = state.correctChars + (isCorrect ? 1 : 0);
