@@ -224,7 +224,6 @@ function reducer(state: TypingState, action: Action): TypingState {
       const finishedByTime = state.testMode === 'timed' && newTimeLeft <= 0;
       const finishedByPassage = state.currentIndex >= state.passage.text.length;
       const finished = finishedByTime || finishedByPassage;
-      const netCorrect = state.correctChars;
       let effectiveCorrect = state.correctChars;
       if (state.testMode === 'timed') {
         const boundaries = state.wordBoundaries;

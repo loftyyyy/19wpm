@@ -15,6 +15,8 @@ function mapApiResultToTestResult(r: { typingResultId: number; textId: number; f
     author: '',
     source: '',
     wpm: r.wpm,
+    rawWpm: 0,
+    consistency: 100,
     accuracy: r.accuracy,
     duration: Math.round(r.durationMs / 1000),
     correctChars: 0,

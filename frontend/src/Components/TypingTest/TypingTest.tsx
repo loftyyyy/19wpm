@@ -297,7 +297,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
               <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
                 <div ref={cursorRef} className={`typing-cursor${state.isFinished ? ' typing-cursor-hidden' : isTypingActive ? ' typing-cursor-active' : ''}`} />
 {passageWords.map((word, wi) => {
-                  const wordStart = word.chars[0].globalIdx;
                   const wordEnd = word.chars[word.chars.length - 1].globalIdx;
                   const isPastWord = state.currentIndex > wordEnd;
                   const hasError = state.mistakeWordIndices.has(wi);
@@ -329,8 +328,9 @@ const displayChar = (isIncorrect && typed !== undefined) ? typed : char;
                     {wi === currentWordIndex && state.extraChars.map((ch, i) => (
                       <span key={`ex-${i}`} className="char-incorrect">{ch}</span>
                     ))}
-                  </span>
-                ))}
+</span>
+                );
+              })}
               </div>
             </div>
           )}
