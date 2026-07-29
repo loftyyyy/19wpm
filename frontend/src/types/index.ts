@@ -36,6 +36,7 @@ export interface TestResult {
   author: string;
   source: string;
   wpm: number;
+  rawWpm: number;
   accuracy: number;
   duration: number;
   correctChars: number;

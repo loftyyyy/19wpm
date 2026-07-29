@@ -38,12 +38,14 @@ interface TypingState {
   isRunning: boolean;
   isFinished: boolean;
   wpm: number;
+  rawWpm: number;
   accuracy: number;
   wpmHistory: WpmPoint[];
   correctChars: number;
   incorrectChars: number;
   totalCorrect: number;
   totalIncorrect: number;
+  totalKeystrokes: number;
   errorsThisSecond: number;
   mistakeWordIndices: Set<number>;
   wordBoundaries: WordBoundary[];
@@ -74,12 +76,14 @@ function initialState(passage: Passage, duration: Duration, testMode: TestMode, 
     isRunning: false,
     isFinished: false,
     wpm: 0,
+    rawWpm: 0,
     accuracy: 100,
     wpmHistory: [],
     correctChars: 0,
     incorrectChars: 0,
     totalCorrect: 0,
     totalIncorrect: 0,
+    totalKeystrokes: 0,
     errorsThisSecond: 0,
     mistakeWordIndices: new Set(),
     wordBoundaries: getWordBoundaries(passage.text),
@@ -107,6 +111,7 @@ function reducer(state: TypingState, action: Action): TypingState {
           incorrectChars: state.incorrectChars + 1,
           errorsThisSecond: state.errorsThisSecond + 1,
           accuracy: Math.round((state.totalCorrect / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
+          totalKeystrokes: state.totalKeystrokes + 1,
           isRunning: true,
           startTime: state.startTime ?? Date.now(),
         };
@@ -121,6 +126,7 @@ function reducer(state: TypingState, action: Action): TypingState {
           extraChars: [],
           lockedIndex: newIndex,
           completedWords: state.completedWords + 1,
+          totalKeystrokes: state.totalKeystrokes + 1,
           isRunning: true,
           startTime: state.startTime ?? Date.now(),
         };
@@ -149,6 +155,7 @@ function reducer(state: TypingState, action: Action): TypingState {
         errorsThisSecond: state.errorsThisSecond + (isCorrect ? 0 : 1),
         accuracy: totalAttempted > 0 ? Math.round((newTotalCorrect / totalAttempted) * 100) : 100,
         mistakeWordIndices: newMistakes,
+        totalKeystrokes: state.totalKeystrokes + 1,
         isRunning: true,
         startTime: state.startTime ?? Date.now(),
         lockedIndex: action.key === ' ' ? newIndex : state.lockedIndex,
@@ -235,6 +242,9 @@ function reducer(state: TypingState, action: Action): TypingState {
       const wpm = elapsedMinutes > 0
         ? Math.round((effectiveCorrect / 5) / elapsedMinutes)
         : 0;
+      const rawWpm = elapsedMinutes > 0
+        ? Math.round((state.totalKeystrokes / 5) / elapsedMinutes)
+        : 0;
       const lastRecorded = state.wpmHistory.length > 0 ? state.wpmHistory[state.wpmHistory.length - 1].time : -1;
       const shouldRecord = roundedElapsed > lastRecorded;
       return {
@@ -242,6 +252,7 @@ function reducer(state: TypingState, action: Action): TypingState {
         timeLeft: newTimeLeft,
         elapsedSeconds: newElapsed,
         wpm,
+        rawWpm,
         wpmHistory: finished
           ? state.wpmHistory
           : shouldRecord
@@ -345,6 +356,7 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
       author: state.passage.author,
       source: state.passage.source,
       wpm: state.wpm,
+      rawWpm: state.rawWpm,
       accuracy: state.accuracy,
       duration: Math.max(1, elapsed),
       correctChars: state.correctChars,
