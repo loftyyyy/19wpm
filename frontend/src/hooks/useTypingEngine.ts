@@ -218,17 +218,23 @@ function reducer(state: TypingState, action: Action): TypingState {
       const finishedByPassage = state.currentIndex >= state.passage.text.length;
       const finished = finishedByTime || finishedByPassage;
       const netCorrect = state.correctChars;
-      let adjustedCorrect = netCorrect;
-      if (finishedByTime && state.currentIndex > state.lockedIndex) {
-        let incompleteCorrect = 0;
-        for (let i = state.lockedIndex; i < state.currentIndex; i++) {
-          if (state.typedChars[i] === state.passage.text[i]) {
-            incompleteCorrect++;
+      let effectiveCorrect = state.correctChars;
+      if (state.testMode === 'timed') {
+        const boundaries = state.wordBoundaries;
+        const currentWordBoundary = boundaries.find(
+          b => state.currentIndex >= b.start && state.currentIndex < b.end
+        );
+        if (currentWordBoundary) {
+          for (let i = currentWordBoundary.start; i < state.currentIndex; i++) {
+            if (state.typedChars[i] === state.passage.text[i]) {
+              effectiveCorrect--;
+            }
           }
         }
-        adjustedCorrect = netCorrect - incompleteCorrect;
       }
-      const wpm = elapsedMinutes > 0 ? Math.round((adjustedCorrect / 5) / elapsedMinutes) : 0;
+      const wpm = elapsedMinutes > 0
+        ? Math.round((effectiveCorrect / 5) / elapsedMinutes)
+        : 0;
       const lastRecorded = state.wpmHistory.length > 0 ? state.wpmHistory[state.wpmHistory.length - 1].time : -1;
       const shouldRecord = roundedElapsed > lastRecorded;
       return {
