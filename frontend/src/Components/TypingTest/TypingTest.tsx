@@ -137,19 +137,26 @@ export default function TypingTest() {
     containerRef.current?.focus();
   }, [next, reset]);
 
-  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
+const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
-      if (restartBtnRef.current) {
-        e.preventDefault();
-        restartBtnRef.current.focus();
-      }
+      e.preventDefault();
+      handleRestart();
+      return;
+    }
+    if (e.key === 'Enter' && !state.isRunning) {
+      e.preventDefault();
+      const nextPassage = next();
+      if (nextPassage) setPassage(nextPassage);
+      reset();
+      navigatedRef.current = false;
+      containerRef.current?.focus();
       return;
     }
     setIsTypingActive(true);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => setIsTypingActive(false), 500);
     handleKeyDown(e);
-  }, [handleKeyDown]);
+  }, [handleKeyDown, handleRestart, next, reset, state.isRunning]);
 
   useEffect(() => {
     if (state.isFinished && !navigatedRef.current) {
@@ -340,7 +347,7 @@ const displayChar = (isIncorrect && typed !== undefined) ? typed : char;
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleRestart(); } }}
               tabIndex={0}
               className="p-2 rounded-xl text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50"
-              title="Restart test (Tab to focus, Enter to confirm)"
+              title="Restart (Tab) &middot; New test (Enter)"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10" />
