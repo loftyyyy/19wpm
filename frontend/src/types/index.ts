@@ -38,6 +38,7 @@ export interface TestResult {
   wpm: number;
   rawWpm: number;
   accuracy: number;
+  consistency: number;
   duration: number;
   correctChars: number;
   incorrectChars: number;

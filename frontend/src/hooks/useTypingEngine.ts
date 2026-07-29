@@ -288,6 +288,19 @@ function computeMistakeWords(
   return result;
 }
 
+function computeConsistency(wpmHistory: WpmPoint[]): number {
+  if (wpmHistory.length < 2) return 100;
+  const wpms = wpmHistory.map(p => p.wpm);
+  const mean = wpms.reduce((a, b) => a + b, 0) / wpms.length;
+  if (mean === 0) return 100;
+  const variance = wpms.reduce((sum, w) =>
+    sum + Math.pow(w - mean, 2), 0) / wpms.length;
+  const stdDev = Math.sqrt(variance);
+  const cv = stdDev / mean;
+  const consistency = Math.max(0, Math.round((1 - cv) * 100));
+  return Math.min(100, consistency);
+}
+
 export function useTypingEngine(passage: Passage, duration: Duration, testMode: TestMode = 'timed', wordCount: WordCount = 25, contentType: ContentType = 'phrases') {
   const [state, dispatch] = useReducer(reducer, { passage, duration, testMode, wordCount, contentType }, (cfg) => initialState(cfg.passage, cfg.duration, cfg.testMode, cfg.wordCount, cfg.contentType));
   const replayEventsRef = useRef<ReplayEvent[]>([]);
@@ -358,6 +371,7 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
       wpm: state.wpm,
       rawWpm: state.rawWpm,
       accuracy: state.accuracy,
+      consistency: computeConsistency(state.wpmHistory),
       duration: Math.max(1, elapsed),
       correctChars: state.correctChars,
       incorrectChars: state.incorrectChars,
