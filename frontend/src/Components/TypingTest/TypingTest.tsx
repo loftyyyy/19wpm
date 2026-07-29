@@ -299,9 +299,10 @@ export default function TypingTest() {
                       if (isCorrect) cls = 'char-correct';
                       if (isIncorrect) cls = 'char-incorrect';
 
+const displayChar = (isIncorrect && typed !== undefined) ? typed : char;
                       return (
                         <span key={globalIdx} ref={isCurrent ? currentCharRef : undefined} className={cls}>
-                          {char}
+                          {displayChar}
                         </span>
                       );
                     })}
@@ -321,7 +322,7 @@ export default function TypingTest() {
         {passage && (
           <div className="mt-6 text-center flex items-center justify-center gap-4">
             <p className="text-text-dim font-sans text-sm italic transition-theme">
-              {passage.title ? `${passage.title} — ` : ''}&mdash; {passage.author}, <em>{passage.source}</em>
+              {passage.title ? `${passage.title} ï¿½ ` : ''}&mdash; {passage.author}, <em>{passage.source}</em>
             </p>
             <button
               ref={restartBtnRef}
