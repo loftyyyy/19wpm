@@ -211,14 +211,24 @@ function reducer(state: TypingState, action: Action): TypingState {
       const newElapsed = state.elapsedSeconds + 0.1;
       const roundedElapsed = Math.round(newElapsed);
       const elapsedMinutes = newElapsed / 60;
-      const netCorrect = state.correctChars;
-      const wpm = elapsedMinutes > 0 ? Math.round((netCorrect / 5) / elapsedMinutes) : 0;
       const newTimeLeft = state.testMode === 'timed'
         ? Math.max(0, Math.round((state.timeLeft - 0.1) * 10) / 10)
         : state.timeLeft;
       const finishedByTime = state.testMode === 'timed' && newTimeLeft <= 0;
       const finishedByPassage = state.currentIndex >= state.passage.text.length;
       const finished = finishedByTime || finishedByPassage;
+      const netCorrect = state.correctChars;
+      let adjustedCorrect = netCorrect;
+      if (finishedByTime && state.currentIndex > state.lockedIndex) {
+        let incompleteCorrect = 0;
+        for (let i = state.lockedIndex; i < state.currentIndex; i++) {
+          if (state.typedChars[i] === state.passage.text[i]) {
+            incompleteCorrect++;
+          }
+        }
+        adjustedCorrect = netCorrect - incompleteCorrect;
+      }
+      const wpm = elapsedMinutes > 0 ? Math.round((adjustedCorrect / 5) / elapsedMinutes) : 0;
       const lastRecorded = state.wpmHistory.length > 0 ? state.wpmHistory[state.wpmHistory.length - 1].time : -1;
       const shouldRecord = roundedElapsed > lastRecorded;
       return {
