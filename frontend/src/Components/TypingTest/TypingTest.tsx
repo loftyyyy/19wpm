@@ -225,7 +225,9 @@ export default function TypingTest() {
     return totalWords > 0 ? (displayCompleted / totalWords) * 100 : 0;
   }, [state.testMode, state.totalTime, state.timeLeft, displayCompleted, totalWords]);
 
-  const timerDisplay = `${Math.floor(state.timeLeft / 60)}:${String(Math.floor(state.timeLeft % 60)).padStart(2, '0')}`;
+  const timerDisplay = state.timeLeft >= 60
+    ? `${Math.floor(state.timeLeft / 60)}:${String(Math.floor(state.timeLeft % 60)).padStart(2, '0')}`
+    : `${Math.floor(state.timeLeft)}`;
 
   return (
     <div className="min-h-screen bg-surface transition-theme flex flex-col">
@@ -287,8 +289,16 @@ export default function TypingTest() {
             <div ref={viewportRef} className="overflow-hidden">
               <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
                 <div ref={cursorRef} className={`typing-cursor${state.isFinished ? ' typing-cursor-hidden' : isTypingActive ? ' typing-cursor-active' : ''}`} />
-                {passageWords.map((word, wi) => (
-                  <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className="flex">
+{passageWords.map((word, wi) => {
+                  const wordStart = word.chars[0].globalIdx;
+                  const wordEnd = word.chars[word.chars.length - 1].globalIdx;
+                  const isPastWord = state.currentIndex > wordEnd;
+                  const hasError = state.mistakeWordIndices.has(wi);
+                  const wordErrorClass = isPastWord && hasError
+                    ? 'underline decoration-error decoration-2'
+                    : '';
+                  return (
+                  <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className={`flex ${wordErrorClass}`}>
                     {word.chars.map(({ char, globalIdx }) => {
                       const typed = state.typedChars[globalIdx];
                       const isCurrent = globalIdx === state.currentIndex;
