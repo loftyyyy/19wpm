@@ -323,11 +323,6 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const now = Date.now();
 
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      reset();
-      return;
-    }
     if (state.isFinished) return;
 
     if (e.key === 'Backspace' && (e.ctrlKey || e.metaKey)) {
@@ -351,7 +346,7 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
       replayEventsRef.current.push({ type: 'key', key: e.key, timestamp: now });
       dispatch({ type: 'KEY_PRESS', key: e.key });
     }
-  }, [state.isFinished, reset]);
+  }, [state.isFinished]);
 
   const getResult = useCallback((): TestResult => {
     const elapsed = state.testMode === 'timed' ? state.totalTime - state.timeLeft : Math.round(state.elapsedSeconds);

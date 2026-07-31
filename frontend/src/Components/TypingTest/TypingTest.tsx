@@ -148,6 +148,13 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       containerRef.current?.focus();
       return;
     }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      reset();
+      navigatedRef.current = false;
+      containerRef.current?.focus();
+      return;
+    }
     setIsTypingActive(true);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => setIsTypingActive(false), 500);
