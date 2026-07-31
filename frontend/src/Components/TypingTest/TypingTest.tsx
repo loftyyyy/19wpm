@@ -246,6 +246,28 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
           >
             &larr; Exit
           </button>
+
+          {!state.isRunning && !state.isFinished && passage && (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">tab</kbd>
+                <span>restart</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">enter</kbd>
+                <span>next</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">esc</kbd>
+                <span>reset</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">ctrl+⌫</kbd>
+                <span>del word</span>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-6">
             {state.testMode === 'timed' ? (
               <div className="text-3xl font-mono font-bold text-accent transition-theme">
