@@ -128,14 +128,10 @@ export default function TypingTest() {
   }, [state.currentIndex, passageWords]);
 
   const handleRestart = useCallback(() => {
-    const nextPassage = next();
-    if (nextPassage) {
-      setPassage(nextPassage);
-    }
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
-  }, [next, reset]);
+  }, [reset]);
 
 const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
@@ -251,11 +247,11 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">tab</kbd>
-                <span>restart</span>
+                <span>same test</span>
               </div>
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">enter</kbd>
-                <span>next</span>
+                <span>next test</span>
               </div>
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">esc</kbd>
