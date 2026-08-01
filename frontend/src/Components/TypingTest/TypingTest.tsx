@@ -312,9 +312,8 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                       const isAtEnd = passage !== null &&
                         state.currentIndex >= passage.text.length;
                       const isLastChar = globalIdx === (passage?.text.length ?? 0) - 1;
-                      const isCursor = !isAtEnd
-                        ? globalIdx === state.currentIndex
-                        : isLastChar;
+                      const isCursorBefore = !isAtEnd && globalIdx === state.currentIndex;
+                      const isCursorAfter = isAtEnd && isLastChar;
                       const isCorrect = typed !== undefined && typed === char;
                       const isIncorrect = typed !== undefined && typed !== char;
 
@@ -322,18 +321,40 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                       if (isCorrect) cls = 'char-correct';
                       if (isIncorrect) cls = 'char-incorrect';
 
-                      if (isCursor && !state.isFinished) {
-                        if (isAtEnd) {
-                          cls += ' border-r-2 border-accent animate-blink';
-                        } else {
-                          cls += ' border-l-2 border-accent animate-blink';
-                        }
-                      }
-
 const displayChar = (isIncorrect && typed !== undefined) ? typed : char;
                       return (
-                        <span key={globalIdx} className={cls}>
-                          {displayChar}
+                        <span key={globalIdx} style={{ position: 'relative', display: 'inline-block' }}>
+                          {isCursorBefore && !state.isFinished && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: '0.05em',
+                                bottom: '0.05em',
+                                width: '2px',
+                                backgroundColor: 'var(--accent)',
+                                borderRadius: '1px',
+                              }}
+                              className="animate-blink"
+                            />
+                          )}
+                          {isCursorAfter && !state.isFinished && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                right: '-2px',
+                                top: '0.05em',
+                                bottom: '0.05em',
+                                width: '2px',
+                                backgroundColor: 'var(--accent)',
+                                borderRadius: '1px',
+                              }}
+                              className="animate-blink"
+                            />
+                          )}
+                          <span className={cls}>
+                            {displayChar}
+                          </span>
                         </span>
                       );
                     })}
