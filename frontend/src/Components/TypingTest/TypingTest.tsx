@@ -36,11 +36,6 @@ export default function TypingTest() {
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
-  const cursorRef = useRef<HTMLDivElement>(null);
-  const currentCharRef = useRef<HTMLSpanElement | null>(null);
-  const lastCharRef = useRef<HTMLSpanElement | null>(null);
-  const [isTypingActive, setIsTypingActive] = useState(false);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const saved = useMemo(loadPreferences, []);
 
@@ -156,9 +151,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       containerRef.current?.focus();
       return;
     }
-    setIsTypingActive(true);
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => setIsTypingActive(false), 500);
     handleKeyDown(e);
   }, [handleKeyDown, handleRestart, next, reset, state.isRunning]);
 
@@ -177,9 +169,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
 
   useEffect(() => {
     containerRef.current?.focus();
-    return () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    };
   }, []);
 
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
@@ -213,24 +202,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       contentRef.current.style.transition = 'transform 0.15s ease-out';
     }
   }, [currentWordIndex, passageWords.length, mode]);
-
-  useLayoutEffect(() => {
-    const cursorEl = cursorRef.current;
-    const containerEl = contentRef.current;
-    if (!cursorEl || !containerEl) return;
-
-    const containerRect = containerEl.getBoundingClientRect();
-    const isAtEnd = passage !== null &&
-      state.currentIndex >= passage.text.length;
-
-    if (isAtEnd && lastCharRef.current) {
-      const charRect = lastCharRef.current.getBoundingClientRect();
-      cursorEl.style.transform = `translate(${charRect.right - containerRect.left}px, ${charRect.top - containerRect.top}px)`;
-    } else if (currentCharRef.current) {
-      const charRect = currentCharRef.current.getBoundingClientRect();
-      cursorEl.style.transform = `translate(${charRect.left - containerRect.left}px, ${charRect.top - containerRect.top}px)`;
-    }
-  }, [state.currentIndex, passage, lastCharRef.current]);
 
   const totalWords = state.wordBoundaries.length;
   const displayCompleted = state.isFinished ? totalWords : state.completedWords;
@@ -327,7 +298,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
           {passage && (
             <div ref={viewportRef} className="overflow-hidden">
               <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
-                <div ref={cursorRef} className={`typing-cursor${state.isFinished ? ' typing-cursor-hidden' : isTypingActive ? ' typing-cursor-active' : ''}`} />
 {passageWords.map((word, wi) => {
                   const wordEnd = word.chars[word.chars.length - 1].globalIdx;
                   const isPastWord = state.currentIndex > wordEnd;
@@ -339,25 +309,30 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                   <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className={`flex ${wordErrorClass}`}>
                     {word.chars.map(({ char, globalIdx }) => {
                       const typed = state.typedChars[globalIdx];
-                      const isCurrent = globalIdx === state.currentIndex;
-                      const isLast = globalIdx === passage.text.length - 1;
+                      const isAtEnd = passage !== null &&
+                        state.currentIndex >= passage.text.length;
+                      const isLastChar = globalIdx === (passage?.text.length ?? 0) - 1;
+                      const isCursor = !isAtEnd
+                        ? globalIdx === state.currentIndex
+                        : isLastChar;
                       const isCorrect = typed !== undefined && typed === char;
                       const isIncorrect = typed !== undefined && typed !== char;
 
-                      let cls = 'char-untyped transition-colors';
+                      let cls = 'char-untyped';
                       if (isCorrect) cls = 'char-correct';
                       if (isIncorrect) cls = 'char-incorrect';
 
+                      if (isCursor && !state.isFinished) {
+                        if (isAtEnd) {
+                          cls += ' border-r-2 border-accent animate-blink';
+                        } else {
+                          cls += ' border-l-2 border-accent animate-blink';
+                        }
+                      }
+
 const displayChar = (isIncorrect && typed !== undefined) ? typed : char;
                       return (
-                        <span
-                          key={globalIdx}
-                          ref={el => {
-                            if (isCurrent) currentCharRef.current = el;
-                            if (isLast) lastCharRef.current = el;
-                          }}
-                          className={cls}
-                        >
+                        <span key={globalIdx} className={cls}>
                           {displayChar}
                         </span>
                       );
