@@ -93,28 +93,23 @@ export default function TypingTest() {
 
   const passageWords = useMemo(() => {
     if (!passage) return [];
-    const words: {
-      chars: { char: string; globalIdx: number }[];
-      wi: number;
-    }[] = [];
+    const words: { chars: { char: string; globalIdx: number }[] }[] = [];
     let globalIdx = 0;
+    const parts = passage.text.split('');
     let currentWord: { char: string; globalIdx: number }[] = [];
-    const chars = passage.text.split('');
-
-    chars.forEach((ch) => {
+    for (const ch of parts) {
       if (ch === ' ') {
-        currentWord.push({ char: ' ', globalIdx });
-        words.push({ chars: currentWord, wi: words.length });
-        currentWord = [];
+        if (currentWord.length > 0) {
+          words.push({ chars: currentWord });
+          currentWord = [];
+        }
         globalIdx++;
       } else {
         currentWord.push({ char: ch, globalIdx });
         globalIdx++;
       }
-    });
-    if (currentWord.length > 0) {
-      words.push({ chars: currentWord, wi: words.length });
     }
+    if (currentWord.length > 0) words.push({ chars: currentWord });
     return words;
   }, [passage]);
 
@@ -125,6 +120,7 @@ export default function TypingTest() {
       const first = word.chars[0].globalIdx;
       const last = word.chars[word.chars.length - 1].globalIdx;
       if (state.currentIndex >= first && state.currentIndex <= last) return i;
+      if (i > 0 && state.currentIndex === first - 1) return i - 1;
     }
     return Math.max(0, passageWords.length - 1);
   }, [state.currentIndex, passageWords]);
@@ -306,8 +302,8 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
             </div>
           ) : null}
           {passage && (
-            <div ref={viewportRef} className="overflow-hidden">
-              <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
+                  <div ref={viewportRef} className="overflow-hidden">
+                    <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
 {passageWords.map((word) => {
                   const { chars, wi } = word;
                   const nonSpaceChars = chars.filter(c => c.char !== ' ');
@@ -323,11 +319,18 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                   <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className={`flex ${wordErrorClass}`}>
                     {chars.map(({ char, globalIdx }) => {
                       const typed = state.typedChars[globalIdx];
-                      const isAtEnd = passage !== null &&
-                        state.currentIndex >= passage.text.length;
-                      const isLastChar = globalIdx === (passage?.text.length ?? 0) - 1;
+                      const passageLength = passage?.text.length ?? 0;
+                      const isAtEnd = state.currentIndex >= passageLength;
+                      const isLastChar = globalIdx === passageLength - 1;
+                      const isLastInWord = globalIdx === word.chars[word.chars.length - 1].globalIdx;
+                      const nextIsSpace = isLastInWord && 
+                        passage !== null && 
+                        passage.text[globalIdx + 1] === ' ';
+                      const cursorOnSpace = nextIsSpace && 
+                        state.currentIndex === globalIdx + 1;
                       const isCursorBefore = !isAtEnd && globalIdx === state.currentIndex;
-                      const isCursorAfter = isAtEnd && isLastChar;
+                      const isCursorAfterLastChar = isAtEnd && isLastChar;
+                      const isCursorAfterWord = cursorOnSpace;
                       const isCorrect = typed !== undefined && typed === char;
                       const isIncorrect = typed !== undefined && typed !== char;
 
@@ -337,7 +340,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
 
                       const displayChar = isIncorrect && typed !== undefined
                         ? typed
-                        : (char === ' ' ? '\u00A0' : char);
+                        : char;
                       return (
                         <span key={globalIdx} style={{ position: 'relative' }}>
                           {isCursorBefore && !state.isFinished && (
@@ -345,23 +348,8 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                               style={{
                                 position: 'absolute',
                                 left: 0,
-                                top: '0.05em',
-                                bottom: '0.05em',
-                                width: '2px',
-                                backgroundColor: 'var(--accent)',
-                                borderRadius: '1px',
-                                zIndex: 10,
-                              }}
-                              className="animate-blink"
-                            />
-                          )}
-                          {isCursorAfter && !state.isFinished && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                right: '-2px',
-                                top: '0.05em',
-                                bottom: '0.05em',
+                                top: '0.1em',
+                                bottom: '0.1em',
                                 width: '2px',
                                 backgroundColor: 'var(--accent)',
                                 borderRadius: '1px',
@@ -373,6 +361,22 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                           <span className={cls}>
                             {displayChar}
                           </span>
+                          {(isCursorAfterWord || isCursorAfterLastChar) && 
+                           !state.isFinished && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                right: '-2px',
+                                top: '0.1em',
+                                bottom: '0.1em',
+                                width: '2px',
+                                backgroundColor: 'var(--accent)',
+                                borderRadius: '1px',
+                                zIndex: 10,
+                              }}
+                              className="animate-blink"
+                            />
+                          )}
                         </span>
                       );
                     })}
@@ -385,7 +389,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
               </div>
             </div>
           )}
-        </div>
 
         {passage && (
           <div className="mt-6 text-center flex items-center justify-center gap-4">
