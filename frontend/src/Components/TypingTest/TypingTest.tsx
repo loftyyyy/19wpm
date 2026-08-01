@@ -304,8 +304,8 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
           {passage && (
                   <div ref={viewportRef} className="overflow-hidden">
                     <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
-{passageWords.map((word) => {
-                  const { chars, wi } = word;
+{passageWords.map((word, wi) => {
+                  const { chars } = word;
                   const nonSpaceChars = chars.filter(c => c.char !== ' ');
                   const wordEnd = nonSpaceChars.length > 0
                     ? nonSpaceChars[nonSpaceChars.length - 1].globalIdx
@@ -389,6 +389,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
               </div>
             </div>
           )}
+        </div>
 
         {passage && (
           <div className="mt-6 text-center flex items-center justify-center gap-4">
