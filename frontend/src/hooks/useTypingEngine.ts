@@ -100,24 +100,77 @@ function reducer(state: TypingState, action: Action): TypingState {
   switch (action.type) {
     case 'KEY_PRESS': {
       if (state.isFinished || state.currentIndex >= state.passage.text.length) return state;
+      
       const expected = state.passage.text[state.currentIndex];
 
-      if (expected === ' ' && action.key !== ' ') {
-        if (state.extraChars.length >= 20) return state;
+      // Case 1: space pressed but expected char is NOT a space
+      // (cursor is mid-word)
+      if (action.key === ' ' && expected !== ' ') {
+        // Do nothing at position 0 — can't skip before typing
+        if (state.currentIndex === 0) return state;
+        
+        // Find the end of the current word and the space after it
+        const text = state.passage.text;
+        let skipTo = state.currentIndex;
+        
+        // Advance to the end of the current word
+        while (skipTo < text.length && text[skipTo] !== ' ') {
+          skipTo++;
+        }
+        // Now skipTo points to the space character (or end of text)
+        // Advance past the space to the start of the next word
+        if (skipTo < text.length && text[skipTo] === ' ') {
+          skipTo++; // skip the space itself
+        }
+        
+        // Mark skipped chars as incorrect in mistakeWordIndices
+        const newMistakes = new Set(state.mistakeWordIndices);
+        const wi = wordIndexAt(state.currentIndex, state.wordBoundaries);
+        if (wi >= 0) newMistakes.add(wi);
+        
+        // Fill typedChars for skipped positions with empty 
+        // string so indices stay aligned — untyped chars 
+        // remain undefined, which renders as char-untyped
+        // We don't fill them — just advance currentIndex
+        // The render will show untyped chars as char-untyped
+        // which is the correct Monkeytype behavior
+        
         return {
           ...state,
-          extraChars: [...state.extraChars, action.key],
-          totalIncorrect: state.totalIncorrect + 1,
-          incorrectChars: state.incorrectChars + 1,
-          errorsThisSecond: state.errorsThisSecond + 1,
-          accuracy: Math.round((state.totalCorrect / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
+          currentIndex: skipTo,
+          lockedIndex: skipTo,
+          completedWords: state.completedWords + 1,
+          mistakeWordIndices: newMistakes,
+          extraChars: [],
           totalKeystrokes: state.totalKeystrokes + 1,
           isRunning: true,
           startTime: state.startTime ?? Date.now(),
         };
       }
 
-      if (expected === ' ' && state.extraChars.length > 0) {
+      // Case 2: space pressed at word boundary with no extraChars
+      // (correct space)
+      if (expected === ' ' && action.key === ' ' && state.extraChars.length === 0) {
+        const newIndex = state.currentIndex + 1;
+        return {
+          ...state,
+          typedChars: [...state.typedChars, ' '],
+          currentIndex: newIndex,
+          correctChars: state.correctChars + 1,
+          totalCorrect: state.totalCorrect + 1,
+          totalKeystrokes: state.totalKeystrokes + 1,
+          lockedIndex: newIndex,
+          completedWords: state.completedWords + 1,
+          extraChars: [],
+          accuracy: Math.round(((state.totalCorrect + 1) / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
+          isRunning: true,
+          startTime: state.startTime ?? Date.now(),
+        };
+      }
+
+      // Case 3: space pressed at word boundary WITH extraChars
+      // (submit word with errors)
+      if (expected === ' ' && action.key === ' ' && state.extraChars.length > 0) {
         const newIndex = state.currentIndex + 1;
         return {
           ...state,
@@ -132,6 +185,24 @@ function reducer(state: TypingState, action: Action): TypingState {
         };
       }
 
+      // Case 4: extra chars when cursor is at a space position
+      // (typing non-space when expected is space)
+      if (expected === ' ' && action.key !== ' ') {
+        if (state.extraChars.length >= 20) return state;
+        return {
+          ...state,
+          extraChars: [...state.extraChars, action.key],
+          totalIncorrect: state.totalIncorrect + 1,
+          incorrectChars: state.incorrectChars + 1,
+          errorsThisSecond: state.errorsThisSecond + 1,
+          totalKeystrokes: state.totalKeystrokes + 1,
+          accuracy: Math.round((state.totalCorrect / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
+          isRunning: true,
+          startTime: state.startTime ?? Date.now(),
+        };
+      }
+
+      // Case 5: normal character (not space, not at space position)
       const isCorrect = action.key === expected;
       const newCorrect = state.correctChars + (isCorrect ? 1 : 0);
       const newIncorrect = state.incorrectChars + (isCorrect ? 0 : 1);
@@ -153,14 +224,14 @@ function reducer(state: TypingState, action: Action): TypingState {
         totalCorrect: newTotalCorrect,
         totalIncorrect: newTotalIncorrect,
         errorsThisSecond: state.errorsThisSecond + (isCorrect ? 0 : 1),
-        accuracy: totalAttempted > 0 ? Math.round((newTotalCorrect / totalAttempted) * 100) : 100,
+        accuracy: totalAttempted > 0 
+          ? Math.round((newTotalCorrect / totalAttempted) * 100) 
+          : 100,
         mistakeWordIndices: newMistakes,
         totalKeystrokes: state.totalKeystrokes + 1,
         isRunning: true,
         startTime: state.startTime ?? Date.now(),
-        lockedIndex: action.key === ' ' ? newIndex : state.lockedIndex,
-        completedWords: action.key === ' ' ? state.completedWords + 1 : state.completedWords,
-        extraChars: action.key === ' ' ? [] : state.extraChars,
+        extraChars: [],
       };
     }
     case 'BACKSPACE': {

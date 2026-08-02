@@ -310,7 +310,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                   const wordEnd = nonSpaceChars.length > 0
                     ? nonSpaceChars[nonSpaceChars.length - 1].globalIdx
                     : chars[chars.length - 1].globalIdx;
-                  const isPastWord = state.currentIndex > wordEnd + 1;
+                  const isPastWord = state.lockedIndex > wordEnd;
                   const hasError = state.mistakeWordIndices.has(wi);
                   const wordErrorClass = isPastWord && hasError
                     ? 'underline decoration-error decoration-2'
