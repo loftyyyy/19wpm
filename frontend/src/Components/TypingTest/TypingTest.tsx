@@ -331,14 +331,16 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                       const isCursorBefore = !isAtEnd && globalIdx === state.currentIndex;
                       const isCursorAfterLastChar = isAtEnd && isLastChar;
                       const isCursorAfterWord = cursorOnSpace;
-                      const isCorrect = typed !== undefined && typed === char;
-                      const isIncorrect = typed !== undefined && typed !== char;
+                      const isSkipped = typed === '';
+                      const isCorrect = typed !== undefined && typed !== '' && typed === char;
+                      const isIncorrect = typed !== undefined && (typed !== '' ? typed !== char : true);
 
                       let cls = 'char-untyped';
                       if (isCorrect) cls = 'char-correct';
-                      if (isIncorrect) cls = 'char-incorrect';
+                      if (isIncorrect || isSkipped) cls = 'char-incorrect';
 
-                      const displayChar = isIncorrect && typed !== undefined
+                      // Skipped chars show original char in red (not the typed char)
+                      const displayChar = (isIncorrect && typed !== undefined && typed !== '')
                         ? typed
                         : char;
                       return (

@@ -135,8 +135,16 @@ function reducer(state: TypingState, action: Action): TypingState {
         // The render will show untyped chars as char-untyped
         // which is the correct Monkeytype behavior
         
+        // Fill all skipped positions with '' so typedChars
+        // stays aligned with currentIndex
+        const newTypedChars = [...state.typedChars];
+        while (newTypedChars.length < skipTo) {
+          newTypedChars.push('');
+        }
+
         return {
           ...state,
+          typedChars: newTypedChars,
           currentIndex: skipTo,
           lockedIndex: skipTo,
           completedWords: state.completedWords + 1,
