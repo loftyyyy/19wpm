@@ -34,8 +34,13 @@ export default function TypingTest() {
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
-  const restartBtnRef = useRef<HTMLButtonElement>(null);
+const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const currentCharRef = useRef<HTMLSpanElement | null>(null);
+  const lastCharRef = useRef<HTMLSpanElement | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isTypingActive, setIsTypingActive] = useState(false);
 
   const saved = useMemo(loadPreferences, []);
 
@@ -153,6 +158,10 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       containerRef.current?.focus();
       return;
     }
+    setIsTypingActive(true);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => 
+      setIsTypingActive(false), 500);
     handleKeyDown(e);
   }, [handleKeyDown, handleRestart, next, reset, state.isRunning]);
 
@@ -171,6 +180,9 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
 
   useEffect(() => {
     containerRef.current?.focus();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
   }, []);
 
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
@@ -207,7 +219,39 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       contentRef.current.style.transform = `translateY(${offset}px)`;
       contentRef.current.style.transition = 'transform 0.15s ease-out';
     }
-  }, [currentWordIndex, passageWords.length, mode]);
+}, [currentWordIndex, passageWords.length, mode]);
+
+  useLayoutEffect(() => {
+    const cursorEl = cursorRef.current;
+    const containerEl = contentRef.current;
+    if (!cursorEl || !containerEl) return;
+
+    const passageLength = passage?.text.length ?? 0;
+    const isAtEnd = state.currentIndex >= passageLength;
+
+    let targetEl: HTMLSpanElement | null = null;
+    let useRightEdge = false;
+
+    if (isAtEnd && lastCharRef.current) {
+      targetEl = lastCharRef.current;
+      useRightEdge = true;
+    } else if (currentCharRef.current) {
+      targetEl = currentCharRef.current;
+      useRightEdge = false;
+    }
+
+    if (!targetEl) return;
+
+    const containerRect = containerEl.getBoundingClientRect();
+    const charRect = targetEl.getBoundingClientRect();
+
+    const x = useRightEdge
+      ? charRect.right - containerRect.left
+      : charRect.left - containerRect.left;
+    const y = charRect.top - containerRect.top;
+
+    cursorEl.style.transform = `translate(${x}px, ${y}px)`;
+  }, [state.currentIndex, passage]);
 
   const totalWords = state.wordBoundaries.length;
   const displayCompleted = state.isFinished ? totalWords : state.completedWords;
@@ -304,6 +348,24 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
           {passage && (
                   <div ref={viewportRef} className="overflow-hidden">
                     <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
+                  <div
+                    ref={cursorRef}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '2px',
+                      height: '1.2em',
+                      backgroundColor: 'var(--accent)',
+                      borderRadius: '1px',
+                      pointerEvents: 'none',
+                      willChange: 'transform',
+                      transition: 'transform 0.06s ease-out',
+                      zIndex: 10,
+                      display: state.isFinished ? 'none' : 'block',
+                    }}
+                    className={isTypingActive ? '' : 'animate-blink'}
+                  />
 {passageWords.map((word, wi) => {
                   const { chars } = word;
                   const nonSpaceChars = chars.filter(c => c.char !== ' ');
@@ -322,15 +384,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                       const passageLength = passage?.text.length ?? 0;
                       const isAtEnd = state.currentIndex >= passageLength;
                       const isLastChar = globalIdx === passageLength - 1;
-                      const isLastInWord = globalIdx === word.chars[word.chars.length - 1].globalIdx;
-                      const nextIsSpace = isLastInWord && 
-                        passage !== null && 
-                        passage.text[globalIdx + 1] === ' ';
-                      const cursorOnSpace = nextIsSpace && 
-                        state.currentIndex === globalIdx + 1;
-                      const isCursorBefore = !isAtEnd && globalIdx === state.currentIndex;
-                      const isCursorAfterLastChar = isAtEnd && isLastChar;
-                      const isCursorAfterWord = cursorOnSpace;
+                      const isCurrent = !isAtEnd && globalIdx === state.currentIndex;
                       const isSkipped = typed === '';
                       const isCorrect = typed !== undefined && typed !== '' && typed === char;
                       const isIncorrect = typed !== undefined && (typed !== '' ? typed !== char : true);
@@ -344,41 +398,15 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                         ? typed
                         : char;
                       return (
-                        <span key={globalIdx} style={{ position: 'relative' }}>
-                          {isCursorBefore && !state.isFinished && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: '0.1em',
-                                bottom: '0.1em',
-                                width: '2px',
-                                backgroundColor: 'var(--accent)',
-                                borderRadius: '1px',
-                                zIndex: 10,
-                              }}
-                              className="animate-blink"
-                            />
-                          )}
-                          <span className={cls}>
-                            {displayChar}
-                          </span>
-                          {(isCursorAfterWord || isCursorAfterLastChar) && 
-                           !state.isFinished && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                right: '-2px',
-                                top: '0.1em',
-                                bottom: '0.1em',
-                                width: '2px',
-                                backgroundColor: 'var(--accent)',
-                                borderRadius: '1px',
-                                zIndex: 10,
-                              }}
-                              className="animate-blink"
-                            />
-                          )}
+                        <span
+                          key={globalIdx}
+                          ref={el => {
+                            if (isCurrent) currentCharRef.current = el;
+                            if (isLastChar) lastCharRef.current = el;
+                          }}
+                          className={cls}
+                        >
+                          {displayChar}
                         </span>
                       );
                     })}
