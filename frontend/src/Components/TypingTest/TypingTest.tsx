@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo, useCallback, useLayoutEffect, useState } from 'react';
+import { animate } from 'animejs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
 import { useCapsLock } from '../../hooks/useCapsLock';
@@ -41,6 +42,9 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
   const lastCharRef = useRef<HTMLSpanElement | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isTypingActive, setIsTypingActive] = useState(false);
+  const caretAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const isFirstPositionRef = useRef(true);
+  const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
 
   const saved = useMemo(loadPreferences, []);
 
@@ -131,6 +135,7 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
   }, [state.currentIndex, passageWords]);
 
   const handleRestart = useCallback(() => {
+    isFirstPositionRef.current = true;
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
@@ -153,6 +158,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      isFirstPositionRef.current = true;
       reset();
       navigatedRef.current = false;
       containerRef.current?.focus();
@@ -189,6 +195,10 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
 
   useEffect(() => {
     lineCacheRef.current = null;
+    if (contentRef.current) {
+      contentRef.current.style.marginTop = '0px';
+    }
+    isFirstPositionRef.current = true;
   }, [passage]);
 
   useLayoutEffect(() => {
@@ -212,45 +222,89 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     const lineIdx = sortedTops.indexOf(currentEl.offsetTop);
     if (lineIdx < 0) return;
 
-    const startLine = Math.max(0, Math.min(lineIdx - 1, sortedTops.length - 3));
-    const offset = -sortedTops[startLine];
+    // Show current word on line 2 (index 1), like Monkeytype
+    const targetLine = Math.max(0, lineIdx - 1);
+    const newMarginTop = -sortedTops[targetLine];
 
-    if (contentRef.current.style.transform !== `translateY(${offset}px)`) {
-      contentRef.current.style.transform = `translateY(${offset}px)`;
-      contentRef.current.style.transition = 'transform 0.15s ease-out';
-    }
-}, [currentWordIndex, passageWords.length, mode]);
+    const currentMarginTop = parseFloat(
+      contentRef.current.style.marginTop || '0'
+    );
 
-  useLayoutEffect(() => {
-    const cursorEl = cursorRef.current;
-    const containerEl = contentRef.current;
-    if (!cursorEl || !containerEl) return;
+    if (Math.abs(newMarginTop - currentMarginTop) < 1) return;
 
-    const passageLength = passage?.text.length ?? 0;
-    const isAtEnd = state.currentIndex >= passageLength;
+    // Cancel in-flight scroll animation
+    scrollAnimationRef.current?.pause();
 
-    let targetEl: HTMLSpanElement | null = null;
-    let useRightEdge = false;
+    // Animate marginTop at 125ms like Monkeytype
+    scrollAnimationRef.current = animate(contentRef.current, {
+      marginTop: newMarginTop,
+      duration: 125,
+      ease: 'inOut(2)',
+    });
+  }, [currentWordIndex, passageWords.length, mode]);
 
-    if (isAtEnd && lastCharRef.current) {
-      targetEl = lastCharRef.current;
-      useRightEdge = true;
-    } else if (currentCharRef.current) {
-      targetEl = currentCharRef.current;
-      useRightEdge = false;
-    }
+  useEffect(() => {
+    const rafId = requestAnimationFrame(() => {
+      const cursorEl = cursorRef.current;
+      const containerEl = contentRef.current;
+      if (!cursorEl || !containerEl) return;
 
-    if (!targetEl) return;
+      const passageLength = passage?.text.length ?? 0;
+      const isAtEnd = state.currentIndex >= passageLength;
 
-    const containerRect = containerEl.getBoundingClientRect();
-    const charRect = targetEl.getBoundingClientRect();
+      let targetEl: HTMLSpanElement | null = null;
+      let useRightEdge = false;
 
-    const x = useRightEdge
-      ? charRect.right - containerRect.left
-      : charRect.left - containerRect.left;
-    const y = charRect.top - containerRect.top;
+      if (isAtEnd && lastCharRef.current) {
+        targetEl = lastCharRef.current;
+        useRightEdge = true;
+      } else if (currentCharRef.current) {
+        targetEl = currentCharRef.current;
+        useRightEdge = false;
+      }
 
-    cursorEl.style.transform = `translate(${x}px, ${y}px)`;
+      if (!targetEl) return;
+
+      // Use offsetLeft/offsetTop relative to contentRef
+      // like Monkeytype does, NOT getBoundingClientRect
+      let el: HTMLElement | null = targetEl;
+      let left = useRightEdge ? el.offsetWidth : 0;
+      let top = 0;
+      while (el && el !== containerEl) {
+        left += el.offsetLeft;
+        top += el.offsetTop;
+        el = el.offsetParent as HTMLElement;
+      }
+
+      // Center vertically like Monkeytype:
+      // top += (letterHeight - caretHeight) / 2
+      const caretHeight = parseFloat(
+        getComputedStyle(cursorEl).height
+      );
+      top += (targetEl.offsetHeight - caretHeight) / 2;
+      // Shift left by half caret width to sit between chars
+      left -= 1;
+
+      if (isFirstPositionRef.current) {
+        // Teleport on first render — no animation
+        isFirstPositionRef.current = false;
+        cursorEl.style.left = `${left}px`;
+        cursorEl.style.top = `${top}px`;
+        return;
+      }
+
+      // Cancel any in-flight animation
+      caretAnimationRef.current?.pause();
+
+      // Animate with Monkeytype's exact easing
+      caretAnimationRef.current = animate(cursorEl, {
+        left,
+        top,
+        duration: 85,
+        ease: 'inOut(1.25)',
+      });
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [state.currentIndex, passage]);
 
   const totalWords = state.wordBoundaries.length;
@@ -359,8 +413,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                       backgroundColor: 'var(--accent)',
                       borderRadius: '1px',
                       pointerEvents: 'none',
-                      willChange: 'transform',
-                      transition: 'transform 0.06s ease-out',
                       zIndex: 10,
                       display: state.isFinished ? 'none' : 'block',
                     }}
