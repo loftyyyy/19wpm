@@ -45,6 +45,7 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
   const caretAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
   const isFirstPositionRef = useRef(true);
   const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const useRightEdgeRef = useRef(false);
 
   const saved = useMemo(loadPreferences, []);
 
@@ -136,6 +137,7 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleRestart = useCallback(() => {
     isFirstPositionRef.current = true;
+    useRightEdgeRef.current = false;
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
@@ -159,6 +161,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       isFirstPositionRef.current = true;
+      useRightEdgeRef.current = false;
       reset();
       navigatedRef.current = false;
       containerRef.current?.focus();
@@ -199,6 +202,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       contentRef.current.style.marginTop = '0px';
     }
     isFirstPositionRef.current = true;
+    useRightEdgeRef.current = false;
   }, [passage]);
 
   useLayoutEffect(() => {
@@ -255,8 +259,10 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       let targetEl: HTMLSpanElement | null = null;
       let useRightEdge = false;
 
-      if (isAtEnd && lastCharRef.current) {
-        targetEl = lastCharRef.current;
+      const shouldUseRightEdge = isAtEnd || useRightEdgeRef.current;
+
+      if (shouldUseRightEdge && (lastCharRef.current || currentCharRef.current)) {
+        targetEl = currentCharRef.current ?? lastCharRef.current;
         useRightEdge = true;
       } else if (currentCharRef.current) {
         targetEl = currentCharRef.current;
@@ -436,7 +442,25 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                       const passageLength = passage?.text.length ?? 0;
                       const isAtEnd = state.currentIndex >= passageLength;
                       const isLastChar = globalIdx === passageLength - 1;
-                      const isCurrent = !isAtEnd && globalIdx === state.currentIndex;
+
+                      // Check if currentIndex points to a space after this char
+                      const passageText = passage?.text ?? '';
+                      const currentIndexOnSpace =
+                        passageText[state.currentIndex] === ' ' &&
+                        globalIdx === state.currentIndex - 1;
+
+                      const isCurrent = !isAtEnd && (
+                        globalIdx === state.currentIndex ||
+                        currentIndexOnSpace
+                      );
+
+                      // Tell cursor positioning to use right edge when
+                      // currentIndex is on a space (end of word)
+                      if (currentIndexOnSpace) {
+                        useRightEdgeRef.current = true;
+                      } else if (globalIdx === state.currentIndex) {
+                        useRightEdgeRef.current = false;
+                      }
                       const isSkipped = typed === '';
                       const isCorrect = typed !== undefined && typed !== '' && typed === char;
                       const isIncorrect = typed !== undefined && (typed !== '' ? typed !== char : true);
