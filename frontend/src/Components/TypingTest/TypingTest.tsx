@@ -40,6 +40,7 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
   const currentCharRef = useRef<HTMLSpanElement | null>(null);
   const lastCharRef = useRef<HTMLSpanElement | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isResettingRef = useRef(false);
   const [isTypingActive, setIsTypingActive] = useState(false);
 
   const saved = useMemo(loadPreferences, []);
@@ -131,6 +132,7 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
   }, [state.currentIndex, passageWords]);
 
   const handleRestart = useCallback(() => {
+    isResettingRef.current = true;
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
@@ -153,6 +155,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      isResettingRef.current = true;
       reset();
       navigatedRef.current = false;
       containerRef.current?.focus();
@@ -221,36 +224,54 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     }
 }, [currentWordIndex, passageWords.length, mode]);
 
-  useLayoutEffect(() => {
-    const cursorEl = cursorRef.current;
-    const containerEl = contentRef.current;
-    if (!cursorEl || !containerEl) return;
+  useEffect(() => {
+    const rafId = requestAnimationFrame(() => {
+      const cursorEl = cursorRef.current;
+      const containerEl = contentRef.current;
+      if (!cursorEl || !containerEl) return;
 
-    const passageLength = passage?.text.length ?? 0;
-    const isAtEnd = state.currentIndex >= passageLength;
+      const passageLength = passage?.text.length ?? 0;
+      const isAtEnd = state.currentIndex >= passageLength;
 
-    let targetEl: HTMLSpanElement | null = null;
-    let useRightEdge = false;
+      let targetEl: HTMLSpanElement | null = null;
+      let useRightEdge = false;
 
-    if (isAtEnd && lastCharRef.current) {
-      targetEl = lastCharRef.current;
-      useRightEdge = true;
-    } else if (currentCharRef.current) {
-      targetEl = currentCharRef.current;
-      useRightEdge = false;
-    }
+      if (isAtEnd && lastCharRef.current) {
+        targetEl = lastCharRef.current;
+        useRightEdge = true;
+      } else if (currentCharRef.current) {
+        targetEl = currentCharRef.current;
+        useRightEdge = false;
+      }
 
-    if (!targetEl) return;
+      if (!targetEl) return;
 
-    const containerRect = containerEl.getBoundingClientRect();
-    const charRect = targetEl.getBoundingClientRect();
+      const containerRect = containerEl.getBoundingClientRect();
+      const charRect = targetEl.getBoundingClientRect();
 
-    const x = useRightEdge
-      ? charRect.right - containerRect.left
-      : charRect.left - containerRect.left;
-    const y = charRect.top - containerRect.top;
+      const x = useRightEdge
+        ? charRect.right - containerRect.left
+        : charRect.left - containerRect.left;
+      const y = charRect.top - containerRect.top;
 
-    cursorEl.style.transform = `translate(${x}px, ${y}px)`;
+      if (isResettingRef.current) {
+        cursorEl.style.transition = 'none';
+        isResettingRef.current = false;
+        // Force reflow so transition:none takes effect
+        void cursorEl.offsetHeight;
+        cursorEl.style.transform = `translate(${x}px, ${y}px)`;
+        // Re-enable transition after next frame
+        requestAnimationFrame(() => {
+          if (cursorEl) {
+            cursorEl.style.transition =
+              'transform 0.05s cubic-bezier(0.2, 0, 0, 1)';
+          }
+        });
+      } else {
+        cursorEl.style.transform = `translate(${x}px, ${y}px)`;
+      }
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [state.currentIndex, passage]);
 
   const totalWords = state.wordBoundaries.length;
@@ -360,7 +381,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                       borderRadius: '1px',
                       pointerEvents: 'none',
                       willChange: 'transform',
-                      transition: 'transform 0.06s ease-out',
+                      transition: 'transform 0.05s cubic-bezier(0.2, 0, 0, 1)',
                       zIndex: 10,
                       display: state.isFinished ? 'none' : 'block',
                     }}
