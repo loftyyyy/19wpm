@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import { animate } from 'animejs';
 import { useNavigate } from 'react-router-dom';
+import { useTypingEngine } from '../hooks/useTypingEngine';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
 import Lobby from '../Components/Race/Lobby';
@@ -10,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRaceSocket } from '../hooks/useRaceSocket';
 import { createRoom, joinRoomByCode, joinMatchmaking, getPendingMatch } from '../services/race';
 import type { TextType } from '../types/race';
+import type { Passage } from '../types';
 
 const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
 
@@ -412,164 +415,324 @@ interface RaceTypingInputProps {
 }
 
 function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypingInputProps) {
-  const [typedChars, setTypedChars] = useState<string[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [lockedIndex, setLockedIndex] = useState(0);
-  const [extraChars, setExtraChars] = useState<string[]>([]);
-  const [finished, setFinished] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const cursorRef = useRef<HTMLDivElement>(null);
-  const currentCharRef = useRef<HTMLSpanElement>(null);
+  const currentCharRef = useRef<HTMLSpanElement | null>(null);
+  const lastCharRef = useRef<HTMLSpanElement | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isTypingActive, setIsTypingActive] = useState(false);
+  const caretAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const isFirstPositionRef = useRef(true);
+  const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const useRightEdgeRef = useRef(false);
+  const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
+  const finishReportedRef = useRef(false);
+  const onProgressRef = useRef(onProgress);
+  const onFinishRef = useRef(onFinish);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  const passageObj = useMemo<Passage>(
+    () => ({ title: '', text: passage, author: '', source: '' }),
+    [passage]
+  );
 
-  useEffect(() => {
-    if (cursorRef.current && currentCharRef.current) {
-      const { offsetLeft, offsetTop } = currentCharRef.current;
-      cursorRef.current.style.transform = `translate(${offsetLeft}px, ${offsetTop}px)`;
+  useEffect(() => { onProgressRef.current = onProgress; }, [onProgress]);
+  useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
+
+  const { state, handleKeyDown } = useTypingEngine(passageObj, 60, 'words', 25, 'words');
+
+  const passageWords = useMemo(() => {
+    if (!passage) return [];
+    const words: { chars: { char: string; globalIdx: number }[] }[] = [];
+    let globalIdx = 0;
+    let currentWord: { char: string; globalIdx: number }[] = [];
+    for (const ch of passage.split('')) {
+      if (ch === ' ') {
+        if (currentWord.length > 0) {
+          words.push({ chars: currentWord });
+          currentWord = [];
+        }
+        globalIdx++;
+      } else {
+        currentWord.push({ char: ch, globalIdx });
+        globalIdx++;
+      }
     }
-  }, [currentIndex, typedChars.length]);
+    if (currentWord.length > 0) words.push({ chars: currentWord });
+    return words;
+  }, [passage]);
 
-  const calcWpm = (typed: string) => {
+  const currentWordIndex = useMemo(() => {
+    if (passageWords.length === 0) return 0;
+    for (let i = 0; i < passageWords.length; i++) {
+      const word = passageWords[i];
+      const first = word.chars[0].globalIdx;
+      const last = word.chars[word.chars.length - 1].globalIdx;
+      if (state.currentIndex >= first && state.currentIndex <= last) return i;
+      if (i > 0 && state.currentIndex === first - 1) return i - 1;
+    }
+    return Math.max(0, passageWords.length - 1);
+  }, [state.currentIndex, passageWords]);
+
+  const calcWpm = useCallback((typed: string) => {
     const minutes = (Date.now() - new Date(startTime).getTime()) / 60000;
     if (minutes <= 0) return 0;
     const words = typed.trim().split(/\s+/).filter(Boolean).length;
     return Math.round(words / minutes);
-  };
+  }, [startTime]);
 
-  const reportProgress = (chars: string[], index: number) => {
-    const typed = chars.join('');
-    onProgress(Math.min(index / passage.length, 1), calcWpm(typed), typed);
-  };
+  useEffect(() => {
+    const typed = state.typedChars.join('');
+    onProgressRef.current(
+      Math.min(state.currentIndex / passage.length, 1),
+      calcWpm(typed),
+      typed
+    );
+  }, [state.typedChars, state.currentIndex, passage, calcWpm]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (finished) return;
+  useEffect(() => {
+    if (state.isFinished && !finishReportedRef.current) {
+      finishReportedRef.current = true;
+      const typed = state.typedChars.join('');
+      onProgressRef.current(1, calcWpm(typed), typed);
+      onFinishRef.current(calcWpm(typed));
+    }
+    if (!state.isFinished) {
+      finishReportedRef.current = false;
+    }
+  }, [state.isFinished, state.typedChars, calcWpm]);
 
-    if (e.key === 'Backspace') {
-      e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        const lastSpace = typedChars.join('').lastIndexOf(' ', (currentIndex - lockedIndex > 0 ? currentIndex - 1 : currentIndex));
-        const wordStart = lastSpace >= lockedIndex ? lastSpace + 1 : lockedIndex;
-        setTypedChars(prev => prev.slice(0, wordStart));
-        setCurrentIndex(wordStart);
-        reportProgress(typedChars.slice(0, wordStart), wordStart);
+  useEffect(() => {
+    containerRef.current?.focus();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    lineCacheRef.current = null;
+    if (contentRef.current) {
+      contentRef.current.style.marginTop = '0px';
+    }
+    isFirstPositionRef.current = true;
+    useRightEdgeRef.current = false;
+  }, [passage]);
+
+  useLayoutEffect(() => {
+    const elements = wordRefs.current;
+    if (!elements.length || !contentRef.current || !viewportRef.current) return;
+
+    if (!lineCacheRef.current) {
+      const tops = new Set<number>();
+      elements.forEach(el => { if (el) tops.add(el.offsetTop); });
+      const sortedTops = [...tops].sort((a, b) => a - b);
+      if (sortedTops.length < 2) return;
+      const lineHeight = sortedTops[1] - sortedTops[0];
+      viewportRef.current.style.height = `${lineHeight * 3}px`;
+      lineCacheRef.current = { sortedTops, lineHeight };
+    }
+
+    const { sortedTops } = lineCacheRef.current;
+    const currentEl = elements[currentWordIndex];
+    if (!currentEl) return;
+
+    const lineIdx = sortedTops.indexOf(currentEl.offsetTop);
+    if (lineIdx < 0) return;
+
+    // Show current word on line 2 (index 1), like Monkeytype
+    const targetLine = Math.max(0, lineIdx - 1);
+    const newMarginTop = -sortedTops[targetLine];
+
+    const currentMarginTop = parseFloat(
+      contentRef.current.style.marginTop || '0'
+    );
+
+    if (Math.abs(newMarginTop - currentMarginTop) < 1) return;
+
+    // Cancel in-flight scroll animation
+    scrollAnimationRef.current?.pause();
+
+    // Animate marginTop at 125ms like Monkeytype
+    scrollAnimationRef.current = animate(contentRef.current, {
+      marginTop: newMarginTop,
+      duration: 125,
+      ease: 'inOut(2)',
+    });
+  }, [currentWordIndex, passageWords.length]);
+
+  useEffect(() => {
+    const rafId = requestAnimationFrame(() => {
+      const cursorEl = cursorRef.current;
+      const containerEl = contentRef.current;
+      if (!cursorEl || !containerEl) return;
+
+      const passageLength = passage.length;
+      const isAtEnd = state.currentIndex >= passageLength;
+
+      let targetEl: HTMLSpanElement | null = null;
+      let useRightEdge = false;
+
+      const shouldUseRightEdge = isAtEnd || useRightEdgeRef.current;
+
+      if (shouldUseRightEdge && (lastCharRef.current || currentCharRef.current)) {
+        targetEl = currentCharRef.current ?? lastCharRef.current;
+        useRightEdge = true;
+      } else if (currentCharRef.current) {
+        targetEl = currentCharRef.current;
+        useRightEdge = false;
+      }
+
+      if (!targetEl) return;
+
+      // Use offsetLeft/offsetTop relative to contentRef
+      // like Monkeytype does, NOT getBoundingClientRect
+      let el: HTMLElement | null = targetEl;
+      let left = useRightEdge ? el.offsetWidth : 0;
+      let top = 0;
+      while (el && el !== containerEl) {
+        left += el.offsetLeft;
+        top += el.offsetTop;
+        el = el.offsetParent as HTMLElement;
+      }
+
+      // Center vertically like Monkeytype:
+      // top += (letterHeight - caretHeight) / 2
+      const caretHeight = parseFloat(
+        getComputedStyle(cursorEl).height
+      );
+      top += (targetEl.offsetHeight - caretHeight) / 2;
+      // Shift left by half caret width to sit between chars
+      left -= 1;
+
+      if (isFirstPositionRef.current) {
+        // Teleport on first render — no animation
+        isFirstPositionRef.current = false;
+        cursorEl.style.left = `${left}px`;
+        cursorEl.style.top = `${top}px`;
         return;
       }
-      if (extraChars.length > 0) {
-        setExtraChars(prev => prev.slice(0, -1));
-      } else if (currentIndex > lockedIndex) {
-        const newIndex = currentIndex - 1;
-        setTypedChars(prev => prev.slice(0, -1));
-        setCurrentIndex(newIndex);
-        reportProgress(typedChars.slice(0, -1), newIndex);
-      }
+
+      // Cancel any in-flight animation
+      caretAnimationRef.current?.pause();
+
+      // Animate with Monkeytype's exact easing
+      caretAnimationRef.current = animate(cursorEl, {
+        left,
+        top,
+        duration: 85,
+        ease: 'inOut(1.25)',
+      });
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [state.currentIndex, passage]);
+
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Tab' || e.key === 'Escape') {
+      e.preventDefault();
       return;
     }
-
-    if (e.key.length !== 1) return;
-    e.preventDefault();
-
-    const passageChar = passage[currentIndex];
-
-    if (e.key === ' ') {
-      if (passageChar === ' ' && extraChars.length === 0) {
-        const newChars = [...typedChars, ' '];
-        const newIndex = currentIndex + 1;
-        setTypedChars(newChars);
-        setCurrentIndex(newIndex);
-        setExtraChars([]);
-        setLockedIndex(newIndex);
-        reportProgress(newChars, newIndex);
-        if (newIndex >= passage.length) {
-          setFinished(true);
-          onProgress(1, calcWpm(newChars.join('')), newChars.join(''));
-          onFinish(calcWpm(newChars.join('')));
-        }
-      } else {
-        setExtraChars(prev => [...prev, ' ']);
-      }
-    } else {
-      if (passageChar === ' ') {
-        setExtraChars(prev => [...prev, e.key]);
-      } else {
-        const newChars = [...typedChars, e.key];
-        const newIndex = currentIndex + 1;
-        setTypedChars(newChars);
-        setCurrentIndex(newIndex);
-        reportProgress(newChars, newIndex);
-        if (newIndex >= passage.length) {
-          setFinished(true);
-          onProgress(1, calcWpm(newChars.join('')), newChars.join(''));
-          onFinish(calcWpm(newChars.join('')));
-        }
-      }
-    }
-  };
-
-  const chars = passage.split('');
+    setIsTypingActive(true);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => setIsTypingActive(false), 500);
+    handleKeyDown(e);
+  }, [handleKeyDown]);
 
   return (
-    <div onClick={() => inputRef.current?.focus()} onCopy={e => e.preventDefault()}>
-      <div className="font-mono text-lg leading-relaxed select-none relative">
-        <div
-          ref={cursorRef}
-          className={`typing-cursor${finished ? ' typing-cursor-hidden' : ''}`}
-        />
-        {chars.map((char, i) => {
-          const charSpan = (() => {
-            if (i < typedChars.length) {
-              const isCorrect = typedChars[i] === char;
-              return (
-                <span key={i} className={isCorrect ? 'char-correct' : 'char-incorrect'}>
-                  {char}
-                </span>
-              );
-            }
-            if (i === currentIndex) {
-              return (
-                <span key={i} ref={currentCharRef} className="char-untyped">
-                  {char}
-                </span>
-              );
-            }
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      onKeyDown={handleContainerKeyDown}
+      onClick={() => containerRef.current?.focus()}
+      className="w-full focus:outline-none focus:ring-2 focus:ring-accent/30 font-mono text-xl md:text-2xl leading-relaxed cursor-text select-none"
+    >
+      {!state.isRunning && !state.isFinished && (
+        <div className="text-center text-text-dim font-sans text-sm mb-4 transition-theme">
+          Start typing to begin
+        </div>
+      )}
+      <div ref={viewportRef} className="overflow-hidden">
+        <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
+          <div
+            ref={cursorRef}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '2px',
+              height: '1.2em',
+              backgroundColor: 'var(--accent)',
+              borderRadius: '1px',
+              pointerEvents: 'none',
+              zIndex: 10,
+              display: state.isFinished ? 'none' : 'block',
+            }}
+            className={isTypingActive ? '' : 'animate-blink'}
+          />
+          {passageWords.map((word, wi) => {
+            const { chars } = word;
+            const nonSpaceChars = chars.filter(c => c.char !== ' ');
+            const wordEnd = nonSpaceChars.length > 0
+              ? nonSpaceChars[nonSpaceChars.length - 1].globalIdx
+              : chars[chars.length - 1].globalIdx;
+            const isPastWord = state.lockedIndex > wordEnd;
+            const hasError = state.mistakeWordIndices.has(wi);
+            const wordErrorClass = isPastWord && hasError
+              ? 'underline decoration-error decoration-2'
+              : '';
             return (
-              <span key={i} className="char-untyped">
-                {char}
+              <span
+                key={wi}
+                ref={el => { wordRefs.current[wi] = el; }}
+                className={`flex ${wordErrorClass}`}
+              >
+                {chars.map(({ char, globalIdx }) => {
+                  const typed = state.typedChars[globalIdx];
+                  const isAtEnd = state.currentIndex >= passage.length;
+                  const isLastChar = globalIdx === passage.length - 1;
+                  const currentIndexOnSpace =
+                    passage[state.currentIndex] === ' ' &&
+                    globalIdx === state.currentIndex - 1;
+                  const isCurrent = !isAtEnd && (
+                    globalIdx === state.currentIndex ||
+                    currentIndexOnSpace
+                  );
+                  if (currentIndexOnSpace) {
+                    useRightEdgeRef.current = true;
+                  } else if (globalIdx === state.currentIndex) {
+                    useRightEdgeRef.current = false;
+                  }
+                  const isSkipped = typed === '';
+                  const isCorrect = typed !== undefined && typed !== '' && typed === char;
+                  const isIncorrect = typed !== undefined && (typed !== '' ? typed !== char : true);
+                  let cls = 'char-untyped';
+                  if (isCorrect) cls = 'char-correct';
+                  if (isIncorrect || isSkipped) cls = 'char-incorrect';
+                  const displayChar = (isIncorrect && typed !== undefined && typed !== '')
+                    ? typed
+                    : char;
+                  return (
+                    <span
+                      key={globalIdx}
+                      ref={el => {
+                        if (isCurrent) currentCharRef.current = el;
+                        if (isLastChar) lastCharRef.current = el;
+                      }}
+                      className={cls}
+                    >
+                      {displayChar}
+                    </span>
+                  );
+                })}
+                {wi === currentWordIndex && state.extraChars.map((ch, i) => (
+                  <span key={`ex-${i}`} className="char-incorrect">{ch}</span>
+                ))}
               </span>
             );
-          })();
-
-          const shouldRenderExtra =
-            extraChars.length > 0 &&
-            i === currentIndex &&
-            passage[currentIndex] === ' ';
-
-          return (
-            <span key={`wrapper-${i}`}>
-              {charSpan}
-              {shouldRenderExtra && (
-                <span className="char-incorrect">{extraChars.join('')}</span>
-              )}
-            </span>
-          );
-        })}
+          })}
+        </div>
       </div>
-      <input
-        ref={inputRef}
-        type="text"
-        value=""
-        onChange={() => {}}
-        onKeyDown={handleKeyDown}
-        onPaste={e => e.preventDefault()}
-        className="opacity-0 absolute w-0 h-0 pointer-events-none"
-        readOnly={false}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-      />
     </div>
   );
 }
