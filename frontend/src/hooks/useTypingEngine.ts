@@ -106,6 +106,7 @@ function reducer(state: TypingState, action: Action): TypingState {
       // Case 1: space pressed but expected char is NOT a space
       // (cursor is mid-word)
       if (action.key === ' ' && expected !== ' ') {
+        console.log('Space mid-word: currentIndex=', state.currentIndex, 'expected=', expected, 'extraChars=', state.extraChars);
         // Do nothing at position 0 — can't skip before typing
         if (state.currentIndex === 0) return state;
         

@@ -726,7 +726,13 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
                   );
                 })}
                 {wi === currentWordIndex && state.extraChars.map((ch, i) => (
-                  <span key={`ex-${i}`} className="char-incorrect">{ch}</span>
+                  <span
+                    key={`ex-${i}`}
+                    className="char-incorrect"
+                    style={{ color: 'var(--error)', backgroundColor: 'var(--error)' }}
+                  >
+                    <span style={{ color: '#fff' }}>{ch}</span>
+                  </span>
                 ))}
               </span>
             );
