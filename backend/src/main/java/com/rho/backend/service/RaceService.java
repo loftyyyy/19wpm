@@ -73,7 +73,7 @@ public class RaceService {
         User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!raceRoom.getState().equals(RaceState.LOBBY)) {
-            throw new InvalidResourceException("Race already started");
+            return raceRoom; // return current state so late joiner gets broadcast of actual room state
         }
 
         if (raceRoom.findParticipant(userId) != null) {
