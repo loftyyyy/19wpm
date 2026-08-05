@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { getAccessToken } from '../services/api';
+import { getRoomState } from '../services/race';
 import type { RaceRoom } from '../types/race';
 
 interface UseRaceSocketOpts {
@@ -78,6 +79,11 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
             body: JSON.stringify({}),
           });
         }
+
+        // Fetch current room state immediately after subscribing in case we missed a broadcast
+        getRoomState(roomCode).then(room => {
+          if (room) setRoom(room);
+        });
       }
 
       if (opts?.onMatchmakingRoomCode) {

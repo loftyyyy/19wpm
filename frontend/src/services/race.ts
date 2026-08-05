@@ -1,5 +1,5 @@
 import { api, getAccessToken, API_BASE_URL } from './api';
-import type { TextType } from '../types/race';
+import type { RaceRoom, TextType } from '../types/race';
 
 export async function createRoom(textType: TextType | null, isPrivate: boolean): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/api/v1/race/rooms`, {
@@ -45,4 +45,19 @@ export async function getPendingMatch(): Promise<string | null> {
   if (response.status === 204) return null;
   if (!response.ok) return null;
   return response.text();
+}
+
+export async function getRoomState(code: string): Promise<RaceRoom | null> {
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
+  const token = localStorage.getItem('19wpm-access-token') ?? '';
+  try {
+    const response = await fetch(
+      `${apiBase}/api/v1/race/rooms/${code}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
 }

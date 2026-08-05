@@ -3,6 +3,7 @@ package com.rho.backend.controller;
 import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.race.CreateRoomRequestDTO;
 import com.rho.backend.race.RaceRoom;
+import com.rho.backend.repository.RaceRoomRepository;
 import com.rho.backend.service.MatchmakingService;
 import com.rho.backend.service.RaceService;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -18,11 +19,13 @@ public class RaceRestController {
     private final RaceService raceService;
     private final MatchmakingService matchmakingService;
     private final RedisTemplate<String, String> redisTemplate;
+    private final RaceRoomRepository raceRoomRepository;
 
-    public RaceRestController(RaceService raceService, MatchmakingService matchmakingService, RedisTemplate<String, String> redisTemplate) {
+    public RaceRestController(RaceService raceService, MatchmakingService matchmakingService, RedisTemplate<String, String> redisTemplate, RaceRoomRepository raceRoomRepository) {
         this.raceService = raceService;
         this.matchmakingService = matchmakingService;
         this.redisTemplate = redisTemplate;
+        this.raceRoomRepository = raceRoomRepository;
     }
 
     @PostMapping("/rooms")
@@ -58,5 +61,14 @@ public class RaceRestController {
         }
         redisTemplate.delete(key);
         return ResponseEntity.ok(roomCode);
+    }
+
+    @GetMapping("/rooms/{code}")
+    public ResponseEntity<?> getRoomState(
+        @PathVariable String code,
+        @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return raceRoomRepository.findByCode(code)
+            .map(room -> ResponseEntity.ok(room))
+            .orElse(ResponseEntity.notFound().build());
     }
 }
