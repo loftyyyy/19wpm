@@ -32,4 +32,6 @@ export interface RaceRoom {
   text: RaceText | null;
   startTime: string | null;
   finishCount: number;
+  countdownStartTime: string | null;
+  countdownDurationMs: number;
 }

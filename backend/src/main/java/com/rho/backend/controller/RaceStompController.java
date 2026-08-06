@@ -50,8 +50,9 @@ public class RaceStompController {
 
         new Thread(() -> {
             try {
-                Thread.sleep(3000);
+                Thread.sleep(RaceService.COUNTDOWN_DURATION_MS);
                 RaceRoom racing = raceService.transitionToRacing(code);
+                logger.info("Room {} transitioned to RACING at {}", code, racing.getStartTime());
                 messagingTemplate.convertAndSend("/topic/room/" + code, racing);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

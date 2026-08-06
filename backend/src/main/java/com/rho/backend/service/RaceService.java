@@ -32,6 +32,7 @@ public class RaceService {
     private static final String ALPHANUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int CODE_LENGTH = 6;
+    public static final long COUNTDOWN_DURATION_MS = 3500L;
     private static final Logger logger = LoggerFactory.getLogger(RaceService.class);
     private final UserRepository userRepository;
     private final RaceSessionRepository raceSessionRepository;
@@ -109,6 +110,10 @@ public class RaceService {
         }
 
         raceRoom.setState(RaceState.COUNTDOWN);
+        raceRoom.setCountdownStartTime(Instant.now());
+        raceRoom.setCountdownDurationMs(COUNTDOWN_DURATION_MS);
+        logger.info("Room {} entering COUNTDOWN; countdownStartTime={}, durationMs={}",
+                roomCode, raceRoom.getCountdownStartTime(), raceRoom.getCountdownDurationMs());
         raceRoomRepository.save(raceRoom);
         return raceRoom;
     }

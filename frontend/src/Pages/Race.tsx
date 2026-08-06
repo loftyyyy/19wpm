@@ -51,6 +51,11 @@ export default function Race() {
   }, [socket.room, phase]);
 
   useEffect(() => {
+    if (!socket.room || phase !== 'countdown') return;
+    if (socket.room.state === 'RACING') setPhase('racing');
+  }, [socket.room, phase]);
+
+  useEffect(() => {
     if (!socket.room) return;
     if (socket.room.hostUserId !== null) return;
     if (socket.room.state !== 'LOBBY') return;
@@ -170,8 +175,8 @@ export default function Race() {
   }, [socket]);
 
   const handleCountdownComplete = useCallback(() => {
-    setPhase('racing');
-  }, []);
+    if (socket.room?.state === 'RACING') setPhase('racing');
+  }, [socket.room?.state]);
 
   const handlePlayAgain = useCallback(() => {
     setRoomCode(null);
@@ -316,7 +321,13 @@ export default function Race() {
     }
 
     if (phase === 'countdown') {
-      return <Countdown onComplete={handleCountdownComplete} />;
+      return (
+        <Countdown
+          startTime={socket.room?.countdownStartTime ?? new Date().toISOString()}
+          durationMs={socket.room?.countdownDurationMs ?? 3500}
+          onComplete={handleCountdownComplete}
+        />
+      );
     }
 
     if (phase === 'racing' && socket.room) {

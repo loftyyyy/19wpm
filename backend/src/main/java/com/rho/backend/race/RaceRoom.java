@@ -28,6 +28,9 @@ public class RaceRoom implements Serializable {
     private Instant startTime;        // set when RACING begins, used for WPM calc
     private int finishCount;          // how many players have finished
 
+    private Instant countdownStartTime;   // set when COUNTDOWN begins, drives the server-authoritative countdown
+    private long countdownDurationMs;     // how long COUNTDOWN lasts before RACING
+
     public RaceRoom() {
         this.participants = new ArrayList<>();
         this.finishCount = 0;
