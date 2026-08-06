@@ -10,7 +10,7 @@ import RaceTrack from '../Components/Race/RaceTrack';
 import RaceResults from '../Components/Race/RaceResults';
 import { useAuth } from '../context/AuthContext';
 import { useRaceSocket } from '../hooks/useRaceSocket';
-import { createRoom, joinRoomByCode, joinMatchmaking, getPendingMatch, getRoomState } from '../services/race';
+import { createRoom, joinRoomByCode, joinMatchmaking, getPendingMatch } from '../services/race';
 import type { TextType } from '../types/race';
 import type { Passage } from '../types';
 
@@ -49,20 +49,6 @@ export default function Race() {
     if (!socket.room || phase !== 'racing') return;
     if (socket.room.state === 'FINISHED') setPhase('finished');
   }, [socket.room, phase]);
-
-  useEffect(() => {
-    if (phase !== 'lobby' || !roomCode) return;
-    if (socket.room?.state === 'COUNTDOWN' || socket.room?.state === 'RACING') return;
-
-    const interval = setInterval(async () => {
-      const room = await getRoomState(roomCode);
-      if (!room) return;
-      if (room.state === 'COUNTDOWN') setPhase('countdown');
-      if (room.state === 'RACING') setPhase('racing');
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [phase, roomCode, socket.room?.state]);
 
   useEffect(() => {
     if (!socket.room) return;
