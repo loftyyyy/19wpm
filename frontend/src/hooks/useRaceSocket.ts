@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { getAccessToken } from '../services/api';
+import { attemptTokenRefresh, getAccessToken } from '../services/api';
 import { getRoomState } from '../services/race';
 import type { RaceRoom } from '../types/race';
 
@@ -17,35 +17,48 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const hasJoinedRef = useRef(false);
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) {
-      setIsTokenReady(false);
-      return;
-    }
-    const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
-    fetch(`${apiBase}/api/v1/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(async res => {
-      if (res.ok) {
-        setIsTokenReady(true);
-      } else if (res.status === 401) {
-        const refreshToken = localStorage.getItem('19wpm-refresh-token');
-        if (!refreshToken) { setIsTokenReady(false); return; }
-        const refreshRes = await fetch(`${apiBase}/api/v1/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken })
+    let cancelled = false;
+
+    async function ensureValidToken() {
+      const token = getAccessToken();
+      if (!token) {
+        setIsTokenReady(false);
+        return;
+      }
+      const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
+      try {
+        const res = await fetch(`${apiBase}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
         });
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          localStorage.setItem('19wpm-access-token', data.accessToken);
-          localStorage.setItem('19wpm-refresh-token', data.refreshToken);
+        if (cancelled) return;
+        if (res.ok) {
           setIsTokenReady(true);
-        } else {
+          return;
+        }
+        if (res.status === 401) {
+          console.info('[race-socket] access token rejected (401); refreshing via shared gate');
+          const refreshed = await attemptTokenRefresh();
+          if (cancelled) return;
+          console.info(refreshed
+            ? '[race-socket] token refreshed; connecting'
+            : '[race-socket] token refresh failed; staying disconnected');
+          setIsTokenReady(refreshed);
+          return;
+        }
+        console.warn(`[race-socket] /auth/me returned ${res.status}; deferring connection`);
+        setIsTokenReady(false);
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[race-socket] /auth/me check failed', err);
           setIsTokenReady(false);
         }
       }
-    }).catch(() => setIsTokenReady(false));
+    }
+
+    void ensureValidToken();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -59,11 +72,14 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
         null,
         { transports: ['websocket', 'xhr-streaming', 'xhr-polling'] }
       ),
-      connectHeaders: { token: getAccessToken() ?? '' },
+      beforeConnect: (stompClient) => {
+        stompClient.connectHeaders = { token: getAccessToken() ?? '' };
+      },
       reconnectDelay: 5000,
     });
 
     client.onConnect = () => {
+      console.info('[race-socket] connected to message broker');
       setConnected(true);
 
       if (roomCode) {
@@ -95,6 +111,16 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     };
 
     client.onDisconnect = () => {
+      console.info('[race-socket] disconnected from message broker');
+      setConnected(false);
+    };
+
+    client.onStompError = (frame) => {
+      console.warn('[race-socket] STOMP error:', frame.headers?.message);
+    };
+
+    client.onWebSocketClose = () => {
+      console.warn('[race-socket] websocket closed');
       setConnected(false);
     };
 

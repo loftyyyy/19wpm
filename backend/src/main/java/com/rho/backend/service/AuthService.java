@@ -129,7 +129,7 @@ public class AuthService {
         // 3. Verify token exists in Redis — rejects revoked tokens even if JWT is valid
         if (!redisTokenStore.isRefreshTokenValid(user.getUserId(), refreshToken)) {
             // Token was already used or explicitly revoked — possible theft
-            logger.warn("Refresh token not found in store for userId={}. Possible token theft — revoking all.", user.getUserId());
+            logger.warn("Refresh token not found in store for userId={} ({}). Possible token theft — revoking all.", user.getUserId(), user.getEmail());
             redisTokenStore.revokeAllRefreshTokens(user.getUserId());
             throw new IllegalArgumentException("Refresh token is invalid or has already been used.");
         }

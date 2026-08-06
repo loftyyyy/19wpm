@@ -56,16 +56,21 @@ export class ApiError extends Error {
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 
-async function attemptTokenRefresh(): Promise<boolean> {
+export async function attemptTokenRefresh(): Promise<boolean> {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
+  if (!refreshToken) {
+    console.info('[auth] refresh skipped: no refresh token present');
+    return false;
+  }
 
   if (isRefreshing && refreshPromise) {
+    console.info('[auth] refresh already in-flight; joining existing attempt');
     return refreshPromise;
   }
 
   isRefreshing = true;
   refreshPromise = (async () => {
+    console.info('[auth] refresh attempt started');
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
@@ -73,12 +78,15 @@ async function attemptTokenRefresh(): Promise<boolean> {
         body: JSON.stringify({ refreshToken }),
       });
       if (!res.ok) {
+        console.warn('[auth] refresh failed with status', res.status);
         return false;
       }
       const data: ApiTokenRefreshResponse = await res.json();
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
+      console.info('[auth] refresh succeeded; token pair rotated');
       return true;
-    } catch {
+    } catch (err) {
+      console.warn('[auth] refresh failed with error', err);
       return false;
     } finally {
       isRefreshing = false;
@@ -92,6 +100,7 @@ async function attemptTokenRefresh(): Promise<boolean> {
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
+  responseType: 'json' | 'text' = 'json',
 ): Promise<T> {
   const token = getAccessToken();
   const wasAuthenticated = !!token;
@@ -113,12 +122,15 @@ async function request<T>(
     if (getRefreshToken()) {
       const refreshed = await attemptTokenRefresh();
       if (refreshed) {
+        console.info(`[api] 401 on ${endpoint}; token refreshed, retrying`);
         const newToken = getAccessToken();
         headers['Authorization'] = `Bearer ${newToken}`;
         response = await fetch(`${API_BASE_URL}/api/v1${endpoint}`, {
           ...options,
           headers,
         });
+      } else {
+        console.warn(`[api] 401 on ${endpoint}; refresh failed`);
       }
     }
 
@@ -146,30 +158,35 @@ async function request<T>(
     return undefined as T;
   }
 
+  if (responseType === 'text') {
+    return response.text() as Promise<T>;
+  }
+
   return response.json();
 }
 
 export const api = {
-  get: <T>(endpoint: string) => request<T>(endpoint),
+  get: <T>(endpoint: string, responseType: 'json' | 'text' = 'json') =>
+    request<T>(endpoint, {}, responseType),
 
-  post: <T>(endpoint: string, body?: unknown) =>
+  post: <T>(endpoint: string, body?: unknown, responseType: 'json' | 'text' = 'json') =>
     request<T>(endpoint, {
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    }),
+    }, responseType),
 
-  put: <T>(endpoint: string, body?: unknown) =>
+  put: <T>(endpoint: string, body?: unknown, responseType: 'json' | 'text' = 'json') =>
     request<T>(endpoint, {
       method: 'PUT',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    }),
+    }, responseType),
 
-  patch: <T>(endpoint: string, body?: unknown) =>
+  patch: <T>(endpoint: string, body?: unknown, responseType: 'json' | 'text' = 'json') =>
     request<T>(endpoint, {
       method: 'PATCH',
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    }),
+    }, responseType),
 
-  delete: <T>(endpoint: string) =>
-    request<T>(endpoint, { method: 'DELETE' }),
+  delete: <T>(endpoint: string, responseType: 'json' | 'text' = 'json') =>
+    request<T>(endpoint, { method: 'DELETE' }, responseType),
 };
