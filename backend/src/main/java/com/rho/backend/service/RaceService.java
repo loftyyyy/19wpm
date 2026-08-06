@@ -94,6 +94,26 @@ public class RaceService {
         return raceRoom;
     }
 
+    public RaceRoom markConnected(String roomCode, Long userId) {
+        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        RaceParticipant participant = raceRoom.findParticipant(userId);
+        if (participant == null) {
+            return raceRoom;
+        }
+        participant.setConnected(true);
+        if (raceRoom.getState() == RaceState.LOBBY) {
+            participant.setDisconnected(false);
+        }
+        raceRoomRepository.save(raceRoom);
+        return raceRoom;
+    }
+
+    private long countConnected(RaceRoom raceRoom) {
+        return raceRoom.getParticipants().stream()
+                .filter(RaceParticipant::isConnected)
+                .count();
+    }
+
     public RaceRoom startRoom(String roomCode, Long userId) {
         RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
         boolean isPublicRoom = raceRoom.getHostUserId() == null;
@@ -105,8 +125,8 @@ public class RaceService {
             return raceRoom;
         }
 
-        if (raceRoom.getParticipants().size() < 2) {
-            throw new InvalidResourceException("Must have at least 2 participants to start the race");
+        if (countConnected(raceRoom) < 2) {
+            throw new InvalidResourceException("Must have at least 2 connected participants to start the race");
         }
 
         raceRoom.setState(RaceState.COUNTDOWN);

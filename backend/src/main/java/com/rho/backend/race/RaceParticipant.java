@@ -16,6 +16,7 @@ public class RaceParticipant implements Serializable {
     private boolean ready;
     private boolean finished;
     private boolean disconnected;
+    private boolean connected;
 
     private double progressPercent;
     private int currentWpm;
@@ -28,6 +29,7 @@ public class RaceParticipant implements Serializable {
         this.ready = false;
         this.finished = false;
         this.disconnected = false;
+        this.connected = false;
         this.progressPercent = 0.0;
         this.currentWpm = 0;
         this.errors = 0;

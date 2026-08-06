@@ -33,7 +33,8 @@ public class RaceStompController {
     public void joinRoom(@DestinationVariable String code, Principal principal, SimpMessageHeaderAccessor headerAccessor){
         logger.info("joinRoom called - code: {}, principal: {}", code, principal != null ? principal.getName() : "null");
         Long userId = Long.parseLong(principal.getName());
-        RaceRoom raceRoom = raceService.joinRoom(code, userId);
+        raceService.joinRoom(code, userId);
+        RaceRoom raceRoom = raceService.markConnected(code, userId);
         Map<String, Object> attrs = headerAccessor.getSessionAttributes();
         if (attrs != null) {
             attrs.put("roomCode", code);

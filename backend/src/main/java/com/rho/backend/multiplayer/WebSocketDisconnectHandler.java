@@ -57,6 +57,7 @@ public class WebSocketDisconnectHandler {
             if (participant.isDisconnected()) return;
 
             participant.setDisconnected(true);
+            participant.setConnected(false);
             raceRoomRepository.save(room);
 
             messagingTemplate.convertAndSend("/topic/room/" + roomCode, room);

@@ -60,7 +60,7 @@ export default function Race() {
     if (socket.room.hostUserId !== null) return;
     if (socket.room.state !== 'LOBBY') return;
 
-    const count = socket.room.participants.filter(p => !p.disconnected).length;
+    const count = socket.room.participants.filter(p => p.connected).length;
 
     if (autoStartTimerRef.current) clearTimeout(autoStartTimerRef.current);
     if (autoStartIntervalRef.current) clearInterval(autoStartIntervalRef.current);
@@ -87,7 +87,7 @@ export default function Race() {
       if (autoStartTimerRef.current) clearTimeout(autoStartTimerRef.current);
       if (autoStartIntervalRef.current) clearInterval(autoStartIntervalRef.current);
     };
-  }, [socket.room?.participants.length, socket.room?.state, socket.room?.hostUserId]);
+  }, [socket.room?.participants.filter(p => p.connected).length, socket.room?.state, socket.room?.hostUserId]);
 
   useEffect(() => {
     if (!isMatchmaking) {

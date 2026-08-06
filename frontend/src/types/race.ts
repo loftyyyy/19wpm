@@ -7,6 +7,7 @@ export interface RaceParticipant {
   ready: boolean;
   finished: boolean;
   disconnected: boolean;
+  connected: boolean;
   progressPercent: number;
   currentWpm: number;
   errors: number;
