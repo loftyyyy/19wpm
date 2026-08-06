@@ -51,10 +51,18 @@ public class WebSocketDisconnectHandler {
         if (roomCodeObj == null) return;
         String roomCode = roomCodeObj.toString();
 
+        String sessionId = accessor.getSessionId();
+
         raceRoomRepository.findByCode(roomCode).ifPresent(room -> {
             RaceParticipant participant = room.findParticipant(userId);
             if (participant == null) return;
             if (participant.isDisconnected()) return;
+
+            String currentSessionId = participant.getSessionId();
+            if (currentSessionId != null && !currentSessionId.equals(sessionId)) {
+                logger.info("Ignoring stale disconnect for userId {} (session {} != current {})", userId, sessionId, currentSessionId);
+                return;
+            }
 
             participant.setDisconnected(true);
             participant.setConnected(false);

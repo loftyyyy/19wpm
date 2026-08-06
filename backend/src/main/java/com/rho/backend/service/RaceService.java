@@ -94,13 +94,14 @@ public class RaceService {
         return raceRoom;
     }
 
-    public RaceRoom markConnected(String roomCode, Long userId) {
+    public RaceRoom markConnected(String roomCode, Long userId, String sessionId) {
         RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
         RaceParticipant participant = raceRoom.findParticipant(userId);
         if (participant == null) {
             return raceRoom;
         }
         participant.setConnected(true);
+        participant.setSessionId(sessionId);
         if (raceRoom.getState() == RaceState.LOBBY) {
             participant.setDisconnected(false);
         }

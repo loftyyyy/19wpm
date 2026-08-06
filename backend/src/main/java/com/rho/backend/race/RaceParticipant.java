@@ -4,6 +4,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.io.Serializable;
 
 @NoArgsConstructor
@@ -17,6 +19,8 @@ public class RaceParticipant implements Serializable {
     private boolean finished;
     private boolean disconnected;
     private boolean connected;
+    @JsonIgnore
+    private String sessionId;
 
     private double progressPercent;
     private int currentWpm;
