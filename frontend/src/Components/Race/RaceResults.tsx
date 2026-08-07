@@ -1,13 +1,16 @@
 import type { RaceParticipant, RaceRoom } from '../../types/race';
+import type { WpmPoint } from '../../types';
+import WpmBurstChart from '../TypingTest/WpmBurstChart';
 
 interface Props {
   participants: RaceParticipant[];
   currentUserId: number;
   onPlayAgain: () => void;
   room?: RaceRoom;
+  wpmHistory?: WpmPoint[];
 }
 
-export default function RaceResults({ participants, currentUserId, onPlayAgain, room }: Props) {
+export default function RaceResults({ participants, currentUserId, onPlayAgain, room, wpmHistory }: Props) {
   const sorted = [...participants].sort((a, b) => {
     if (a.finishRank > 0 && b.finishRank > 0) return a.finishRank - b.finishRank;
     if (a.finishRank > 0) return -1;
@@ -136,6 +139,16 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
               <p className="text-xs font-sans text-text-dim">Errors</p>
             </div>
           </div>
+
+          {wpmHistory && wpmHistory.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-sans font-semibold text-text-dim uppercase tracking-wider mb-3">WPM Burst Chart</p>
+              <div className="bg-card border border-line rounded-xl p-4 transition-theme">
+                {/* Note: race history is per-keystroke instantaneous WPM, not practice mode's per-second bins — intentional, matches the live race track */}
+                <WpmBurstChart data={wpmHistory} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRaceSocket } from '../hooks/useRaceSocket';
 import { createRoom, joinRoomByCode, joinMatchmaking, getPendingMatch } from '../services/race';
 import type { TextType } from '../types/race';
-import type { Passage } from '../types';
+import type { Passage, WpmPoint } from '../types';
 
 const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
 
@@ -29,6 +29,7 @@ export default function Race() {
   const [joinError, setJoinError] = useState('');
   const [matchmakingSeconds, setMatchmakingSeconds] = useState(0);
   const [autoStartCountdown, setAutoStartCountdown] = useState<number | null>(null);
+  const [raceWpmHistory, setRaceWpmHistory] = useState<WpmPoint[]>([]);
   const autoStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStartIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -187,6 +188,7 @@ export default function Race() {
     setJoinError('');
     setMatchmakingSeconds(0);
     setAutoStartCountdown(null);
+    setRaceWpmHistory([]);
   }, []);
 
   const renderContent = () => {
@@ -346,7 +348,10 @@ export default function Race() {
               <RaceTypingInput
                 passage={socket.room.text.content}
                 onProgress={(p, w, t) => socket.sendProgress(p, w, t)}
-                onFinish={(wpm, errors, correctChars) => socket.sendFinish(wpm, errors, correctChars)}
+                onFinish={(wpm, errors, correctChars, wpmHistory) => {
+                  setRaceWpmHistory(wpmHistory);
+                  socket.sendFinish(wpm, errors, correctChars);
+                }}
                 startTime={socket.room.startTime!}
               />
             </div>
@@ -362,6 +367,7 @@ export default function Race() {
           currentUserId={Number(user?.id ?? 0)}
           onPlayAgain={handlePlayAgain}
           room={socket.room}
+          wpmHistory={raceWpmHistory}
         />
       );
     }
@@ -422,7 +428,7 @@ export default function Race() {
 interface RaceTypingInputProps {
   passage: string;
   onProgress: (progressPercent: number, currentWpm: number, typedContent: string) => void;
-  onFinish: (finalWpm: number, errors: number, correctChars: number) => void;
+  onFinish: (finalWpm: number, errors: number, correctChars: number, wpmHistory: WpmPoint[]) => void;
   startTime: string;
 }
 
@@ -525,12 +531,12 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       finishReportedRef.current = true;
       const typed = state.typedChars.join('');
       onProgressRef.current(1, calcWpm(typed), typed);
-      onFinishRef.current(calcWpm(typed), calcErrors(typed), calcCorrectChars(typed));
+      onFinishRef.current(calcWpm(typed), calcErrors(typed), calcCorrectChars(typed), state.wpmHistory);
     }
     if (!state.isFinished) {
       finishReportedRef.current = false;
     }
-  }, [state.isFinished, state.typedChars, calcWpm, calcCorrectChars]);
+  }, [state.isFinished, state.typedChars, state.wpmHistory, calcWpm, calcErrors, calcCorrectChars]);
 
   useEffect(() => {
     containerRef.current?.focus();
