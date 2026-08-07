@@ -11,6 +11,11 @@ interface UseRaceSocketOpts {
 
 export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts) {
   const [room, setRoom] = useState<RaceRoom | null>(null);
+  const [prevRoomCode, setPrevRoomCode] = useState(roomCode);
+  if (prevRoomCode !== roomCode) {
+    setPrevRoomCode(roomCode);
+    if (roomCode === null) setRoom(null);
+  }
   const [connected, setConnected] = useState(false);
   const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
