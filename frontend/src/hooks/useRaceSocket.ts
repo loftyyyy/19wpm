@@ -15,6 +15,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const hasJoinedRef = useRef(false);
+  const pendingFinishRef = useRef<{ finalWpm: number; errors: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +97,20 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           });
         }
 
+        if (pendingFinishRef.current !== null) {
+          const pendingFinish = pendingFinishRef.current;
+          pendingFinishRef.current = null;
+          try {
+            client.publish({
+              destination: `/app/room/${roomCode}/finish`,
+              body: JSON.stringify({ finalWpm: pendingFinish.finalWpm, errors: pendingFinish.errors }),
+            });
+          } catch (err) {
+            console.warn('[race-socket] finish redelivery failed; re-queued', err);
+            pendingFinishRef.current = pendingFinish;
+          }
+        }
+
         // Fetch current room state immediately after subscribing in case we missed a broadcast
         getRoomState(roomCode).then(room => {
           if (room) setRoom(room);
@@ -129,6 +144,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
 
     return () => {
       hasJoinedRef.current = false;
+      pendingFinishRef.current = null;
       client.deactivate();
       clientRef.current = null;
     };
@@ -142,11 +158,15 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     });
   }, [roomCode]);
 
-  const sendFinish = useCallback((finalWpm: number) => {
-    if (!clientRef.current?.connected || !roomCode) return;
+  const sendFinish = useCallback((finalWpm: number, errors: number) => {
+    if (!roomCode) return;
+    if (!clientRef.current?.connected) {
+      pendingFinishRef.current = { finalWpm, errors };
+      return;
+    }
     clientRef.current.publish({
       destination: `/app/room/${roomCode}/finish`,
-      body: JSON.stringify({ finalWpm }),
+      body: JSON.stringify({ finalWpm, errors }),
     });
   }, [roomCode]);
 

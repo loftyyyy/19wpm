@@ -41,18 +41,18 @@ export default function Race() {
   const socket = useRaceSocket(roomCode, { onMatchmakingRoomCode: handleMatchmakingCode });
 
   useEffect(() => {
-    if (!socket.room || phase !== 'lobby') return;
-    if (socket.room.state === 'COUNTDOWN') setPhase('countdown');
-  }, [socket.room, phase]);
-
-  useEffect(() => {
-    if (!socket.room || phase !== 'racing') return;
+    if (!socket.room || phase === 'finished') return;
     if (socket.room.state === 'FINISHED') setPhase('finished');
   }, [socket.room, phase]);
 
   useEffect(() => {
-    if (!socket.room || phase !== 'countdown') return;
+    if (!socket.room || phase === 'racing' || phase === 'finished') return;
     if (socket.room.state === 'RACING') setPhase('racing');
+  }, [socket.room, phase]);
+
+  useEffect(() => {
+    if (!socket.room || phase !== 'lobby') return;
+    if (socket.room.state === 'COUNTDOWN') setPhase('countdown');
   }, [socket.room, phase]);
 
   useEffect(() => {
@@ -176,6 +176,7 @@ export default function Race() {
 
   const handleCountdownComplete = useCallback(() => {
     if (socket.room?.state === 'RACING') setPhase('racing');
+    else if (socket.room?.state === 'FINISHED') setPhase('finished');
   }, [socket.room?.state]);
 
   const handlePlayAgain = useCallback(() => {
@@ -345,7 +346,7 @@ export default function Race() {
               <RaceTypingInput
                 passage={socket.room.text.content}
                 onProgress={(p, w, t) => socket.sendProgress(p, w, t)}
-                onFinish={(wpm) => socket.sendFinish(wpm)}
+                onFinish={(wpm, errors) => socket.sendFinish(wpm, errors)}
                 startTime={socket.room.startTime!}
               />
             </div>
@@ -421,7 +422,7 @@ export default function Race() {
 interface RaceTypingInputProps {
   passage: string;
   onProgress: (progressPercent: number, currentWpm: number, typedContent: string) => void;
-  onFinish: (finalWpm: number) => void;
+  onFinish: (finalWpm: number, errors: number) => void;
   startTime: string;
 }
 
@@ -494,6 +495,14 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
     return Math.round(words / minutes);
   }, [startTime]);
 
+  const calcErrors = useCallback((typed: string) => {
+    let errors = 0;
+    for (let i = 0; i < typed.length; i++) {
+      if (i >= passage.length || typed[i] !== passage[i]) errors++;
+    }
+    return errors;
+  }, [passage]);
+
   useEffect(() => {
     const typed = state.typedChars.join('');
     onProgressRef.current(
@@ -508,7 +517,7 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       finishReportedRef.current = true;
       const typed = state.typedChars.join('');
       onProgressRef.current(1, calcWpm(typed), typed);
-      onFinishRef.current(calcWpm(typed));
+      onFinishRef.current(calcWpm(typed), calcErrors(typed));
     }
     if (!state.isFinished) {
       finishReportedRef.current = false;

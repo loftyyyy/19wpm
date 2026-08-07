@@ -172,7 +172,7 @@ public class RaceService {
         return raceRoom;
     }
 
-    public RaceRoom finishRace(String roomCode, Long userId, int finalWpm) {
+    public RaceRoom finishRace(String roomCode, Long userId, int finalWpm, int errors) {
         RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
         if (!raceRoom.getState().equals(RaceState.RACING)) {
             throw new InvalidResourceException("Can't finish a not started race");
@@ -184,13 +184,14 @@ public class RaceService {
         }
 
         if (raceParticipant.isFinished()) {
-            throw new InvalidResourceException("Participant already finished");
+            return null;
         }
 
         raceParticipant.setFinishRank(raceRoom.getFinishCount() + 1);
         raceRoom.setFinishCount(raceRoom.getFinishCount() + 1);
         raceParticipant.setFinished(true);
         raceParticipant.setCurrentWpm(finalWpm);
+        raceParticipant.setErrors(errors);
         raceRoomRepository.save(raceRoom);
 
         if (raceRoom.allActiveFinished()) {
