@@ -25,6 +25,8 @@ public class RaceParticipant implements Serializable {
     private double progressPercent;
     private int currentWpm;
     private int errors;
+    private int correctChars;
+    private int accuracy;      // 0-100, computed server-side from correctChars + errors
     private int finishRank;
 
     public RaceParticipant(Long userId, String username) {
@@ -37,6 +39,8 @@ public class RaceParticipant implements Serializable {
         this.progressPercent = 0.0;
         this.currentWpm = 0;
         this.errors = 0;
+        this.correctChars = 0;
+        this.accuracy = 0;
         this.finishRank = 0;
     }
 

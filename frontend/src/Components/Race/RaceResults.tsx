@@ -18,6 +18,16 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
   const winner = sorted.find(p => p.finishRank === 1 && p.finished);
   const myResult = participants.find(p => p.userId === currentUserId);
 
+  const accuracyClass = (accuracy: number) =>
+    accuracy >= 95 ? 'text-success' : accuracy >= 80 ? 'text-accent' : 'text-error';
+
+  const formatDuration = (seconds: number) => {
+    if (seconds <= 0) return null;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
+  };
+
   return (
     <div className="bg-card border border-line rounded-2xl shadow-sm p-6 transition-theme max-w-lg mx-auto">
       <div className="text-center mb-6">
@@ -25,6 +35,7 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
         {room?.text && (
           <p className="text-xs font-sans text-text-dim">
             {room.text.title} · {room.text.author} · {room.text.wordCount} words
+            {room.durationSeconds > 0 && ` · ${formatDuration(room.durationSeconds)}`}
           </p>
         )}
       </div>
@@ -40,6 +51,12 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
             <div className="text-center">
               <p className="text-2xl font-display font-bold text-text-main">{winner.currentWpm}</p>
               <p className="text-xs font-sans text-text-dim">WPM</p>
+            </div>
+            <div className="text-center">
+              <p className={`text-2xl font-display font-bold ${accuracyClass(winner.accuracy)}`}>
+                {winner.accuracy}%
+              </p>
+              <p className="text-xs font-sans text-text-dim">Accuracy</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-display font-bold text-text-main">{winner.errors}</p>
@@ -79,6 +96,9 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
               {!isDnf && (
                 <>
                   <span className="text-sm font-sans font-semibold text-accent w-14 text-right">{p.currentWpm}</span>
+                  <span className={`text-sm font-sans font-semibold ${accuracyClass(p.accuracy)} w-12 text-right`}>
+                    {p.accuracy}%
+                  </span>
                   <span className="text-sm font-sans text-text-dim w-10 text-right">{p.errors}</span>
                 </>
               )}
@@ -96,10 +116,16 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
       {myResult && (
         <div className="bg-muted rounded-2xl p-4 mt-4">
           <p className="text-xs font-sans font-semibold text-text-dim uppercase tracking-wider mb-3">Your Performance</p>
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-4 gap-4 text-center">
             <div>
               <p className="text-xl font-display font-bold text-accent">{myResult.currentWpm}</p>
               <p className="text-xs font-sans text-text-dim">WPM</p>
+            </div>
+            <div>
+              <p className={`text-xl font-display font-bold ${accuracyClass(myResult.accuracy)}`}>
+                {myResult.accuracy}%
+              </p>
+              <p className="text-xs font-sans text-text-dim">Accuracy</p>
             </div>
             <div>
               <p className="text-xl font-display font-bold text-text-main">#{myResult.finishRank || 'DNF'}</p>

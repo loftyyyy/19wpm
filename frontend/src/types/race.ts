@@ -11,6 +11,8 @@ export interface RaceParticipant {
   progressPercent: number;
   currentWpm: number;
   errors: number;
+  correctChars: number;
+  accuracy: number;
   finishRank: number;
 }
 
@@ -35,4 +37,5 @@ export interface RaceRoom {
   finishCount: number;
   countdownStartTime: string | null;
   countdownDurationMs: number;
+  durationSeconds: number;
 }

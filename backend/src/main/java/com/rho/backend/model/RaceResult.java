@@ -36,6 +36,12 @@ public class RaceResult {
     private int errorCount;
 
     @Column(nullable = false)
+    private int correctChars;
+
+    @Column(nullable = false)
+    private int accuracy;   // 0-100 percentage
+
+    @Column(nullable = false)
     private boolean finished;   // false = disconnected before finishing
 
 }

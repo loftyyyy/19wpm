@@ -31,6 +31,8 @@ public class RaceRoom implements Serializable {
     private Instant countdownStartTime;   // set when COUNTDOWN begins, drives the server-authoritative countdown
     private long countdownDurationMs;     // how long COUNTDOWN lasts before RACING
 
+    private int durationSeconds;          // race duration in seconds, set when the room reaches FINISHED
+
     public RaceRoom() {
         this.participants = new ArrayList<>();
         this.finishCount = 0;

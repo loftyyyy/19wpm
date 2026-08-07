@@ -20,7 +20,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const hasJoinedRef = useRef(false);
-  const pendingFinishRef = useRef<{ finalWpm: number; errors: number } | null>(null);
+  const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +108,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           try {
             client.publish({
               destination: `/app/room/${roomCode}/finish`,
-              body: JSON.stringify({ finalWpm: pendingFinish.finalWpm, errors: pendingFinish.errors }),
+              body: JSON.stringify({ finalWpm: pendingFinish.finalWpm, errors: pendingFinish.errors, correctChars: pendingFinish.correctChars }),
             });
           } catch (err) {
             console.warn('[race-socket] finish redelivery failed; re-queued', err);
@@ -163,15 +163,15 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     });
   }, [roomCode]);
 
-  const sendFinish = useCallback((finalWpm: number, errors: number) => {
+  const sendFinish = useCallback((finalWpm: number, errors: number, correctChars: number) => {
     if (!roomCode) return;
     if (!clientRef.current?.connected) {
-      pendingFinishRef.current = { finalWpm, errors };
+      pendingFinishRef.current = { finalWpm, errors, correctChars };
       return;
     }
     clientRef.current.publish({
       destination: `/app/room/${roomCode}/finish`,
-      body: JSON.stringify({ finalWpm, errors }),
+      body: JSON.stringify({ finalWpm, errors, correctChars }),
     });
   }, [roomCode]);
 

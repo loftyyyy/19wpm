@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -172,7 +173,7 @@ public class RaceService {
         return raceRoom;
     }
 
-    public RaceRoom finishRace(String roomCode, Long userId, int finalWpm, int errors) {
+    public RaceRoom finishRace(String roomCode, Long userId, int finalWpm, int errors, int correctChars) {
         RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
         if (!raceRoom.getState().equals(RaceState.RACING)) {
             throw new InvalidResourceException("Can't finish a not started race");
@@ -192,10 +193,13 @@ public class RaceService {
         raceParticipant.setFinished(true);
         raceParticipant.setCurrentWpm(finalWpm);
         raceParticipant.setErrors(errors);
+        raceParticipant.setCorrectChars(correctChars);
+        raceParticipant.setAccuracy(computeAccuracy(correctChars, errors));
         raceRoomRepository.save(raceRoom);
 
         if (raceRoom.allActiveFinished()) {
             raceRoom.setState(RaceState.FINISHED);
+            raceRoom.setDurationSeconds((int) Math.max(0, Duration.between(raceRoom.getStartTime(), Instant.now()).toSeconds()));
             raceRoomRepository.save(raceRoom);
             persistRacePublic(raceRoom);
         }
@@ -222,12 +226,22 @@ public class RaceService {
                             .finishRank(participant.getFinishRank())
                             .finalWpm(participant.getCurrentWpm())
                             .errorCount(participant.getErrors())
+                            .correctChars(participant.getCorrectChars())
+                            .accuracy(participant.getAccuracy())
                             .finished(participant.isFinished())
                             .build();
                 }).toList();
 
         raceResultRepository.saveAll(raceResults);
 
+    }
+
+    private int computeAccuracy(int correctChars, int errors) {
+        int total = correctChars + errors;
+        if (total <= 0) {
+            return 0;
+        }
+        return (int) Math.round(correctChars * 100.0 / total);
     }
 
     private int calculateErrors(String typed, String passage) {

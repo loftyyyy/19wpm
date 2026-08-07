@@ -346,7 +346,7 @@ export default function Race() {
               <RaceTypingInput
                 passage={socket.room.text.content}
                 onProgress={(p, w, t) => socket.sendProgress(p, w, t)}
-                onFinish={(wpm, errors) => socket.sendFinish(wpm, errors)}
+                onFinish={(wpm, errors, correctChars) => socket.sendFinish(wpm, errors, correctChars)}
                 startTime={socket.room.startTime!}
               />
             </div>
@@ -422,7 +422,7 @@ export default function Race() {
 interface RaceTypingInputProps {
   passage: string;
   onProgress: (progressPercent: number, currentWpm: number, typedContent: string) => void;
-  onFinish: (finalWpm: number, errors: number) => void;
+  onFinish: (finalWpm: number, errors: number, correctChars: number) => void;
   startTime: string;
 }
 
@@ -503,6 +503,14 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
     return errors;
   }, [passage]);
 
+  const calcCorrectChars = useCallback((typed: string) => {
+    let correct = 0;
+    for (let i = 0; i < typed.length; i++) {
+      if (i < passage.length && typed[i] === passage[i]) correct++;
+    }
+    return correct;
+  }, [passage]);
+
   useEffect(() => {
     const typed = state.typedChars.join('');
     onProgressRef.current(
@@ -517,12 +525,12 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       finishReportedRef.current = true;
       const typed = state.typedChars.join('');
       onProgressRef.current(1, calcWpm(typed), typed);
-      onFinishRef.current(calcWpm(typed), calcErrors(typed));
+      onFinishRef.current(calcWpm(typed), calcErrors(typed), calcCorrectChars(typed));
     }
     if (!state.isFinished) {
       finishReportedRef.current = false;
     }
-  }, [state.isFinished, state.typedChars, calcWpm]);
+  }, [state.isFinished, state.typedChars, calcWpm, calcCorrectChars]);
 
   useEffect(() => {
     containerRef.current?.focus();
