@@ -4,8 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
-const EMAIL_PATTERN = "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}";
-
 export default function LoginContainer() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
@@ -134,8 +132,6 @@ export default function LoginContainer() {
               onChange={e => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              pattern={EMAIL_PATTERN}
-              title="Enter a valid email address (e.g. user@example.com)"
               className="w-full px-4 py-2.5 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 transition-theme"
             />
           </div>
