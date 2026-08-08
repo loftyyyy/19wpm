@@ -86,7 +86,7 @@ public class TextIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(registerRequestDTO)))
                 .andDo(print())
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -205,7 +205,7 @@ public class TextIntegrationTest {
                     .header("Authorization", "Bearer " + adminAccessToken)
                     .content(objectMapper.writeValueAsString(validTextRequest)))
                     .andDo(print())
-                    .andExpect(status().isOk())
+                    .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.title").value("Sample Title"))
                     .andExpect(jsonPath("$.author").value("Sample Author"));
         }
@@ -226,7 +226,7 @@ public class TextIntegrationTest {
         @DisplayName("Should return bad request for missing required fields")
         @Test
         void testCreateTextWithMissingFields() throws Exception {
-            String adminAccessToken = createUser(adminRegister).get("accessToken");
+            String adminAccessToken = loginUserAdmin().get("accessToken");
 
             TextRequestDTO invalidRequest = new TextRequestDTO(
                     "",
@@ -247,7 +247,7 @@ public class TextIntegrationTest {
         @DisplayName("Should return bad request for title exceeding max length")
         @Test
         void testCreateTextWithTitleExceedingMaxLength() throws Exception {
-            String adminAccessToken = createUser(adminRegister).get("accessToken");
+            String adminAccessToken = loginUserAdmin().get("accessToken");
 
             TextRequestDTO invalidRequest = new TextRequestDTO(
                     "a".repeat(101),
@@ -291,7 +291,7 @@ public class TextIntegrationTest {
                     .header("Authorization", "Bearer " + accessToken)
                     .content(objectMapper.writeValueAsString(validTextRequest)))
                     .andDo(print())
-                    .andExpect(status().isOk())
+                    .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.title").value("My Custom Text"))
                     .andExpect(jsonPath("$.author").value("Me"));
         }
@@ -362,7 +362,7 @@ public class TextIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + accessToken)
                     .content(objectMapper.writeValueAsString(validTextRequest)))
-                    .andExpect(status().isOk())
+                    .andExpect(status().isCreated())
                     .andReturn()
                     .getResponse()
                     .getContentAsString();
@@ -371,7 +371,7 @@ public class TextIntegrationTest {
             long textId = objectMapper.readTree(responseBody).get("textId").asLong();
 
             // Modify the text
-            mockMvc.perform(post("/api/v1/texts/" + textId)
+            mockMvc.perform(put("/api/v1/texts/" + textId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + accessToken)
                     .content(objectMapper.writeValueAsString(updateTextRequest)))
@@ -384,7 +384,7 @@ public class TextIntegrationTest {
         @DisplayName("Should return unauthorized without token")
         @Test
         void testModifyTextWithoutToken() throws Exception {
-            mockMvc.perform(post("/api/v1/texts/1")
+            mockMvc.perform(put("/api/v1/texts/1")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(updateTextRequest)))
                     .andDo(print())
@@ -401,7 +401,7 @@ public class TextIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + accessToken)
                     .content(objectMapper.writeValueAsString(validTextRequest)))
-                    .andExpect(status().isOk())
+                    .andExpect(status().isCreated())
                     .andReturn()
                     .getResponse()
                     .getContentAsString();
@@ -417,7 +417,7 @@ public class TextIntegrationTest {
                     "Updated content"
             );
 
-            mockMvc.perform(post("/api/v1/texts/" + textId)
+            mockMvc.perform(put("/api/v1/texts/" + textId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + accessToken)
                     .content(objectMapper.writeValueAsString(invalidUpdate)))

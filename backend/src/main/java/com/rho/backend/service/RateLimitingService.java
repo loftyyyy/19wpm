@@ -37,6 +37,9 @@ public class RateLimitingService {
 
     private final RedisTemplate<String, String> redisTemplate;
 
+    @Value("${security.rate-limit.enabled:true}")
+    private boolean rateLimitEnabled;
+
     @Value("${security.rate-limit.login.attempts:5}")
     private int loginAttempts;
 
@@ -126,6 +129,10 @@ public class RateLimitingService {
      */
     private boolean isAllowed(String key, int limit, int windowSeconds,
                               String label, String clientIp) {
+        if (!rateLimitEnabled) {
+            return true;
+        }
+
         Long count = redisTemplate.opsForValue().increment(key);
 
         if (count == null) {

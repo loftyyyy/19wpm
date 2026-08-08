@@ -69,7 +69,7 @@ public class AuthIntegrationTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRegister))
                     )
-                    .andExpect(status().isOk())
+                    .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.accessToken").isNotEmpty())
                     .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                     .andDo(print());
@@ -81,7 +81,7 @@ public class AuthIntegrationTest {
             mockMvc.perform(post(signUpURL)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(validRegister)))
-                    .andExpect(status().isOk())
+                    .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.accessToken").isNotEmpty())
                     .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                     .andDo(print());
@@ -135,7 +135,7 @@ public class AuthIntegrationTest {
             mockMvc.perform(post(signUpURL)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(registerRequestDTO)))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isCreated());
 
         }
 
