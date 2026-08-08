@@ -2,6 +2,8 @@ package com.rho.backend.controller;
 
 import com.rho.backend.dto.race.FinishMessageDTO;
 import com.rho.backend.dto.race.ProgressUpdateDTO;
+import com.rho.backend.dto.race.RaceFinishStreakDTO;
+import com.rho.backend.race.RaceParticipant;
 import com.rho.backend.race.RaceRoom;
 import com.rho.backend.service.RaceService;
 import org.slf4j.Logger;
@@ -75,6 +77,11 @@ public class RaceStompController {
         RaceRoom raceRoom = raceService.finishRace(code, userId, finishMessageDTO.finalWpm(), finishMessageDTO.errors(), finishMessageDTO.correctChars());
         if (raceRoom != null) {
             messagingTemplate.convertAndSend("/topic/room/" + code, raceRoom);
+
+            RaceParticipant participant = raceRoom.findParticipant(userId);
+            if (participant != null && participant.getLatestStreak() != null) {
+                messagingTemplate.convertAndSendToUser(userId.toString(), "/queue/race-finish", new RaceFinishStreakDTO(participant.getLatestStreak()));
+            }
         }
 
     }

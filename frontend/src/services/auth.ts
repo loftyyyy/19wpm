@@ -88,6 +88,10 @@ export function updateUserProfile(id: string, updates: Partial<User>): User | nu
 
 // ── New API-based functions ──
 
+export function getBrowserTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
 export function mapMinimalUserToUser(dto: NonNullable<ApiAuthResponse['userResponseDTO']>): User {
   return {
     id: String(dto.id),
@@ -97,7 +101,7 @@ export function mapMinimalUserToUser(dto: NonNullable<ApiAuthResponse['userRespo
     email: dto.email,
     country: '',
     joinDate: new Date().toISOString().split('T')[0],
-    streak: 0,
+    streak: dto.streak ?? 0,
     isActive: true,
   };
 }
@@ -119,7 +123,7 @@ export function mapProfileToUser(dto: ApiUserProfile): User {
 
 export async function apiLogin(email: string, password: string): Promise<{ user: User | null; error: string | null }> {
   try {
-    const body: ApiAuthRequest = { email, password };
+    const body: ApiAuthRequest = { email, password, timezone: getBrowserTimezone() };
     const data = await api.post<ApiAuthResponse>('/auth/login', body);
     setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
     const user = mapMinimalUserToUser(data.userResponseDTO);
@@ -139,7 +143,7 @@ export async function apiRegister(
   country: string,
 ): Promise<{ user: User | null; error: string | null }> {
   try {
-    const body: ApiRegisterRequest = { username, firstName, lastName, email, password, country };
+    const body: ApiRegisterRequest = { username, firstName, lastName, email, password, country, timezone: getBrowserTimezone() };
     const data = await api.post<ApiAuthResponse>('/auth/signup', body);
     setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
     const user = mapMinimalUserToUser(data.userResponseDTO);

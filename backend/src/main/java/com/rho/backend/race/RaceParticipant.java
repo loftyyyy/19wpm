@@ -29,6 +29,9 @@ public class RaceParticipant implements Serializable {
     private int accuracy;      // 0-100, computed server-side from correctChars + errors
     private int finishRank;
 
+    @JsonIgnore
+    private Integer latestStreak;
+
     public RaceParticipant(Long userId, String username) {
         this.userId = userId;
         this.username = username;

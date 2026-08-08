@@ -28,6 +28,8 @@ public record RegisterRequestDTO(
     String password,
 
     @NotBlank(message = "Country is required")
-    String country
+    String country,
 
-){}
+    String timezone
+
+) {}

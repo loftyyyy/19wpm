@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
+import java.time.ZoneId;
 
 @Service
 public class AuthService {
@@ -73,6 +74,7 @@ public class AuthService {
                 .provider(AuthProvider.LOCAL)
                 .role(roleRepository.getRoleByName("USER"))
                 .country(request.country())
+                .timezone(resolveTimezone(request.timezone()))
                 .isActive(Boolean.TRUE)
                 .build();
 
@@ -85,6 +87,7 @@ public class AuthService {
 
     // ── Login ─────────────────────────────────────────────────────────────────
 
+    @Transactional
     public AuthResponseDTO login(AuthRequestDTO request) {
         // Throws AuthenticationException → 401 if credentials are wrong
         Authentication auth = authenticationManager.authenticate(
@@ -94,6 +97,12 @@ public class AuthService {
         CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
         User user = userDetails.getUser();
 
+        // Refresh the user's timezone on each login so streak day boundaries stay correct
+        String timezone = resolveTimezone(request.timezone());
+        if (user.getTimezone() == null || !user.getTimezone().equals(timezone)) {
+            user.setTimezone(timezone);
+            userRepository.save(user);
+        }
 
         logger.info("User logged in: {}", user.getEmail());
         return issueTokenPair(user);
@@ -216,6 +225,22 @@ public class AuthService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Resolves an optional client-provided IANA timezone id to a normalized
+     * id, falling back to "UTC" for missing or invalid values.
+     */
+    private String resolveTimezone(String timezone) {
+        if (timezone == null || timezone.isBlank()) {
+            return "UTC";
+        }
+        try {
+            return ZoneId.of(timezone.trim()).getId();
+        } catch (Exception e) {
+            logger.debug("Invalid timezone '{}', falling back to UTC", timezone);
+            return "UTC";
+        }
+    }
 
     /**
      * Generates a fresh access + refresh token pair, stores the refresh token

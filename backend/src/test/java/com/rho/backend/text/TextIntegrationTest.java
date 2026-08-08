@@ -55,11 +55,11 @@ public class TextIntegrationTest {
     private String logInURL = "/api/v1/auth/login";
 
     private RegisterRequestDTO validRegister = new RegisterRequestDTO(
-            "james", "John", "Doe", "james@gmail.com", "Test12345", "PH"
+            "james", "John", "Doe", "james@gmail.com", "Test12345", "PH", "Asia/Manila"
     );
 
     private RegisterRequestDTO adminRegister = new RegisterRequestDTO(
-            "admin", "Admin", "User", "admin@gmail.com", "Test12345", "PH"
+            "admin", "Admin", "User", "admin@gmail.com", "Test12345", "PH", "Asia/Manila"
     );
     @Autowired
     private UserRepository userRepository;
@@ -107,12 +107,14 @@ public class TextIntegrationTest {
                         .password(passwordEncoder.encode("Test13245"))
                         .isActive(Boolean.TRUE)
                         .provider(AuthProvider.LOCAL)
+                        .timezone("Asia/Manila")
                         .role(roleRepository.getRoleByName("ADMIN"))
                 .build());
 
         AuthRequestDTO adminLogin = new AuthRequestDTO(
                 "admin1@gmail.com",
-                "Test13245"
+                "Test13245",
+                "Asia/Manila"
         );
 
         String responseBody = mockMvc.perform(post(logInURL)

@@ -11,10 +11,14 @@ interface UseRaceSocketOpts {
 
 export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts) {
   const [room, setRoom] = useState<RaceRoom | null>(null);
+  const [raceStreak, setRaceStreak] = useState<number | null>(null);
   const [prevRoomCode, setPrevRoomCode] = useState(roomCode);
   if (prevRoomCode !== roomCode) {
     setPrevRoomCode(roomCode);
-    if (roomCode === null) setRoom(null);
+    if (roomCode === null) {
+      setRoom(null);
+      setRaceStreak(null);
+    }
   }
   const [connected, setConnected] = useState(false);
   const [isTokenReady, setIsTokenReady] = useState(false);
@@ -128,6 +132,13 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           opts!.onMatchmakingRoomCode!(code);
         });
       }
+
+      client.subscribe('/user/queue/race-finish', (message) => {
+        const dto: { streak?: number | null } = JSON.parse(message.body);
+        if (typeof dto.streak === 'number') {
+          setRaceStreak(dto.streak);
+        }
+      });
     };
 
     client.onDisconnect = () => {
@@ -183,5 +194,5 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     });
   }, [roomCode]);
 
-  return { room, connected, sendProgress, sendFinish, sendStart };
+  return { room, connected, raceStreak, sendProgress, sendFinish, sendStart };
 }

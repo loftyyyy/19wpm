@@ -20,7 +20,8 @@ public record TypingResultResponseDTO(
         String textTitle,
         String textContent,
         Mode mode,
-        int wordCount
+        int wordCount,
+        Integer streak
 ) {
     public TypingResultResponseDTO(TypingResult typingResult){
         this(
@@ -37,7 +38,28 @@ public record TypingResultResponseDTO(
                 typingResult.getTextTitle(),
                 typingResult.getTextContent(),
                 typingResult.getMode(),
-                typingResult.getTextContent() != null ? typingResult.getTextContent().split("\\s+").length : 0
+                typingResult.getTextContent() != null ? typingResult.getTextContent().split("\\s+").length : 0,
+                null
+        );
+    }
+
+    public TypingResultResponseDTO(TypingResult typingResult, Integer streak){
+        this(
+                typingResult.getTypingResultId(),
+                typingResult.getUser().getUserId(),
+                typingResult.getUser().getUsername(),
+                typingResult.getTextId(),
+                typingResult.getFinishedAt(),
+                typingResult.getDurationMs(),
+                typingResult.getTimeConstraintMs(),
+                typingResult.getWpm(),
+                typingResult.getAccuracy(),
+                typingResult.getCreatedAt(),
+                typingResult.getTextTitle(),
+                typingResult.getTextContent(),
+                typingResult.getMode(),
+                typingResult.getTextContent() != null ? typingResult.getTextContent().split("\\s+").length : 0,
+                streak
         );
     }
 }

@@ -58,7 +58,7 @@ public class AuthIntegrationTest {
             ));
 
             validRegister = new RegisterRequestDTO(
-                    "james", "John", "Doe", "james@gmail.com", "Test12345", "PH"
+                    "james", "John", "Doe", "james@gmail.com", "Test12345", "PH", "Asia/Manila"
             );
         }
 
@@ -99,7 +99,7 @@ public class AuthIntegrationTest {
         @Test
         void testMissingFieldRegister() throws Exception {
             RegisterRequestDTO bad = new RegisterRequestDTO(
-                    null, null, "Doe", "james1@gmail.com", "Test12345", "PH"
+                    null, null, "Doe", "james1@gmail.com", "Test12345", "PH", null
             );
             mockMvc.perform(post(signUpURL)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -127,7 +127,7 @@ public class AuthIntegrationTest {
            ));
 
             validRegister = new RegisterRequestDTO(
-                    "james", "John", "Doe", "james@gmail.com", "Test12345", "PH"
+                    "james", "John", "Doe", "james@gmail.com", "Test12345", "PH", "Asia/Manila"
             );
         }
 
@@ -145,7 +145,7 @@ public class AuthIntegrationTest {
             registerUser(validRegister);
 
             AuthRequestDTO authRequestDTO = new AuthRequestDTO(
-                    "james@gmail.com", "Test12345"
+                    "james@gmail.com", "Test12345", "Asia/Manila"
             );
 
             mockMvc.perform(post(logInURL)
@@ -161,7 +161,7 @@ public class AuthIntegrationTest {
             registerUser(validRegister);
 
             AuthRequestDTO authRequestDTO = new AuthRequestDTO(
-                    "james@gmail.com", "Test123456"
+                    "james@gmail.com", "Test123456", "Asia/Manila"
             );
 
             mockMvc.perform(post(logInURL)
@@ -178,7 +178,7 @@ public class AuthIntegrationTest {
             registerUser(validRegister);
 
             AuthRequestDTO authRequestDTO = new AuthRequestDTO(
-                    "james@gmail.com", "Test123456"
+                    "james@gmail.com", "Test123456", "Asia/Manila"
             );
 
             mockMvc.perform(post(logInURL)
@@ -195,7 +195,7 @@ public class AuthIntegrationTest {
             registerUser(validRegister);
 
             AuthRequestDTO authRequestDTO = new AuthRequestDTO(
-                    "", ""
+                    "", "", null
             );
 
             mockMvc.perform(post(logInURL)

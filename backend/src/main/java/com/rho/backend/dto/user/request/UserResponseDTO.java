@@ -18,7 +18,11 @@ public record UserResponseDTO(
         String username,
 
         @NotBlank(message = "Provider is required")
-        String provider
+        String provider,
+
+        Integer streak,
+
+        String timezone
 )
 {
 
@@ -27,7 +31,9 @@ public record UserResponseDTO(
                         user.getUserId(),
                         user.getEmail(),
                         user.getUsername(),
-                        user.getProvider().toString()
+                        user.getProvider().toString(),
+                        user.getStreak(),
+                        user.getTimezone()
                 );
 
         }

@@ -18,7 +18,7 @@ const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
 
 export default function Race() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, updateUser } = useAuth();
 
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [phase, setPhase] = useState<'setup' | 'lobby' | 'countdown' | 'racing' | 'finished'>('setup');
@@ -40,6 +40,11 @@ export default function Race() {
   }, []);
 
   const socket = useRaceSocket(roomCode, { onMatchmakingRoomCode: handleMatchmakingCode });
+
+  useEffect(() => {
+    if (socket.raceStreak == null) return;
+    updateUser({ streak: socket.raceStreak });
+  }, [socket.raceStreak, updateUser]);
 
   useEffect(() => {
     if (!socket.room || phase === 'finished') return;

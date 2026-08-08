@@ -1,6 +1,7 @@
 export interface ApiAuthRequest {
   email: string;
   password: string;
+  timezone: string;
 }
 
 export interface ApiRegisterRequest {
@@ -10,6 +11,7 @@ export interface ApiRegisterRequest {
   email: string;
   password: string;
   country: string;
+  timezone: string;
 }
 
 export interface ApiUserMinimal {
@@ -17,6 +19,8 @@ export interface ApiUserMinimal {
   email: string;
   username: string;
   provider: string;
+  streak: number | null;
+  timezone: string;
 }
 
 export interface ApiUserProfile {
@@ -26,6 +30,7 @@ export interface ApiUserProfile {
   lastName: string;
   email: string;
   country: string;
+  timezone: string;
   avatar: string | null;
   streak: number | null;
   isActive: boolean | null;
@@ -105,6 +110,7 @@ export interface ApiTypingResultResponse {
   textContent?: string;
   mode: 'TEXT' | 'WORDS';
   wordCount: number;
+  streak: number | null;
 }
 
 export interface ApiUserStatResponse {

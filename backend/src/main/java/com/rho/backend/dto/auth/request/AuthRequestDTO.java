@@ -11,6 +11,8 @@ public record AuthRequestDTO(
 
         @NotBlank(message = "Password is required")
         @Size(min = 8, message = "Password must be at least 8 characters")
-        String password
+        String password,
 
-){}
+        String timezone
+
+) {}

@@ -38,13 +38,15 @@ public class RaceService {
     private final UserRepository userRepository;
     private final RaceSessionRepository raceSessionRepository;
     private final RaceResultRepository raceResultRepository;
+    private final StreakService streakService;
 
-    public RaceService(TextService textService, RaceRoomRepository raceRoomRepository, UserRepository userRepository, RaceSessionRepository raceSessionRepository, RaceResultRepository raceResultRepository) {
+    public RaceService(TextService textService, RaceRoomRepository raceRoomRepository, UserRepository userRepository, RaceSessionRepository raceSessionRepository, RaceResultRepository raceResultRepository, StreakService streakService) {
         this.textService = textService;
         this.raceRoomRepository = raceRoomRepository;
         this.userRepository = userRepository;
         this.raceSessionRepository = raceSessionRepository;
         this.raceResultRepository = raceResultRepository;
+        this.streakService = streakService;
     }
 
     public String createRoom(Long hostUserId, TextType textType, boolean isPrivate) {
@@ -196,6 +198,8 @@ public class RaceService {
         raceParticipant.setCorrectChars(correctChars);
         raceParticipant.setAccuracy(computeAccuracy(correctChars, errors));
         raceRoomRepository.save(raceRoom);
+
+        raceParticipant.setLatestStreak(streakService.recordActivity(userId));
 
         if (raceRoom.allActiveFinished()) {
             raceRoom.setState(RaceState.FINISHED);

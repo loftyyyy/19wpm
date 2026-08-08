@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { User, TestResult, TestMode, ContentType } from '../types';
 import type { ApiAuthResponse, ApiAuthRequest, ApiRegisterRequest, ApiUserProfile } from '../types/api';
-import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile, mapProfileToUser, mapMinimalUserToUser } from '../services/auth';
+import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile, mapProfileToUser, mapMinimalUserToUser, getBrowserTimezone } from '../services/auth';
 import { saveGuestResult, getGuestResults, clearGuestResults, clearAllResults, migrateGuestResults, apiGetResults, apiSaveResult } from '../services/results';
 import { api, setTokens, clearTokens, getAccessToken, setOnUnauthorizedHandler, clearOnUnauthorizedHandler, ApiError } from '../services/api';
 
@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     setIsLoading(true);
     try {
-      const loginBody: ApiAuthRequest = { email, password };
+      const loginBody: ApiAuthRequest = { email, password, timezone: getBrowserTimezone() };
       const data = await api.post<ApiAuthResponse>('/auth/login', loginBody);
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
       await setUserAndMigrate(mapMinimalUserToUser(data.userResponseDTO));
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (username: string, firstName: string, lastName: string, email: string, password: string, country: string): Promise<string | null> => {
     setIsLoading(true);
     try {
-      const registerBody: ApiRegisterRequest = { username, firstName, lastName, email, password, country };
+      const registerBody: ApiRegisterRequest = { username, firstName, lastName, email, password, country, timezone: getBrowserTimezone() };
       const data = await api.post<ApiAuthResponse>('/auth/signup', registerBody);
       setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
       const u = mapMinimalUserToUser(data.userResponseDTO);
@@ -205,7 +205,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUser = useCallback((updates: Partial<User>) => {
     setUser(prev => {
       if (!prev) return prev;
-      return updateUserProfile(prev.id, updates);
+      try {
+        return updateUserProfile(prev.id, updates);
+      } catch {
+        return { ...prev, ...updates };
+      }
     });
   }, []);
 
@@ -228,13 +232,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       timeConstraintMs: null,
       wpm: result.wpm,
       accuracy: result.accuracy,
-    }).then(({ error }) => {
+    }).then(({ data, error }) => {
       if (error) {
         console.error('Failed to save result to backend:', error);
       }
+      if (data?.streak != null && user) {
+        updateUser({ streak: data.streak });
+      }
       fetchResults();
     });
-  }, [user, fetchResults]);
+  }, [user, fetchResults, updateUser]);
 
   const getResults = useCallback((): TestResult[] => {
     if (user) return serverResults;

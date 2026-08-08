@@ -22,12 +22,14 @@ public class TypingResultService {
     private final UserRepository userRepository;
     private final UserStatService userStatService;
     private final TextRepository textRepository;
+    private final StreakService streakService;
 
-    public TypingResultService(TypingResultRepository typingResultRepository, UserRepository userRepository, UserStatService userStatService, TextRepository textRepository){
+    public TypingResultService(TypingResultRepository typingResultRepository, UserRepository userRepository, UserStatService userStatService, TextRepository textRepository, StreakService streakService){
         this.typingResultRepository = typingResultRepository;
         this.userRepository = userRepository;
         this.userStatService = userStatService;
         this.textRepository = textRepository;
+        this.streakService = streakService;
     }
 
     @Transactional
@@ -65,7 +67,8 @@ public class TypingResultService {
 
         typingResultRepository.save(typingResult);
         userStatService.updateUserStats(userId, typingResultRequestDTO.wpm());
-        return new TypingResultResponseDTO(typingResult);
+        Integer streak = streakService.recordActivity(userId);
+        return new TypingResultResponseDTO(typingResult, streak);
     }
 
     public List<TypingResultResponseDTO> getResultsByUser(long userId){
