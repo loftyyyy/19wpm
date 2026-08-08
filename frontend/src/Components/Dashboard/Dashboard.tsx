@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import Navbar from '../Navbar';
 import UsersCard from './UsersCard';
 import ProgressionChart from './ProgressionChart';
@@ -8,11 +8,9 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function Dashboard() {
   const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
 
   if (!isAuthenticated) {
-    navigate('/login');
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   return (

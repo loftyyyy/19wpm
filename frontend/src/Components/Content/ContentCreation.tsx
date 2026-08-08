@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import Navbar from '../Navbar';
 import Footer from '../Footer';
 import { useAuth } from '../../context/AuthContext';
@@ -31,8 +31,7 @@ export default function ContentCreation() {
   }, [message]);
 
   if (!isAuthenticated) {
-    navigate('/login');
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
