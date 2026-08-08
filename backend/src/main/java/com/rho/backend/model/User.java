@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -72,6 +73,12 @@ public class User {
 
     @Column(name = "streak")
     private Integer streak;
+
+    @Column(name = "timezone", nullable = false, length = 50)
+    private String timezone = "UTC";
+
+    @Column(name = "last_played_date")
+    private LocalDate lastPlayedDate;
 
 //    @Override
 //    public String getPassword(){
