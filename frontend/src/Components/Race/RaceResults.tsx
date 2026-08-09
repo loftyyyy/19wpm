@@ -1,6 +1,7 @@
 import type { RaceParticipant, RaceRoom } from '../../types/race';
-import type { WpmPoint } from '../../types';
+import type { TestResult, WpmPoint } from '../../types';
 import WpmBurstChart from '../TypingTest/WpmBurstChart';
+import TypingReplay from '../TypingTest/TypingReplay';
 
 interface Props {
   participants: RaceParticipant[];
@@ -8,9 +9,10 @@ interface Props {
   onPlayAgain: () => void;
   room?: RaceRoom;
   wpmHistory?: WpmPoint[];
+  replayResult?: TestResult | null;
 }
 
-export default function RaceResults({ participants, currentUserId, onPlayAgain, room, wpmHistory }: Props) {
+export default function RaceResults({ participants, currentUserId, onPlayAgain, room, wpmHistory, replayResult }: Props) {
   const sorted = [...participants].sort((a, b) => {
     if (a.finishRank > 0 && b.finishRank > 0) return a.finishRank - b.finishRank;
     if (a.finishRank > 0) return -1;
@@ -146,6 +148,15 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
               <div className="bg-card border border-line rounded-xl p-4 transition-theme">
                 {/* Note: race history is per-keystroke instantaneous WPM, not practice mode's per-second bins — intentional, matches the live race track */}
                 <WpmBurstChart data={wpmHistory} />
+              </div>
+            </div>
+          )}
+
+          {replayResult && (
+            <div className="mt-4">
+              <p className="text-xs font-sans font-semibold text-text-dim uppercase tracking-wider mb-3">Your Run Replay</p>
+              <div className="bg-card border border-line rounded-xl p-4 transition-theme">
+                <TypingReplay result={replayResult} />
               </div>
             </div>
           )}
