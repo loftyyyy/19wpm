@@ -452,14 +452,12 @@ export default function TypingReplay({ result }: { result: TestResult }) {
               >
                 {word.chars.map(({ char, globalIdx }) => {
                   const typed = typedChars[globalIdx];
-                  const isCurrent = globalIdx === typedChars.length;
                   const isCorrect = typed !== undefined && typed === char;
                   const isIncorrect = typed !== undefined && typed !== char;
 
-                  let cls = 'char-untyped transition-colors';
+                  let cls = 'char-untyped';
                   if (isCorrect) cls = 'char-correct';
                   if (isIncorrect) cls = 'char-incorrect';
-                  if (isCurrent && playState === 'playing') cls = 'char-current text-text-main';
 
                   return (
                     <span key={globalIdx} ref={el => { replayCharRefs.current[globalIdx] = el; }} className={cls}>

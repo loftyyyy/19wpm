@@ -114,11 +114,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   text-decoration-color: var(--error);
 }
 
-.char-current {
-  border-left: 2px solid var(--accent);
-  animation: pulse-caret 1s step-end infinite;
-}
-
 .char-untyped {
   color: var(--text-dim);
 }
