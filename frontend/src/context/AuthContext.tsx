@@ -205,8 +205,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUser = useCallback((updates: Partial<User>) => {
     setUser(prev => {
       if (!prev) return prev;
+      if (getAccessToken()) {
+        // API user: streak is already persisted server-side; merge locally only.
+        return { ...prev, ...updates };
+      }
+      // LocalStorage-mode user: persist to the legacy store. If the user isn't
+      // found there (e.g. data migrated to the API), merge locally instead of
+      // returning null — never let a profile update log the user out.
       try {
-        return updateUserProfile(prev.id, updates);
+        return updateUserProfile(prev.id, updates) ?? { ...prev, ...updates };
       } catch {
         return { ...prev, ...updates };
       }
