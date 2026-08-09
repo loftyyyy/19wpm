@@ -48,7 +48,9 @@ public class SecurityFilterChainConfig {
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
-                                "/ws/**"
+                                "/ws/**",
+                                "/api/v1/texts/**",
+                                "/api/v1/words/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
