@@ -41,7 +41,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             UPDATE User u
             SET u.streak = :newStreak, u.lastPlayedDate = :today
             WHERE u.userId = :userId
-              AND ((:expectedLastPlayed IS NULL AND u.lastPlayedDate IS NULL) OR u.lastPlayedDate = :expectedLastPlayed)
+              AND (u.lastPlayedDate IS NULL OR u.lastPlayedDate = :expectedLastPlayed)
             """)
     int updateStreakConditionally(@Param("userId") Long userId,
                                   @Param("newStreak") int newStreak,
