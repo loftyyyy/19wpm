@@ -10,6 +10,17 @@ export function getAccessToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+export function getAccessTokenExpiry(): number | null {
+  const token = getAccessToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_KEY);
 }

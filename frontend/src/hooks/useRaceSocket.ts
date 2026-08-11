@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { attemptTokenRefresh, getAccessToken } from '../services/api';
+import { attemptTokenRefresh, getAccessToken, getAccessTokenExpiry } from '../services/api';
 import { getRoomState } from '../services/race';
 import type { RaceRoom } from '../types/race';
 
@@ -82,7 +82,11 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
         null,
         { transports: ['websocket', 'xhr-streaming', 'xhr-polling'] }
       ),
-      beforeConnect: (stompClient) => {
+      beforeConnect: async (stompClient) => {
+        const expiry = getAccessTokenExpiry();
+        if (expiry !== null && expiry - Date.now() < 30_000) {
+          await attemptTokenRefresh();
+        }
         stompClient.connectHeaders = { token: getAccessToken() ?? '' };
       },
       reconnectDelay: 5000,

@@ -3,7 +3,7 @@ import type { User, TestResult, TestMode, ContentType } from '../types';
 import type { ApiAuthResponse, ApiAuthRequest, ApiRegisterRequest, ApiUserProfile } from '../types/api';
 import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile, mapProfileToUser, mapMinimalUserToUser, getBrowserTimezone } from '../services/auth';
 import { saveGuestResult, getGuestResults, clearGuestResults, clearAllResults, migrateGuestResults, apiGetResults, apiSaveResult } from '../services/results';
-import { api, setTokens, clearTokens, getAccessToken, setOnUnauthorizedHandler, clearOnUnauthorizedHandler, ApiError } from '../services/api';
+import { api, setTokens, clearTokens, getAccessToken, setOnUnauthorizedHandler, clearOnUnauthorizedHandler, ApiError, attemptTokenRefresh } from '../services/api';
 
 function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string; textTitle?: string; textContent?: string; mode: 'TEXT' | 'WORDS'; wordCount: number }): TestResult {
   const isTextMode = r.mode === 'TEXT';
@@ -86,9 +86,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const validateToken = async () => {
       try {
-        const res = await fetch('/api/v1/auth/me', {
-          headers: { Authorization: `Bearer ${token}` },
+        let activeToken = token;
+        let res = await fetch('/api/v1/auth/me', {
+          headers: { Authorization: `Bearer ${activeToken}` },
         });
+
+        if (res.status === 401 && (await attemptTokenRefresh())) {
+          activeToken = getAccessToken() ?? '';
+          res = await fetch('/api/v1/auth/me', {
+            headers: { Authorization: `Bearer ${activeToken}` },
+          });
+        }
 
         if (res.ok) {
           const data: ApiUserProfile = await res.json();
