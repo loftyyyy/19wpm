@@ -176,6 +176,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
                 .password(null)
                 .role(role)
                 .isActive(true)
+                .timezone("UTC")
                 .build();
 
         User savedUser = userRepository.save(user);
