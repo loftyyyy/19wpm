@@ -20,6 +20,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
@@ -130,5 +132,44 @@ class StreakPostgresIntegrationTest {
         User persisted = userRepository.findById(user.getUserId()).orElseThrow();
         assertThat(persisted.getStreak()).isEqualTo(7);
         assertThat(persisted.getLastPlayedDate()).isEqualTo(today);
+    }
+
+    @DisplayName("Boundary: UTC-stored user at 05:00 local on a new day keeps the streak (5) until the UTC date advances")
+    @Test
+    void boundaryUtcStoredUserKeepsStreakWithinSameUtcDate() {
+        Instant boundary = Instant.parse("2026-08-11T21:00:00Z"); // = 2026-08-12T05:00 Asia/Manila
+        User user = userRepository.save(newUser());
+        user.setProvider(AuthProvider.GITHUB);
+        user.setStreak(5);
+        user.setLastPlayedDate(LocalDate.of(2026, 8, 11));
+        userRepository.save(user);
+
+        StreakService fixedClockService = new StreakService(userRepository, Clock.fixed(boundary, UTC));
+
+        Integer streak = fixedClockService.recordActivity(user.getUserId());
+
+        assertThat(streak).isEqualTo(5);
+    }
+
+    @DisplayName("Boundary control: same instant with correctly stored Asia/Manila timezone increments to 6")
+    @Test
+    void boundaryManilaStoredUserIncrementsOnNewLocalDay() {
+        Instant boundary = Instant.parse("2026-08-11T21:00:00Z"); // = 2026-08-12T05:00 Asia/Manila
+        User user = userRepository.save(newUser());
+        user.setTimezone("Asia/Manila");
+        user.setStreak(5);
+        user.setLastPlayedDate(LocalDate.of(2026, 8, 11));
+        userRepository.save(user);
+
+        StreakService fixedClockService = new StreakService(userRepository, Clock.fixed(boundary, UTC));
+
+        Integer streak = fixedClockService.recordActivity(user.getUserId());
+
+        assertThat(streak).isEqualTo(6);
+        entityManager.flush();
+        entityManager.clear();
+        User persisted = userRepository.findById(user.getUserId()).orElseThrow();
+        assertThat(persisted.getStreak()).isEqualTo(6);
+        assertThat(persisted.getLastPlayedDate()).isEqualTo(LocalDate.of(2026, 8, 12));
     }
 }

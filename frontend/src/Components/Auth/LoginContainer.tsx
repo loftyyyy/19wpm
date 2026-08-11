@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getBrowserTimezone } from '../../services/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
@@ -201,7 +202,7 @@ export default function LoginContainer() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => { window.location.href = `${API_BASE_URL}/oauth2/authorization/google`; }}
+              onClick={() => { window.location.href = `${API_BASE_URL}/oauth2/authorization/google?timezone=${encodeURIComponent(getBrowserTimezone())}`; }}
               className="flex items-center justify-center gap-2 px-4 py-2.5 border border-line rounded-xl text-sm font-sans text-text-sub hover:bg-muted transition-colors hover:cursor-pointer"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -214,7 +215,7 @@ export default function LoginContainer() {
             </button>
             <button
               type="button"
-              onClick={() => { window.location.href = `${API_BASE_URL}/oauth2/authorization/github`; }}
+              onClick={() => { window.location.href = `${API_BASE_URL}/oauth2/authorization/github?timezone=${encodeURIComponent(getBrowserTimezone())}`; }}
               className="flex items-center justify-center gap-2 px-4 py-2.5 border border-line rounded-xl text-sm font-sans text-text-sub hover:bg-muted transition-colors hover:cursor-pointer"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
