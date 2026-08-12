@@ -101,6 +101,13 @@ export default function TypingReplay({ result }: { result: TestResult }) {
       if (charIdx < result.passage.length && result.passage[charIdx] === ' ' && ev.key !== ' ') {
         newExtraChars = [...newExtraChars, ev.key];
         newIncorrect++;
+      } else if (ev.key === ' ' && charIdx < result.passage.length && result.passage[charIdx] === ' ') {
+        newChars.push(ev.key);
+        if (newExtraChars.length > 0) {
+          newExtraChars = [];
+        } else {
+          newCorrect++;
+        }
       } else {
         const expected = result.passage[charIdx];
         const isCorrect = ev.key === expected;
