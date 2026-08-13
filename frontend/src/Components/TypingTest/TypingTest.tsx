@@ -292,7 +292,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       left -= 1;
 
       if (isFirstPositionRef.current) {
-        // Teleport on first render ΓÇö no animation
+        // Teleport on first render — no animation
         isFirstPositionRef.current = false;
         cursorEl.style.left = `${left}px`;
         cursorEl.style.top = `${top}px`;
@@ -353,7 +353,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                 <span>reset</span>
               </div>
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
-                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">ctrl+Γî½</kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">ctrl+&#9003;</kbd>
                 <span>del word</span>
               </div>
             </div>
@@ -500,7 +500,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
         {passage && (
           <div className="mt-6 text-center flex items-center justify-center gap-4">
             <p className="text-text-dim font-sans text-sm italic transition-theme">
-              {passage.title ? `${passage.title} ∩┐╜ ` : ''}&mdash; {passage.author}, <em>{passage.source}</em>
+              {passage.title ? `${passage.title} \u2014 ` : ''}&mdash; {passage.author}, <em>{passage.source}</em>
             </p>
             <button
               ref={restartBtnRef}
