@@ -20,7 +20,6 @@ export function usePassageQueue(
 ): {
   next: () => Passage | null;
   isLoading: boolean;
-  peek: () => Passage | null;
 } {
   const queueRef = useRef<Passage[]>([]);
   const isFetchingRef = useRef(false);
@@ -125,9 +124,5 @@ export function usePassageQueue(
     return passage;
   }, [fetchBatch]);
 
-  const peek = useCallback((): Passage | null => {
-    return queueRef.current[0] ?? null;
-  }, []);
-
-  return { next, isLoading, peek };
+  return { next, isLoading };
 }

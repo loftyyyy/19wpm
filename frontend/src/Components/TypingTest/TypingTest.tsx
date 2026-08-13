@@ -71,7 +71,7 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
   }, [mode]);
 
   const [passage, setPassage] = useState<Passage | null>(null);
-  const { next, isLoading, peek } = usePassageQueue(mode, duration, wordCount, phraseLength, difficulty);
+  const { next, isLoading } = usePassageQueue(mode, duration, wordCount, phraseLength, difficulty);
 
   // Custom passage from ?custom query param
   useEffect(() => {
@@ -90,9 +90,9 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
   // Initialize passage from queue once loading completes
   useEffect(() => {
     if (!isLoading && passage === null) {
-      setPassage(peek());
+      setPassage(next());
     }
-  }, [isLoading]);
+  }, [isLoading, next]);
 
   const isCapsLockOn = useCapsLock();
 
