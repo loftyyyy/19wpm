@@ -2,6 +2,10 @@
 
 A multiplayer typing test built with React, TypeScript, and Spring Boot.
 
+## WIP
+
+- **Touch Typing Practice Course** - planned interactive course for learning touch typing (home-row basics through full-keyboard drills) and an accompanying practice mode
+
 ## Features
 
 - **Typing Tests** - timed (15s/30s/60s) and word-count (10/25/50/100) modes with phrases mode
