@@ -1,3 +1,4 @@
+# Note: Railway expired, no backend currently
 # 19wpm
 
 Typing test app with solo practice modes and real-time multiplayer races. Guest sessions use localStorage; authenticated users sync results to the backend.
