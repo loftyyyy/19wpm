@@ -37,3 +37,5 @@ dump.rdb
 
 /src/main/resources/application.properties
 /src/main/resources/application-dev.properties
+
+containerapp.yaml
