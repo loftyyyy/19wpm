@@ -1,4 +1,4 @@
-# Note: Backend Working but OAUTH2 login is currently facing cors errors (WIP)
+# Note: Backend Is Fully Working. Microsoft Azure FTW
 # 19wpm
 
 Typing test app with solo practice modes and real-time multiplayer races. Guest sessions use localStorage; authenticated users sync results to the backend.
