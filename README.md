@@ -1,4 +1,4 @@
-# Note: Railway expired, no backend currently. Planning to migrate the backend in microsoft azure. SOON TO WORK AGAIN
+# Note: Backend Working but OAUTH2 login is currently facing erros
 # 19wpm
 
 Typing test app with solo practice modes and real-time multiplayer races. Guest sessions use localStorage; authenticated users sync results to the backend.
