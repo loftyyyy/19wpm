@@ -47,6 +47,7 @@ Flyway runs migrations on startup. Word lists and preset texts are seeded at dep
 
 ## Environment Variables
 
+
 ### Backend (`backend/.env`)
 
 | Variable | Description |
