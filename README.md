@@ -45,28 +45,6 @@ npm run dev                   # starts on :5173, proxies /api to :8080
 
 Flyway runs migrations on startup. Word lists and preset texts are seeded at deploy time.
 
-## Environment Variables
-
-
-### Backend (`backend/.env`)
-
-| Variable | Description |
-|---|---|
-| `DB_URL` | PostgreSQL JDBC URL |
-| `DB_USERNAME` | PostgreSQL user |
-| `DB_PASSWORD` | PostgreSQL password |
-| `JWT_SECRET` | HMAC key for access/refresh tokens |
-| `GITHUB_CLIENT_ID` | GitHub OAuth2 client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth2 client secret |
-| `GOOGLE_CLIENT_ID` | Google OAuth2 client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret |
-
-### Frontend (`frontend/.env.production`)
-
-| Variable | Description |
-|---|---|
-| `VITE_API_BASE_URL` | Backend API URL (production builds) |
-
 ## Limitations
 
 - Guest results live in localStorage only. Clearing site data removes them permanently.
