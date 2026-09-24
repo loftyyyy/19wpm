@@ -1,6 +1,11 @@
 # 19wpm
 19wpm is a typing test app with solo practice modes and real-time multiplayer races. Guest sessions use localStorage; authenticated users sync results to the backend.
 
+
+# WIP
+- Streak
+- diverse quotes
+  
 ## Routes
 
 | Path | Page |
