@@ -5,6 +5,7 @@
 # WIP
 - Streak
 - diverse quotes
+- Improve UI/UX
   
 ## Routes
 
