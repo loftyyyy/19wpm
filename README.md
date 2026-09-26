@@ -6,6 +6,7 @@
 - Streak
 - diverse quotes
 - Improve UI/UX
+- Improve latency in races
   
 ## Routes
 
