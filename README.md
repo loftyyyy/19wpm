@@ -7,6 +7,7 @@
 - diverse quotes
 - Improve UI/UX
 - Improve latency in races
+- Mobile compatibility
   
 ## Routes
 
