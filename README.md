@@ -8,7 +8,7 @@
 - Improve UI/UX
 - Improve latency in races
 - Mobile compatibility
-  
+- Ease of Use
 ## Routes
 
 | Path | Page |
