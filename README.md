@@ -9,6 +9,7 @@
 - Improve latency in races
 - Mobile compatibility
 - Ease of Use
+- Smooth animations
 ## Routes
 
 | Path | Page |
