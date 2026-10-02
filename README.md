@@ -10,6 +10,7 @@
 - Mobile compatibility
 - Ease of Use
 - Smooth animations
+- Fluidity
 ## Routes
 
 | Path | Page |
