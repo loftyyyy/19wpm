@@ -11,6 +11,7 @@
 - Ease of Use
 - Smooth animations
 - Fluidity
+- Responsiveness
 ## Routes
 
 | Path | Page |
