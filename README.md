@@ -12,7 +12,7 @@
 - Smooth animations
 - Fluidity
 - Responsiveness
-- Reduce library size
+- Reduce library/package size
 
 ## Routes
 
