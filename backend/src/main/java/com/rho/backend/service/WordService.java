@@ -13,8 +13,6 @@ import com.rho.backend.repository.WordRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -80,19 +78,17 @@ public class WordService {
             throw new InvalidResourceException("Count must be greater than 0");
         }
 
-        List<Word> words = wordRepository.findByLanguageAndDifficulty(language.trim().toLowerCase(), difficulty);
+        List<Word> words = wordRepository.findRandomByLanguageAndDifficulty(
+                language.trim().toLowerCase(), difficulty.name(), count);
 
         if(words.isEmpty()){
             throw new ResourceNotFoundException("No words found for language: " + language + " and difficulty: " + difficulty);
         }
-        if(count > words.size()){
+        if(words.size() < count){
             throw new InvalidResourceException("Count exceeds available words");
         }
 
-        Collections.shuffle(words);
-
         return words.stream()
-                .limit(count)
                 .map(WordResponseDTO::new)
                 .toList();
     }

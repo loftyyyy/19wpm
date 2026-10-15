@@ -18,7 +18,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.awt.print.Pageable;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -153,19 +152,17 @@ public class TextService {
             throw new InvalidResourceException("Count must be greater than 0");
         }
 
-        List<Text> words = textRepository.findByLanguageAndType(language.trim().toLowerCase(), textType);
+        List<Text> texts = textRepository.findRandomByLanguageAndType(
+                language.trim().toLowerCase(), textType.name(), count);
 
-        if(words.isEmpty()){
+        if(texts.isEmpty()){
             throw new ResourceNotFoundException("No words found for language: " + language + " and difficulty: " + textType);
         }
-        if(count > words.size()){
+        if(texts.size() < count){
             throw new InvalidResourceException("Count exceeds available words");
         }
 
-        Collections.shuffle(words);
-
-        return words.stream()
-                .limit(count)
+        return texts.stream()
                 .map(TextResponseDTO::new)
                 .toList();
     }

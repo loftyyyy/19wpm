@@ -33,5 +33,6 @@ public interface TextRepository extends JpaRepository<Text, Long> {
     @Query("SELECT t FROM Text t WHERE t.textId >= :randId AND t.isCustom = false AND t.type = :type ORDER BY t.textId ASC")
     List<Text> findFirstPresetByIdGreaterThanEqualAndType(@Param("randId") Long randId, @Param("type") TextType type, Pageable pageable);
 
-    List<Text> findByLanguageAndType(String language, TextType type);
+    @Query(value = "SELECT * FROM texts WHERE language = :language AND type = :type ORDER BY random() LIMIT :count", nativeQuery = true)
+    List<Text> findRandomByLanguageAndType(@Param("language") String language, @Param("type") String type, @Param("count") int count);
 }

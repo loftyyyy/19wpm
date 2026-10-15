@@ -70,6 +70,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 1.2 | Race countdown uses a shared scheduler instead of a raw thread per start | Managed task scheduling (`TaskScheduler`) | [`docs/refactors/04-race-countdown-scheduler.md`](docs/refactors/04-race-countdown-scheduler.md) |
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
+| 4.1 | Random word/text selection done in the database | Push selection down to the database (set-based random sampling) | [`docs/refactors/05-word-text-random-selection.md`](docs/refactors/05-word-text-random-selection.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -130,6 +131,18 @@ in the committed profile files (`application-prod.properties` / `application-dev
 
 **Impact:** no SQL logging on the request path outside dev, DB connections returned to the pool at
 transaction end instead of end-of-request, and a bounded, tunable connection pool.
+
+### 4.1 — Random word/text selection in the database
+
+**Before:** `getRandomWords` / `getRandomTexts` fetched **every** row matching a language +
+difficulty/type bucket into the app, `Collections.shuffle`d the list, and kept `count` of them.
+
+**After:** a native `SELECT ... ORDER BY random() LIMIT :count` returns at most `count`
+uniformly-random rows; the service never sees the rest of the bucket. The oversized-`count` guard is
+now `size() < count` against the small result set.
+
+**Impact:** transfer and heap usage are bounded by `count` instead of the bucket size on a hot
+endpoint.
 
 ## Limitations
 
