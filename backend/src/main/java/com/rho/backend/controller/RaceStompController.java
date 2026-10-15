@@ -3,6 +3,7 @@ package com.rho.backend.controller;
 import com.rho.backend.dto.race.FinishMessageDTO;
 import com.rho.backend.dto.race.ProgressUpdateDTO;
 import com.rho.backend.dto.race.RaceFinishStreakDTO;
+import com.rho.backend.dto.race.RaceProgressDTO;
 import com.rho.backend.race.RaceParticipant;
 import com.rho.backend.race.RaceRoom;
 import com.rho.backend.service.RaceService;
@@ -67,8 +68,10 @@ public class RaceStompController {
     @MessageMapping("/room/{code}/progress")
     public void updateProgress(@DestinationVariable String code, @Payload ProgressUpdateDTO progressUpdateDTO, Principal principal){
         Long userId = Long.parseLong(principal.getName());
-        RaceRoom raceRoom = raceService.updateProgress(code, userId, progressUpdateDTO.progressPercent(), progressUpdateDTO.currentWpm(), progressUpdateDTO.typedContent());
-        messagingTemplate.convertAndSend("/topic/room/" + code, raceRoom);
+        RaceProgressDTO progress = raceService.updateProgress(code, userId, progressUpdateDTO.progressPercent(), progressUpdateDTO.currentWpm(), progressUpdateDTO.typedContent());
+        // Broadcast only the delta on the high-frequency path; full room state is reserved
+        // for lifecycle events (join / start / racing / finish / disconnect).
+        messagingTemplate.convertAndSend("/topic/room/" + code + "/progress", progress);
     }
 
     @MessageMapping("/room/{code}/finish")

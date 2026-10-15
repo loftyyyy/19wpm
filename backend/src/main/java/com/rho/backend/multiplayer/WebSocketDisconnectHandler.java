@@ -2,8 +2,7 @@ package com.rho.backend.multiplayer;
 
 import com.rho.backend.enums.RaceState;
 import com.rho.backend.race.RaceParticipant;
-import com.rho.backend.race.RaceRoom;
-import com.rho.backend.repository.RaceRoomRepository;
+import com.rho.backend.race.RaceRoomStore;
 import com.rho.backend.service.RaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,15 +17,15 @@ public class WebSocketDisconnectHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(WebSocketDisconnectHandler.class);
 
-    private final RaceRoomRepository raceRoomRepository;
+    private final RaceRoomStore raceRoomStore;
     private final RaceService raceService;
     private final SimpMessagingTemplate messagingTemplate;
 
     public WebSocketDisconnectHandler(
-            RaceRoomRepository raceRoomRepository,
+            RaceRoomStore raceRoomStore,
             RaceService raceService,
             SimpMessagingTemplate messagingTemplate) {
-        this.raceRoomRepository = raceRoomRepository;
+        this.raceRoomStore = raceRoomStore;
         this.raceService = raceService;
         this.messagingTemplate = messagingTemplate;
     }
@@ -53,31 +52,33 @@ public class WebSocketDisconnectHandler {
 
         String sessionId = accessor.getSessionId();
 
-        raceRoomRepository.findByCode(roomCode).ifPresent(room -> {
-            RaceParticipant participant = room.findParticipant(userId);
-            if (participant == null) return;
-            if (participant.isDisconnected()) return;
+        raceRoomStore.get(roomCode).ifPresent(room -> {
+            synchronized (room) {
+                RaceParticipant participant = room.findParticipant(userId);
+                if (participant == null) return;
+                if (participant.isDisconnected()) return;
 
-            String currentSessionId = participant.getSessionId();
-            if (currentSessionId != null && !currentSessionId.equals(sessionId)) {
-                logger.info("Ignoring stale disconnect for userId {} (session {} != current {})", userId, sessionId, currentSessionId);
-                return;
-            }
+                String currentSessionId = participant.getSessionId();
+                if (currentSessionId != null && !currentSessionId.equals(sessionId)) {
+                    logger.info("Ignoring stale disconnect for userId {} (session {} != current {})", userId, sessionId, currentSessionId);
+                    return;
+                }
 
-            participant.setDisconnected(true);
-            participant.setConnected(false);
-            raceRoomRepository.save(room);
+                participant.setDisconnected(true);
+                participant.setConnected(false);
+                raceRoomStore.persist(room);
 
-            messagingTemplate.convertAndSend("/topic/room/" + roomCode, room);
-
-            if (room.getState() == RaceState.RACING && room.allActiveFinished()) {
-                room.setState(RaceState.FINISHED);
-                raceRoomRepository.save(room);
-                raceService.persistRacePublic(room);
                 messagingTemplate.convertAndSend("/topic/room/" + roomCode, room);
-            }
 
-            logger.info("Marked userId {} as disconnected in room {}", userId, roomCode);
+                if (room.getState() == RaceState.RACING && room.allActiveFinished()) {
+                    room.setState(RaceState.FINISHED);
+                    raceRoomStore.persist(room);
+                    raceService.persistRacePublic(room);
+                    messagingTemplate.convertAndSend("/topic/room/" + roomCode, room);
+                }
+
+                logger.info("Marked userId {} as disconnected in room {}", userId, roomCode);
+            }
         });
     }
 }

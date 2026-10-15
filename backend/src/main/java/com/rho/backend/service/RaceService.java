@@ -1,19 +1,19 @@
 package com.rho.backend.service;
 
+import com.rho.backend.dto.race.RaceProgressDTO;
 import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.enums.RaceState;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.exception.InvalidResourceException;
 import com.rho.backend.exception.UnauthorizedResourceException;
-import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.model.RaceResult;
 import com.rho.backend.model.RaceSession;
 import com.rho.backend.model.User;
 import com.rho.backend.race.RaceParticipant;
 import com.rho.backend.race.RaceRoom;
+import com.rho.backend.race.RaceRoomStore;
 import com.rho.backend.repository.RaceResultRepository;
-import com.rho.backend.repository.RaceRoomRepository;
 import com.rho.backend.repository.RaceSessionRepository;
 import com.rho.backend.repository.UserRepository;
 import org.slf4j.Logger;
@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @Service
 public class RaceService {
     private final TextService textService;
-    private final RaceRoomRepository raceRoomRepository;
+    private final RaceRoomStore raceRoomStore;
     private static final String ALPHANUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int CODE_LENGTH = 6;
@@ -40,13 +40,18 @@ public class RaceService {
     private final RaceResultRepository raceResultRepository;
     private final StreakService streakService;
 
-    public RaceService(TextService textService, RaceRoomRepository raceRoomRepository, UserRepository userRepository, RaceSessionRepository raceSessionRepository, RaceResultRepository raceResultRepository, StreakService streakService) {
+    public RaceService(TextService textService, RaceRoomStore raceRoomStore, UserRepository userRepository, RaceSessionRepository raceSessionRepository, RaceResultRepository raceResultRepository, StreakService streakService) {
         this.textService = textService;
-        this.raceRoomRepository = raceRoomRepository;
+        this.raceRoomStore = raceRoomStore;
         this.userRepository = userRepository;
         this.raceSessionRepository = raceSessionRepository;
         this.raceResultRepository = raceResultRepository;
         this.streakService = streakService;
+    }
+
+    private RaceRoom getRoom(String roomCode) {
+        return raceRoomStore.get(roomCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
     }
 
     public String createRoom(Long hostUserId, TextType textType, boolean isPrivate) {
@@ -56,14 +61,15 @@ public class RaceService {
         for (int i = 0; i < maxAttempts; i++) {
             roomCode = generateRoomCode();
 
-            if (raceRoomRepository.exists(roomCode)) {
+            if (raceRoomStore.exists(roomCode)) {
                 continue;
             }
 
             RaceRoom raceRoom = new RaceRoom(roomCode, textType, isPrivate, hostUserId);
             TextResponseDTO text = (textType != null) ? textService.getRandomTextByType(textType) : textService.getRandomText();
             raceRoom.setText(text);
-            raceRoomRepository.save(raceRoom);
+            raceRoomStore.put(raceRoom);
+            raceRoomStore.persist(raceRoom);
 
             return roomCode;
 
@@ -73,43 +79,47 @@ public class RaceService {
     }
 
     public RaceRoom joinRoom(String roomCode, Long userId) {
-        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        RaceRoom raceRoom = getRoom(roomCode);
         User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (!raceRoom.getState().equals(RaceState.LOBBY)) {
-            return raceRoom; // return current state so late joiner gets broadcast of actual room state
-        }
+        synchronized (raceRoom) {
+            if (!raceRoom.getState().equals(RaceState.LOBBY)) {
+                return raceRoom; // return current state so late joiner gets broadcast of actual room state
+            }
 
-        if (raceRoom.findParticipant(userId) != null) {
+            if (raceRoom.findParticipant(userId) != null) {
+                return raceRoom;
+            }
+
+            if (raceRoom.getParticipants().size() >= 8) {
+                throw new InvalidResourceException("Race room is already full");
+            }
+
+            RaceParticipant raceParticipant = new RaceParticipant(userId, user.getUsername());
+            raceRoom.getParticipants().add(raceParticipant);
+
+            raceRoomStore.persist(raceRoom);
+
             return raceRoom;
         }
-
-        if (raceRoom.getParticipants().size() >= 8) {
-            throw new InvalidResourceException("Race room is already full");
-        }
-
-
-        RaceParticipant raceParticipant = new RaceParticipant(userId, user.getUsername());
-        raceRoom.getParticipants().add(raceParticipant);
-
-        raceRoomRepository.save(raceRoom);
-
-        return raceRoom;
     }
 
     public RaceRoom markConnected(String roomCode, Long userId, String sessionId) {
-        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
-        RaceParticipant participant = raceRoom.findParticipant(userId);
-        if (participant == null) {
+        RaceRoom raceRoom = getRoom(roomCode);
+
+        synchronized (raceRoom) {
+            RaceParticipant participant = raceRoom.findParticipant(userId);
+            if (participant == null) {
+                return raceRoom;
+            }
+            participant.setConnected(true);
+            participant.setSessionId(sessionId);
+            if (raceRoom.getState() == RaceState.LOBBY) {
+                participant.setDisconnected(false);
+            }
+            raceRoomStore.persist(raceRoom);
             return raceRoom;
         }
-        participant.setConnected(true);
-        participant.setSessionId(sessionId);
-        if (raceRoom.getState() == RaceState.LOBBY) {
-            participant.setDisconnected(false);
-        }
-        raceRoomRepository.save(raceRoom);
-        return raceRoom;
     }
 
     private long countConnected(RaceRoom raceRoom) {
@@ -119,92 +129,112 @@ public class RaceService {
     }
 
     public RaceRoom startRoom(String roomCode, Long userId) {
-        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        RaceRoom raceRoom = getRoom(roomCode);
         boolean isPublicRoom = raceRoom.getHostUserId() == null;
         if (!isPublicRoom && !raceRoom.isHost(userId)) {
             throw new UnauthorizedResourceException("Only the room creator can start the race");
         }
 
-        if (!raceRoom.getState().equals(RaceState.LOBBY)) {
+        synchronized (raceRoom) {
+            if (!raceRoom.getState().equals(RaceState.LOBBY)) {
+                return raceRoom;
+            }
+
+            if (countConnected(raceRoom) < 2) {
+                throw new InvalidResourceException("Must have at least 2 connected participants to start the race");
+            }
+
+            raceRoom.setState(RaceState.COUNTDOWN);
+            raceRoom.setCountdownStartTime(Instant.now());
+            raceRoom.setCountdownDurationMs(COUNTDOWN_DURATION_MS);
+            logger.info("Room {} entering COUNTDOWN; countdownStartTime={}, durationMs={}",
+                    roomCode, raceRoom.getCountdownStartTime(), raceRoom.getCountdownDurationMs());
+            raceRoomStore.persist(raceRoom);
             return raceRoom;
         }
-
-        if (countConnected(raceRoom) < 2) {
-            throw new InvalidResourceException("Must have at least 2 connected participants to start the race");
-        }
-
-        raceRoom.setState(RaceState.COUNTDOWN);
-        raceRoom.setCountdownStartTime(Instant.now());
-        raceRoom.setCountdownDurationMs(COUNTDOWN_DURATION_MS);
-        logger.info("Room {} entering COUNTDOWN; countdownStartTime={}, durationMs={}",
-                roomCode, raceRoom.getCountdownStartTime(), raceRoom.getCountdownDurationMs());
-        raceRoomRepository.save(raceRoom);
-        return raceRoom;
     }
 
     public RaceRoom transitionToRacing(String roomCode) {
-        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        RaceRoom raceRoom = getRoom(roomCode);
 
-        if (!raceRoom.getState().equals(RaceState.COUNTDOWN)) {
-            throw new InvalidResourceException("Cannot start race");
+        synchronized (raceRoom) {
+            if (!raceRoom.getState().equals(RaceState.COUNTDOWN)) {
+                throw new InvalidResourceException("Cannot start race");
+            }
+
+            raceRoom.setState(RaceState.RACING);
+            raceRoom.setStartTime(Instant.now());
+            raceRoomStore.persist(raceRoom);
+            return raceRoom;
         }
-
-        raceRoom.setState(RaceState.RACING);
-        raceRoom.setStartTime(Instant.now());
-        raceRoomRepository.save(raceRoom);
-        return raceRoom;
     }
 
-    public RaceRoom updateProgress(String roomCode, Long userId, double progressPercent, int currentWpm, String typedContent) {
-        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
-        if (!raceRoom.getState().equals(RaceState.RACING)) {
-            throw new InvalidResourceException("Race is not in progress");
+    /**
+     * Applies a progress tick in memory and returns a lightweight delta for broadcasting.
+     * The room is intentionally NOT persisted to Redis here: this runs several times per
+     * second per participant and only the final state matters.
+     */
+    public RaceProgressDTO updateProgress(String roomCode, Long userId, double progressPercent, int currentWpm, String typedContent) {
+        RaceRoom raceRoom = getRoom(roomCode);
+
+        synchronized (raceRoom) {
+            if (!raceRoom.getState().equals(RaceState.RACING)) {
+                throw new InvalidResourceException("Race is not in progress");
+            }
+
+            RaceParticipant raceParticipant = raceRoom.findParticipant(userId);
+            if (raceParticipant == null) {
+                throw new ResourceNotFoundException("Participant not found in room");
+            }
+
+            int errors = calculateErrors(typedContent, raceRoom.getText().content());
+            raceParticipant.setProgressPercent(progressPercent);
+            raceParticipant.setCurrentWpm(currentWpm);
+            raceParticipant.setErrors(errors);
+
+            return new RaceProgressDTO(userId, progressPercent, currentWpm, errors);
         }
-
-        RaceParticipant raceParticipant = raceRoom.findParticipant(userId);
-        if (raceParticipant == null) {
-            throw new ResourceNotFoundException("Participant not found in room");
-        }
-
-        raceParticipant.setProgressPercent(progressPercent);
-        raceParticipant.setCurrentWpm(currentWpm);
-        raceParticipant.setErrors(calculateErrors(typedContent, raceRoom.getText().content()));
-
-        raceRoomRepository.save(raceRoom);
-
-        return raceRoom;
     }
 
     public RaceRoom finishRace(String roomCode, Long userId, int finalWpm, int errors, int correctChars) {
-        RaceRoom raceRoom = raceRoomRepository.findByCode(roomCode).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
-        if (!raceRoom.getState().equals(RaceState.RACING)) {
-            throw new InvalidResourceException("Can't finish a not started race");
-        }
+        RaceRoom raceRoom = getRoom(roomCode);
+        RaceParticipant raceParticipant;
+        boolean roomFinished = false;
 
-        RaceParticipant raceParticipant = raceRoom.findParticipant(userId);
-        if (raceParticipant == null) {
-            throw new ResourceNotFoundException("Participant not found in room");
-        }
+        synchronized (raceRoom) {
+            if (!raceRoom.getState().equals(RaceState.RACING)) {
+                throw new InvalidResourceException("Can't finish a not started race");
+            }
 
-        if (raceParticipant.isFinished()) {
-            return null;
-        }
+            raceParticipant = raceRoom.findParticipant(userId);
+            if (raceParticipant == null) {
+                throw new ResourceNotFoundException("Participant not found in room");
+            }
 
-        raceParticipant.setFinishRank(raceRoom.getFinishCount() + 1);
-        raceRoom.setFinishCount(raceRoom.getFinishCount() + 1);
-        raceParticipant.setFinished(true);
-        raceParticipant.setCurrentWpm(finalWpm);
-        raceParticipant.setErrors(errors);
-        raceParticipant.setCorrectChars(correctChars);
-        raceParticipant.setAccuracy(computeAccuracy(correctChars, errors));
-        raceRoomRepository.save(raceRoom);
+            if (raceParticipant.isFinished()) {
+                return null;
+            }
+
+            raceParticipant.setFinishRank(raceRoom.getFinishCount() + 1);
+            raceRoom.setFinishCount(raceRoom.getFinishCount() + 1);
+            raceParticipant.setFinished(true);
+            raceParticipant.setCurrentWpm(finalWpm);
+            raceParticipant.setErrors(errors);
+            raceParticipant.setCorrectChars(correctChars);
+            raceParticipant.setAccuracy(computeAccuracy(correctChars, errors));
+
+            if (raceRoom.allActiveFinished()) {
+                raceRoom.setState(RaceState.FINISHED);
+                raceRoom.setDurationSeconds((int) Math.max(0, Duration.between(raceRoom.getStartTime(), Instant.now()).toSeconds()));
+                roomFinished = true;
+            }
+
+            raceRoomStore.persist(raceRoom);
+        }
 
         raceParticipant.setLatestStreak(streakService.recordActivity(userId));
 
-        if (raceRoom.allActiveFinished()) {
-            raceRoom.setState(RaceState.FINISHED);
-            raceRoom.setDurationSeconds((int) Math.max(0, Duration.between(raceRoom.getStartTime(), Instant.now()).toSeconds()));
-            raceRoomRepository.save(raceRoom);
+        if (roomFinished) {
             persistRacePublic(raceRoom);
         }
 

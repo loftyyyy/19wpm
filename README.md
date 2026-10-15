@@ -59,6 +59,31 @@ npm run dev                   # starts on :5173, proxies /api to :8080
 
 Flyway runs migrations on startup. Word lists and preset texts are seeded at deploy time.
 
+## Backend Performance Refactors
+
+Each refactor is an isolated commit so it can be reverted on its own if it regresses.
+Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
+
+| # | Change | Architecture pattern | Details |
+|---|---|---|---|
+| 1.1 | Race room live-state store + delta progress broadcasts | In-memory live state with write-through persistence; delta (event) broadcast | [`docs/refactors/01-race-room-live-store.md`](docs/refactors/01-race-room-live-store.md) |
+
+### 1.1 — Race room live-state store + delta progress broadcasts
+
+**Before:** every progress tick read-modify-wrote the *entire* race room (all participants + the
+full passage text) as JSON in Redis and rebroadcast that whole object to every subscriber —
+O(N²) payload fan-out, write amplification, and a non-atomic GET/SET that could lose updates.
+
+**After:** live rooms are held in an in-memory `RaceRoomStore` (Caffeine, idle-expiring) and Redis
+is written only on lifecycle transitions (create / join / start / racing / finish / disconnect).
+Room mutations are guarded by a per-room monitor so concurrent updates can't be lost, and progress
+ticks now emit a fixed-size `RaceProgressDTO` on a dedicated `/topic/room/{code}/progress` topic
+that the client merges into its last full snapshot.
+
+**Impact:** removes two Redis round-trips plus full-room serialization per tick per participant,
+fixes the concurrent lost-update bug, and drops the per-tick payload from O(participants) to a
+constant-size delta.
+
 ## Limitations
 
 - Guest results live in localStorage only. Clearing site data removes them permanently.

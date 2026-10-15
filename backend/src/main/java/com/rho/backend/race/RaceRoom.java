@@ -9,8 +9,8 @@ import lombok.Setter;
 
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Setter
 @Getter
@@ -34,7 +34,9 @@ public class RaceRoom implements Serializable {
     private int durationSeconds;          // race duration in seconds, set when the room reaches FINISHED
 
     public RaceRoom() {
-        this.participants = new ArrayList<>();
+        // CopyOnWriteArrayList keeps broadcasts safe when a join mutates the list
+        // while another thread serializes the room for the message broker.
+        this.participants = new CopyOnWriteArrayList<>();
         this.finishCount = 0;
     }
 

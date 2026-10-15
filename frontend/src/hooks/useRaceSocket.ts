@@ -102,6 +102,22 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           setRoom(raceRoom);
         });
 
+        // High-frequency progress deltas are broadcast separately from full room state
+        // so the server only sends the changed participant fields per tick.
+        client.subscribe(`/topic/room/${roomCode}/progress`, (message) => {
+          const delta: { userId: number; progressPercent: number; currentWpm: number; errors: number } =
+            JSON.parse(message.body);
+          setRoom((prev) => {
+            if (!prev) return prev;
+            const participants = prev.participants.map((p) =>
+              p.userId === delta.userId
+                ? { ...p, progressPercent: delta.progressPercent, currentWpm: delta.currentWpm, errors: delta.errors }
+                : p
+            );
+            return { ...prev, participants };
+          });
+        });
+
         if (!hasJoinedRef.current) {
           hasJoinedRef.current = true;
           client.publish({
