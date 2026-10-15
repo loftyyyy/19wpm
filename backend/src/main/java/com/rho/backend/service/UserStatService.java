@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 @Service
 public class UserStatService {
@@ -45,22 +44,10 @@ public class UserStatService {
 
     @Transactional
     public void updateUserStats(long userId, BigDecimal newWpm){
-        UserStat userStat = userStatRepository.findByUser_UserId(userId).orElseThrow(() -> new ResourceNotFoundException("User Statistics not found"));
-        int oldCount = userStat.getTextCompleted();
-        int newCount = oldCount + 1;
-
-        userStat.setLastSpeed(newWpm);
-
-        if(newWpm.compareTo(userStat.getBestSpeed()) > 0){
-            userStat.setBestSpeed(newWpm);
+        int updatedRows = userStatRepository.applyResult(userId, newWpm);
+        if (updatedRows == 0) {
+            throw new ResourceNotFoundException("User Statistics not found");
         }
-
-        BigDecimal totalWpm = userStat.getAverageSpeed().multiply(BigDecimal.valueOf(oldCount)).add(newWpm);
-
-        userStat.setAverageSpeed(totalWpm.divide(BigDecimal.valueOf(newCount), 2, RoundingMode.HALF_UP));
-        userStat.setTextCompleted(newCount);
-
-        userStatRepository.save(userStat);
     }
 
 

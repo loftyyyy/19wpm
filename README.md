@@ -71,6 +71,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
 | 4.1 | Random word/text selection done in the database | Push selection down to the database (set-based random sampling) | [`docs/refactors/05-word-text-random-selection.md`](docs/refactors/05-word-text-random-selection.md) |
+| 4.2 | User-stats update is a single atomic SQL statement | Atomic state transition (single-statement read-modify-write) | [`docs/refactors/06-user-stat-atomic-update.md`](docs/refactors/06-user-stat-atomic-update.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -143,6 +144,18 @@ now `size() < count` against the small result set.
 
 **Impact:** transfer and heap usage are bounded by `count` instead of the bucket size on a hot
 endpoint.
+
+### 4.2 — Atomic user-stats update
+
+**Before:** `updateUserStats` loaded the `user_stats` row, recomputed the running average / best /
+count in Java, and saved it back — a read-modify-write that loses updates when two results arrive
+concurrently.
+
+**After:** a single `@Modifying UPDATE user_stats SET ... text_completed = text_completed + 1 ...`
+computes everything against the row's current values in one row-locked statement, consistent with
+the atomic streak update. `updatedRows == 0` preserves the "not found" behaviour.
+
+**Impact:** concurrent result submissions no longer clobber each other's count/average.
 
 ## Limitations
 
