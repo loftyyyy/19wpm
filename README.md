@@ -69,6 +69,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 1.1 | Race room live-state store + delta progress broadcasts | In-memory live state with write-through persistence; delta (event) broadcast | [`docs/refactors/01-race-room-live-store.md`](docs/refactors/01-race-room-live-store.md) |
 | 1.2 | Race countdown uses a shared scheduler instead of a raw thread per start | Managed task scheduling (`TaskScheduler`) | [`docs/refactors/04-race-countdown-scheduler.md`](docs/refactors/04-race-countdown-scheduler.md) |
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
+| 2.3 | Indexes for `words`/`texts` content lookups | Index the query predicates (access-path-aligned indexes) | [`docs/refactors/07-db-indexes.md`](docs/refactors/07-db-indexes.md) |
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
 | 4.1 | Random word/text selection done in the database | Push selection down to the database (set-based random sampling) | [`docs/refactors/05-word-text-random-selection.md`](docs/refactors/05-word-text-random-selection.md) |
 | 4.2 | User-stats update is a single atomic SQL statement | Atomic state transition (single-statement read-modify-write) | [`docs/refactors/06-user-stat-atomic-update.md`](docs/refactors/06-user-stat-atomic-update.md) |
@@ -115,6 +116,18 @@ were deleted.
 
 **Impact:** 3 → 1 signature verifications and 2 → 1 DB queries per authenticated request; the
 STOMP handshake gains expiry validation it previously lacked.
+
+### 2.3 — Indexes for content lookups
+
+**Before:** the schema indexed only `texts(is_custom)` and `texts(created_by)`, so the
+language/difficulty and language/type content-selection queries sequential-scanned `words` (~13k
+seeded rows) and `texts`.
+
+**After:** `V10__add_lookup_indexes.sql` adds `words(language, difficulty)`,
+`texts(language, type)` and `texts(type)` — leading-column composites that also cover the
+language-only filter.
+
+**Impact:** content lookups use an index instead of a full table scan.
 
 ### 3.1 — SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool
 
