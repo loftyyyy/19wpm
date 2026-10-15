@@ -2,12 +2,10 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import type { TestResult } from '../../types';
 
-const ITEMS_PER_PAGE = 10;
-
 export default function RecentHistory() {
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const { getResults } = useAuth();
+  const [loadingMore, setLoadingMore] = useState(false);
+  const { getResults, hasMoreResults, loadMoreResults } = useAuth();
   const results = useMemo(() => getResults?.() ?? [], [getResults]);
 
   const filtered = useMemo(() => {
@@ -21,8 +19,14 @@ export default function RecentHistory() {
     );
   }, [results, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-  const paginated = filtered.slice(0, page * ITEMS_PER_PAGE);
+  async function handleLoadMore() {
+    setLoadingMore(true);
+    try {
+      await loadMoreResults?.();
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   function formatDate(dateStr: string) {
     const d = new Date(dateStr);
@@ -53,14 +57,14 @@ function formatDuration(seconds: number) {
             <input
               type="text"
               value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              onChange={e => setSearch(e.target.value)}
               placeholder="Search passages..."
               className="pl-9 pr-4 py-2 bg-muted border border-line rounded-xl text-sm font-sans text-text-main placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-accent/30 w-56 transition-theme"
             />
           </div>
         </div>
 
-        {paginated.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="py-12 text-center text-text-dim font-sans text-sm transition-theme">
             {search ? 'No results match your search.' : 'No test history yet. Complete a test to see it here.'}
           </div>
@@ -80,7 +84,7 @@ function formatDuration(seconds: number) {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginated.map((r: TestResult) => (
+                  {filtered.map((r: TestResult) => (
                     <tr key={r.id} className="border-b border-line hover:bg-muted transition-colors">
                       <td className="py-4 text-sm font-sans text-text-main">
                         <div className="font-medium">
@@ -104,17 +108,17 @@ function formatDuration(seconds: number) {
               </table>
             </div>
 
-            {totalPages > 1 && (
+            {hasMoreResults && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-line">
                 <span className="text-xs text-text-dim font-sans">
-                  Showing {paginated.length} of {filtered.length}
+                  Showing {filtered.length} result{filtered.length === 1 ? '' : 's'}
                 </span>
                 <button
-                  onClick={() => setPage(p => Math.min(p + 1, totalPages))}
-                  disabled={page >= totalPages}
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
                   className="px-4 py-2 text-sm font-sans font-semibold text-accent hover:bg-muted rounded-xl disabled:opacity-30 transition-colors hover:cursor-pointer"
                 >
-                  Load More
+                  {loadingMore ? 'Loading...' : 'Load More'}
                 </button>
               </div>
             )}

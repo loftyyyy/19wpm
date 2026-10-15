@@ -72,6 +72,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
 | 2.3 | Indexes for `words`/`texts` content lookups | Index the query predicates (access-path-aligned indexes) | [`docs/refactors/07-db-indexes.md`](docs/refactors/07-db-indexes.md) |
 | 2.4 | Typing-result history is paginated in the database | Offset pagination with a stable page envelope | [`docs/refactors/09-typing-result-pagination.md`](docs/refactors/09-typing-result-pagination.md) |
+| 2.5 | Frontend consumes the paginated history | "Load more" accumulation over the page envelope | [`docs/refactors/10-typing-result-pagination-frontend.md`](docs/refactors/10-typing-result-pagination-frontend.md) |
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
 | 4.1 | Random word/text selection done in the database | Push selection down to the database (set-based random sampling) | [`docs/refactors/05-word-text-random-selection.md`](docs/refactors/05-word-text-random-selection.md) |
 | 4.2 | User-stats update is a single atomic SQL statement | Atomic state transition (single-statement read-modify-write) | [`docs/refactors/06-user-stat-atomic-update.md`](docs/refactors/06-user-stat-atomic-update.md) |
@@ -160,6 +161,18 @@ stable `PageResponseDTO` envelope; the word count uses one shared compiled patte
 **Impact:** transfer and mapping are bounded by the page size instead of the whole history; deep
 history is served via the existing `typing_results(user_id, created_at)` index. (The frontend
 consumer is updated in 2.5.)
+
+### 2.5 — Frontend consumes the paginated history
+
+**Before:** `apiGetResults()` expected the whole history as one array; `RecentHistory` faked paging
+with a local `page` counter and `slice()`.
+
+**After:** the API type is `ApiPage<T>`; `AuthContext` loads the first page, tracks `hasMoreResults`
+and **appends** pages via `loadMoreResults()`; `RecentHistory` shows a server-driven "Load More" and
+no longer slices locally.
+
+**Impact:** the client no longer holds/maps the entire history up front; paging matches the backend
+envelope. Note: history search now filters the *loaded* pages (full-history search is a follow-up).
 
 ### 3.1 — SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool
 

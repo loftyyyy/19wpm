@@ -1,5 +1,5 @@
 import type { TestResult } from '../types';
-import type { ApiTypingResultRequest, ApiTypingResultResponse } from '../types/api';
+import type { ApiTypingResultRequest, ApiTypingResultResponse, ApiPage } from '../types/api';
 import { api, ApiError } from './api';
 
 const GUEST_RESULTS_KEY = '19wpm-guest-results';
@@ -128,13 +128,15 @@ export async function apiSaveResult(result: ApiTypingResultRequest): Promise<{ d
   }
 }
 
-export async function apiGetResults(): Promise<{ data: ApiTypingResultResponse[] | null; error: string | null }> {
+export const RESULTS_PAGE_SIZE = 20;
+
+export async function apiGetResults(page = 0, size = RESULTS_PAGE_SIZE): Promise<{ data: ApiPage<ApiTypingResultResponse> | null; error: string | null }> {
   try {
-    const data = await api.get<ApiTypingResultResponse[]>('/result');
+    const data = await api.get<ApiPage<ApiTypingResultResponse>>(`/result?page=${page}&size=${size}`);
     return { data, error: null };
   } catch (err: unknown) {
     if (err instanceof Error && (err as { status?: number }).status === 404) {
-      return { data: [], error: null };
+      return { data: { content: [], page: 0, size, totalElements: 0, totalPages: 0, last: true }, error: null };
     }
     const msg = err instanceof Error ? err.message : 'Failed to fetch results';
     return { data: null, error: msg };

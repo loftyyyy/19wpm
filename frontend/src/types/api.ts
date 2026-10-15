@@ -113,6 +113,15 @@ export interface ApiTypingResultResponse {
   streak: number | null;
 }
 
+export interface ApiPage<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+}
+
 export interface ApiUserStatResponse {
   userStatId: number;
   user: ApiUserMinimal;

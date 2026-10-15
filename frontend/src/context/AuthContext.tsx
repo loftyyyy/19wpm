@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import type { User, TestResult, TestMode, ContentType } from '../types';
 import type { ApiAuthResponse, ApiAuthRequest, ApiRegisterRequest, ApiUserProfile } from '../types/api';
 import { loginUser, registerUser, logoutUser as serviceLogout, getSessionUser, updateUserProfile, mapProfileToUser, mapMinimalUserToUser, getBrowserTimezone } from '../services/auth';
-import { saveGuestResult, getGuestResults, clearGuestResults, clearAllResults, migrateGuestResults, apiGetResults, apiSaveResult } from '../services/results';
+import { saveGuestResult, getGuestResults, clearGuestResults, clearAllResults, migrateGuestResults, apiGetResults, apiSaveResult, RESULTS_PAGE_SIZE } from '../services/results';
 import { api, setTokens, clearTokens, getAccessToken, setOnUnauthorizedHandler, clearOnUnauthorizedHandler, ApiError, attemptTokenRefresh } from '../services/api';
 
 function mapApiResultToTestResult(r: { typingResultId: number; textId: number; finishedAt: string; durationMs: number; wpm: number; accuracy: number; createdAt: string; textTitle?: string; textContent?: string; mode: 'TEXT' | 'WORDS'; wordCount: number }): TestResult {
@@ -43,6 +43,8 @@ interface AuthContextValue {
   updateUser: (updates: Partial<User>) => void;
   addResult: (result: TestResult) => void;
   getResults: () => TestResult[];
+  hasMoreResults: boolean;
+  loadMoreResults: () => Promise<void>;
   setupFromOAuth: (u: User) => Promise<void>;
 }
 
@@ -52,6 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(getSessionUser);
   const [isLoading, setIsLoading] = useState(!!getAccessToken());
   const [serverResults, setServerResults] = useState<TestResult[]>([]);
+  const [resultsPage, setResultsPage] = useState(0);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -68,11 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       serviceLogout();
       setUser(null);
       setServerResults([]);
+      setResultsPage(0);
+      setHasMoreResults(false);
       window.location.href = '/login';
     });
     return () => clearOnUnauthorizedHandler();
   }, []);
-
   // On mount, validate the stored token against the server.
   // Uses raw fetch to bypass the global 401 interceptor (which would redirect).
   useEffect(() => {
@@ -106,6 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           serviceLogout();
           setUser(null);
           setServerResults([]);
+          setResultsPage(0);
+          setHasMoreResults(false);
         }
       } catch {
         // Network error — keep existing in-memory state for offline use
@@ -117,13 +124,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validateToken();
   }, []);
 
-  // Fetch results from the API when authenticated (on mount and after login/register)
+  // Fetch the first page of results from the API when authenticated (on mount and after login/register)
   const fetchResults = useCallback(async () => {
     if (!getAccessToken()) return;
-    const { data } = await apiGetResults();
+    const { data } = await apiGetResults(0, RESULTS_PAGE_SIZE);
     if (!data) return;
-    setServerResults(data.map(mapApiResultToTestResult));
+    setServerResults(data.content.map(mapApiResultToTestResult));
+    setResultsPage(data.page);
+    setHasMoreResults(!data.last);
   }, []);
+
+  // Append the next page of results (driven by the history "Load More" action)
+  const loadMoreResults = useCallback(async () => {
+    if (!getAccessToken() || !hasMoreResults) return;
+    const { data } = await apiGetResults(resultsPage + 1, RESULTS_PAGE_SIZE);
+    if (!data) return;
+    setServerResults(prev => [...prev, ...data.content.map(mapApiResultToTestResult)]);
+    setResultsPage(data.page);
+    setHasMoreResults(!data.last);
+  }, [resultsPage, hasMoreResults]);
 
   useEffect(() => {
     if (getAccessToken()) {
@@ -208,6 +227,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAllResults();
     setUser(null);
     setServerResults([]);
+    setResultsPage(0);
+    setHasMoreResults(false);
   }, []);
 
   const updateUser = useCallback((updates: Partial<User>) => {
@@ -274,6 +295,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUser,
       addResult,
       getResults,
+      hasMoreResults,
+      loadMoreResults,
       setupFromOAuth,
     }}>
       {children}
