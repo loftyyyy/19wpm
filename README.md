@@ -68,6 +68,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 |---|---|---|---|
 | 1.1 | Race room live-state store + delta progress broadcasts | In-memory live state with write-through persistence; delta (event) broadcast | [`docs/refactors/01-race-room-live-store.md`](docs/refactors/01-race-room-live-store.md) |
 | 1.2 | Race countdown uses a shared scheduler instead of a raw thread per start | Managed task scheduling (`TaskScheduler`) | [`docs/refactors/04-race-countdown-scheduler.md`](docs/refactors/04-race-countdown-scheduler.md) |
+| 1.4 | Static text catalogue served from a Caffeine cache | Cache-aside for read-mostly data (Spring Cache + Caffeine) | [`docs/refactors/08-text-catalogue-cache.md`](docs/refactors/08-text-catalogue-cache.md) |
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
 | 2.3 | Indexes for `words`/`texts` content lookups | Index the query predicates (access-path-aligned indexes) | [`docs/refactors/07-db-indexes.md`](docs/refactors/07-db-indexes.md) |
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
@@ -101,6 +102,22 @@ the pool is bounded and named, and it is shut down with the application context.
 
 **Impact:** no thread-per-race creation; concurrent countdowns are absorbed by a managed pool and
 no threads leak across redeploys.
+
+### 1.4 — Static text catalogue cached with Caffeine
+
+**Before:** Caffeine was on the classpath but Spring's cache abstraction was never enabled, so every
+hit to the text catalogue (`/preset-texts`, `/short`, `/medium`, `/long`, `/thicc`) re-queried the
+whole table and rebuilt the DTO list — even though the catalogue is seeded at deploy time and
+effectively static.
+
+**After:** `@EnableCaching` with a Caffeine `CacheManager` (bounded at 1k entries, 30-minute
+write-expiry). The five catalogue reads are `@Cacheable` under one `textCatalogue` region (distinct
+keys); the three text write paths (`saveText`, `saveCustomText`, `modifyText`) `@CacheEvict` the
+region so newly created/edited texts appear immediately. Random-selection paths are intentionally
+not cached.
+
+**Impact:** catalogue reads are served from memory with no query and no DTO rebuild; writes stay
+correct via eviction.
 
 ### 2.1 — JWT parsed once; redundant auth DB/Redis work removed
 

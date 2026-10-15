@@ -1,5 +1,6 @@
 package com.rho.backend.service;
 
+import com.rho.backend.config.CacheConfig;
 import com.rho.backend.dto.text.request.TextRequestDTO;
 import com.rho.backend.dto.text.request.TextUpdateRequestDTO;
 import com.rho.backend.dto.text.response.TextResponseDTO;
@@ -14,6 +15,8 @@ import com.rho.backend.repository.TextRepository;
 import com.rho.backend.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.apache.coyote.Response;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +35,7 @@ public class TextService {
         this.userRepository = userRepository;
     }
 
+    @CacheEvict(cacheNames = CacheConfig.TEXT_CATALOGUE, allEntries = true)
     public TextResponseDTO saveText(TextRequestDTO textRequestDTO, Long id){
         User user = userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -68,6 +72,7 @@ public class TextService {
         return new TextResponseDTO(textRepository.save(text));
     }
 
+    @CacheEvict(cacheNames = CacheConfig.TEXT_CATALOGUE, allEntries = true)
     public TextResponseDTO saveCustomText(TextRequestDTO textRequestDTO, Long id){
         if(textRequestDTO.content() == null || textRequestDTO.content().isBlank()){
             throw new InvalidResourceException("Content cannot be empty");
@@ -98,6 +103,7 @@ public class TextService {
         return new TextResponseDTO(textRepository.save(text));
     }
 
+    @CacheEvict(cacheNames = CacheConfig.TEXT_CATALOGUE, allEntries = true)
     public TextResponseDTO modifyText(TextUpdateRequestDTO textUpdateRequestDTO, Long id, Long textId){
         Text text = textRepository.findById(textId).orElseThrow(() -> new ResourceNotFoundException("Text not found"));
 
@@ -182,6 +188,7 @@ public class TextService {
         return new TextResponseDTO(text);
     }
 
+    @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'preset'")
     public List<TextResponseDTO> getPresetTexts(){
         List<Text> texts = textRepository.findByIsCustomFalse();
         return texts.stream().map(TextResponseDTO::new).toList();
@@ -220,21 +227,25 @@ public class TextService {
         return new TextResponseDTO(results.get(0));
     }
 
+    @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'short'")
     public List<TextResponseDTO> getShortTexts(){
         List<Text> smallTexts = textRepository.findByType(TextType.SHORT);
         return smallTexts.stream().map(TextResponseDTO::new).toList();
     }
 
+    @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'medium'")
     public List<TextResponseDTO> getMediumTexts(){
         List<Text> mediumTexts = textRepository.findByType(TextType.MEDIUM);
         return mediumTexts.stream().map(TextResponseDTO::new).toList();
     }
 
+    @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'long'")
     public List<TextResponseDTO> getLongTexts(){
         List<Text> longTexts = textRepository.findByType(TextType.LONG);
         return longTexts.stream().map(TextResponseDTO::new).toList();
     }
 
+    @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'thicc'")
     public List<TextResponseDTO> getThiccTexts(){
         List<Text> thiccTexts = textRepository.findByType(TextType.THICC);
         return thiccTexts.stream().map(TextResponseDTO::new).toList();
