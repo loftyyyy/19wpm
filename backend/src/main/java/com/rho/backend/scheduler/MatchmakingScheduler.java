@@ -15,7 +15,12 @@ public class MatchmakingScheduler {
         this.matchmakingService = matchmakingService;
     }
 
-    @Scheduled(fixedRate = 2000)
+    /**
+     * Safety net only. Matching now happens immediately when a player joins the queue
+     * (see {@code MatchmakingService.joinQueue}); this periodic sweep just catches any
+     * players that were left unmatched. Hence the low frequency.
+     */
+    @Scheduled(fixedRate = 10000)
     public void poll() {
         matchmakingService.pollQueues();
     }

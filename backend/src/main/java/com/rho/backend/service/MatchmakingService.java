@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class MatchmakingService {
@@ -18,6 +19,9 @@ public class MatchmakingService {
 
     private final RaceService raceService;
     private final SimpMessagingTemplate simpMessagingTemplate;
+
+    /** Serializes matching so concurrent callbacks cannot pop the same player into two rooms. */
+    private final ReentrantLock matchLock = new ReentrantLock();
 
     public MatchmakingService(RedisTemplate<String, String> redisTemplate, RaceService raceService, SimpMessagingTemplate simpMessagingTemplate){
         this.redisTemplate = redisTemplate;
@@ -36,6 +40,9 @@ public class MatchmakingService {
 
         redisTemplate.opsForList().leftPush(queueKey, userId.toString());
         redisTemplate.opsForValue().set(playerKey, textType.name(), Duration.ofSeconds(60));
+
+        // Event-driven: try to pair this player immediately instead of waiting for the poll.
+        matchQueue(textType);
     }
 
     public void leaveQueue(Long userId){
@@ -54,11 +61,24 @@ public class MatchmakingService {
 
     public void pollQueues(){
         for(TextType textType : TextType.values()){
+            matchQueue(textType);
+        }
+    }
+
+    /**
+     * Attempts to form a room from the head of a queue. Invoked immediately when a player
+     * joins the queue (event-driven) and periodically by {@link com.rho.backend.scheduler.MatchmakingScheduler}
+     * as a safety net. Serialized by {@link #matchLock} so overlapping callbacks cannot pop the
+     * same player into two rooms (single-instance assumption).
+     */
+    private void matchQueue(TextType textType){
+        matchLock.lock();
+        try {
             String queueKey = queueKey(textType);
             Long queueSize = redisTemplate.opsForList().size(queueKey);
 
             if(queueSize == null || queueSize < 2){
-                continue;
+                return;
             }
 
             List<Long> matchedPlayers = new ArrayList<>();
@@ -76,7 +96,7 @@ public class MatchmakingService {
                 for (Long userId : matchedPlayers) {
                     redisTemplate.opsForList().rightPush(queueKey, userId.toString());
                 }
-                continue;
+                return;
             }
 
             String roomCode = raceService.createRoom(null, textType, false);
@@ -91,6 +111,8 @@ public class MatchmakingService {
                         Duration.ofMinutes(2)
                 );
             }
+        } finally {
+            matchLock.unlock();
         }
     }
 

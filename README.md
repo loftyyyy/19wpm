@@ -68,6 +68,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 |---|---|---|---|
 | 1.1 | Race room live-state store + delta progress broadcasts | In-memory live state with write-through persistence; delta (event) broadcast | [`docs/refactors/01-race-room-live-store.md`](docs/refactors/01-race-room-live-store.md) |
 | 1.2 | Race countdown uses a shared scheduler instead of a raw thread per start | Managed task scheduling (`TaskScheduler`) | [`docs/refactors/04-race-countdown-scheduler.md`](docs/refactors/04-race-countdown-scheduler.md) |
+| 1.3 | Matchmaking pairs players on join instead of on the 2s poll | Event-driven matching with a serialized match routine + safety-net poll | [`docs/refactors/11-matchmaking-event-driven.md`](docs/refactors/11-matchmaking-event-driven.md) |
 | 1.4 | Static text catalogue served from a Caffeine cache | Cache-aside for read-mostly data (Spring Cache + Caffeine) | [`docs/refactors/08-text-catalogue-cache.md`](docs/refactors/08-text-catalogue-cache.md) |
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
 | 2.3 | Indexes for `words`/`texts` content lookups | Index the query predicates (access-path-aligned indexes) | [`docs/refactors/07-db-indexes.md`](docs/refactors/07-db-indexes.md) |
@@ -120,6 +121,20 @@ not cached.
 
 **Impact:** catalogue reads are served from memory with no query and no DTO rebuild; writes stay
 correct via eviction.
+
+### 1.3 — Event-driven matchmaking on join
+
+**Before:** pairing was polled. `MatchmakingScheduler` ran `pollQueues()` every 2 s, which swept all
+five queues with an `LLEN` each — even when nobody was queued — and players waited up to 2 s to be
+paired after their opponent joined.
+
+**After:** `joinQueue` enqueues the player and immediately calls the (extracted) `matchQueue(textType)`,
+so a pair forms as soon as the second player arrives. `matchQueue` is guarded by a `ReentrantLock` so
+overlapping callbacks (concurrent joins + the poll) can't pop the same player into two rooms; the
+scheduler now runs only as a **low-frequency safety net** (`fixedRate = 10000`).
+
+**Impact:** match latency drops from up to 2 s to near-immediate; idle queue sweeps fall from every
+2 s to every 10 s.
 
 ### 2.1 — JWT parsed once; redundant auth DB/Redis work removed
 
