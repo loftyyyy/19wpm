@@ -68,6 +68,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 |---|---|---|---|
 | 1.1 | Race room live-state store + delta progress broadcasts | In-memory live state with write-through persistence; delta (event) broadcast | [`docs/refactors/01-race-room-live-store.md`](docs/refactors/01-race-room-live-store.md) |
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
+| 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -99,6 +100,23 @@ were deleted.
 
 **Impact:** 3 → 1 signature verifications and 2 → 1 DB queries per authenticated request; the
 STOMP handshake gains expiry validation it previously lacked.
+
+### 3.1 — SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool
+
+**Before:** the configuration shipped `show-sql=true` (every statement logged on the hot path) and
+left `spring.jpa.open-in-view` at the Spring Boot default of `true`, so a database connection was
+held open for the whole HTTP request — controller execution plus JSON serialization. HikariCP was
+left with implicit, undocumented defaults.
+
+**After:** `show-sql=false` (dev-only logging moved to `application-dev.properties`),
+`open-in-view=false` so the Hibernate session/connection is scoped to the transaction, and explicit
+HikariCP sizing (`DB_POOL_MAX`/`DB_POOL_MIN`-overridable). The single OSIV-dependent read path
+(`UserStatService.getStat`, which dereferenced the lazy `UserStat.user`) is now
+`@Transactional(readOnly = true)`, as is `TypingResultService.getResultsByUser`. These settings live
+in the committed profile files (`application-prod.properties` / `application-dev.properties`).
+
+**Impact:** no SQL logging on the request path outside dev, DB connections returned to the pool at
+transaction end instead of end-of-request, and a bounded, tunable connection pool.
 
 ## Limitations
 

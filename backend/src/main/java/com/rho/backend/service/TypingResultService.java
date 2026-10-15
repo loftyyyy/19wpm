@@ -71,6 +71,7 @@ public class TypingResultService {
         return new TypingResultResponseDTO(typingResult, streak);
     }
 
+    @Transactional(readOnly = true)
     public List<TypingResultResponseDTO> getResultsByUser(long userId){
         return typingResultRepository.findByUserWithUser(userId)
                 .stream()

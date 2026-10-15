@@ -6,8 +6,8 @@ import com.rho.backend.model.User;
 import com.rho.backend.model.UserStat;
 import com.rho.backend.repository.UserRepository;
 import com.rho.backend.repository.UserStatRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,6 +36,7 @@ public class UserStatService {
         userStatRepository.save(userStat);
     }
 
+    @Transactional(readOnly = true)
     public UserStatResponseDTO getStat(long userId){
         UserStat userStat = userStatRepository.findByUser_UserId(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return new UserStatResponseDTO(userStat);
