@@ -14,9 +14,11 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
+import java.time.Instant;
 import java.util.Map;
 
 @Controller
@@ -26,10 +28,12 @@ public class RaceStompController {
 
     private final RaceService raceService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final TaskScheduler taskScheduler;
 
-    public RaceStompController(RaceService raceService, SimpMessagingTemplate messagingTemplate){
+    public RaceStompController(RaceService raceService, SimpMessagingTemplate messagingTemplate, TaskScheduler taskScheduler){
         this.raceService = raceService;
         this.messagingTemplate = messagingTemplate;
+        this.taskScheduler = taskScheduler;
     }
 
     @MessageMapping("/room/{code}/join")
@@ -52,17 +56,22 @@ public class RaceStompController {
         RaceRoom raceRoom = raceService.startRoom(code, userId);
         messagingTemplate.convertAndSend("/topic/room/" + code, raceRoom);
 
-        new Thread(() -> {
-            try {
-                Thread.sleep(RaceService.COUNTDOWN_DURATION_MS);
-                RaceRoom racing = raceService.transitionToRacing(code);
-                logger.info("Room {} transitioned to RACING at {}", code, racing.getStartTime());
-                messagingTemplate.convertAndSend("/topic/room/" + code, racing);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }).start();
+        // Schedule the countdown -> RACING transition on the shared, managed thread pool
+        // instead of spawning a raw Thread per race (which was unbounded and unmanaged).
+        taskScheduler.schedule(
+                () -> transitionToRacing(code),
+                Instant.now().plusMillis(RaceService.COUNTDOWN_DURATION_MS));
 
+    }
+
+    private void transitionToRacing(String code) {
+        try {
+            RaceRoom racing = raceService.transitionToRacing(code);
+            logger.info("Room {} transitioned to RACING at {}", code, racing.getStartTime());
+            messagingTemplate.convertAndSend("/topic/room/" + code, racing);
+        } catch (Exception e) {
+            logger.warn("Could not transition room {} to RACING: {}", code, e.getMessage());
+        }
     }
 
     @MessageMapping("/room/{code}/progress")

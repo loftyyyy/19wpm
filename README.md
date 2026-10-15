@@ -67,6 +67,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | # | Change | Architecture pattern | Details |
 |---|---|---|---|
 | 1.1 | Race room live-state store + delta progress broadcasts | In-memory live state with write-through persistence; delta (event) broadcast | [`docs/refactors/01-race-room-live-store.md`](docs/refactors/01-race-room-live-store.md) |
+| 1.2 | Race countdown uses a shared scheduler instead of a raw thread per start | Managed task scheduling (`TaskScheduler`) | [`docs/refactors/04-race-countdown-scheduler.md`](docs/refactors/04-race-countdown-scheduler.md) |
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
 
@@ -85,6 +86,18 @@ that the client merges into its last full snapshot.
 **Impact:** removes two Redis round-trips plus full-room serialization per tick per participant,
 fixes the concurrent lost-update bug, and drops the per-tick payload from O(participants) to a
 constant-size delta.
+
+### 1.2 — Race countdown on a shared scheduler
+
+**Before:** each race start spawned a raw `new Thread(...)` that slept for the countdown (~3.5s)
+before flipping the room to `RACING` — one unmanaged OS thread per race, parked in `sleep`.
+
+**After:** the delayed transition is scheduled on the container-managed `TaskScheduler`
+(`taskScheduler.schedule(..., Instant.now().plusMillis(COUNTDOWN_DURATION_MS))`); no thread sleeps,
+the pool is bounded and named, and it is shut down with the application context.
+
+**Impact:** no thread-per-race creation; concurrent countdowns are absorbed by a managed pool and
+no threads leak across redeploys.
 
 ### 2.1 — JWT parsed once; redundant auth DB/Redis work removed
 
