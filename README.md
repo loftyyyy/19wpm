@@ -71,6 +71,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 1.4 | Static text catalogue served from a Caffeine cache | Cache-aside for read-mostly data (Spring Cache + Caffeine) | [`docs/refactors/08-text-catalogue-cache.md`](docs/refactors/08-text-catalogue-cache.md) |
 | 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
 | 2.3 | Indexes for `words`/`texts` content lookups | Index the query predicates (access-path-aligned indexes) | [`docs/refactors/07-db-indexes.md`](docs/refactors/07-db-indexes.md) |
+| 2.4 | Typing-result history is paginated in the database | Offset pagination with a stable page envelope | [`docs/refactors/09-typing-result-pagination.md`](docs/refactors/09-typing-result-pagination.md) |
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
 | 4.1 | Random word/text selection done in the database | Push selection down to the database (set-based random sampling) | [`docs/refactors/05-word-text-random-selection.md`](docs/refactors/05-word-text-random-selection.md) |
 | 4.2 | User-stats update is a single atomic SQL statement | Atomic state transition (single-statement read-modify-write) | [`docs/refactors/06-user-stat-atomic-update.md`](docs/refactors/06-user-stat-atomic-update.md) |
@@ -145,6 +146,20 @@ seeded rows) and `texts`.
 language-only filter.
 
 **Impact:** content lookups use an index instead of a full table scan.
+
+### 2.4 — Typing-result history paginated in the database
+
+**Before:** `GET /api/v1/result` returned **every** result the user had ever recorded as an unbounded
+`List`, mapping the full history to DTOs per request (each row recompiling a `\\s+` regex for its
+word count), with the sort hard-coded in the query.
+
+**After:** the query is `Page<TypingResult> findByUserWithUser(userId, Pageable)` (a `COUNT` query
+plus `LIMIT/OFFSET`), the endpoint takes `page`/`size` (default 20, `createdAt DESC`) and returns a
+stable `PageResponseDTO` envelope; the word count uses one shared compiled pattern.
+
+**Impact:** transfer and mapping are bounded by the page size instead of the whole history; deep
+history is served via the existing `typing_results(user_id, created_at)` index. (The frontend
+consumer is updated in 2.5.)
 
 ### 3.1 — SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool
 

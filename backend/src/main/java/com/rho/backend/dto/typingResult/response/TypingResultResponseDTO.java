@@ -5,6 +5,7 @@ import com.rho.backend.model.TypingResult;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.regex.Pattern;
 
 public record TypingResultResponseDTO(
         long typingResultId,
@@ -23,6 +24,15 @@ public record TypingResultResponseDTO(
         int wordCount,
         Integer streak
 ) {
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
+    private static int wordCount(String content) {
+        if (content == null || content.isBlank()) {
+            return 0;
+        }
+        return WHITESPACE.split(content.trim()).length;
+    }
+
     public TypingResultResponseDTO(TypingResult typingResult){
         this(
                 typingResult.getTypingResultId(),
@@ -38,7 +48,7 @@ public record TypingResultResponseDTO(
                 typingResult.getTextTitle(),
                 typingResult.getTextContent(),
                 typingResult.getMode(),
-                typingResult.getTextContent() != null ? typingResult.getTextContent().split("\\s+").length : 0,
+                wordCount(typingResult.getTextContent()),
                 null
         );
     }
@@ -58,7 +68,7 @@ public record TypingResultResponseDTO(
                 typingResult.getTextTitle(),
                 typingResult.getTextContent(),
                 typingResult.getMode(),
-                typingResult.getTextContent() != null ? typingResult.getTextContent().split("\\s+").length : 0,
+                wordCount(typingResult.getTextContent()),
                 streak
         );
     }

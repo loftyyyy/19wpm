@@ -1,5 +1,6 @@
 package com.rho.backend.service;
 
+import com.rho.backend.dto.common.PageResponseDTO;
 import com.rho.backend.dto.typingResult.request.TypingResultRequestDTO;
 import com.rho.backend.dto.typingResult.response.TypingResultResponseDTO;
 import com.rho.backend.enums.Mode;
@@ -11,10 +12,9 @@ import com.rho.backend.model.User;
 import com.rho.backend.repository.TextRepository;
 import com.rho.backend.repository.TypingResultRepository;
 import com.rho.backend.repository.UserRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class TypingResultService {
@@ -72,11 +72,10 @@ public class TypingResultService {
     }
 
     @Transactional(readOnly = true)
-    public List<TypingResultResponseDTO> getResultsByUser(long userId){
-        return typingResultRepository.findByUserWithUser(userId)
-                .stream()
-                .map(TypingResultResponseDTO::new)
-                .toList();
+    public PageResponseDTO<TypingResultResponseDTO> getResultsByUser(long userId, Pageable pageable){
+        return PageResponseDTO.of(
+                typingResultRepository.findByUserWithUser(userId, pageable),
+                TypingResultResponseDTO::new);
     }
 
 }
