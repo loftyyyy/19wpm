@@ -8,7 +8,6 @@ import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import io.jsonwebtoken.Jwts;
 
@@ -60,18 +59,17 @@ public class JwtService {
         return builder.compact();
     }
 
-    public boolean isAccessTokenValid(String token, UserDetails userDetails){
-        try{
-            Claims claims = extractAllClaims(token);
-            return subjectMatches(claims, userDetails.getUsername()) && isNotExpired(claims) && isNotBeforeValid(claims) && TYPE_ACCESS.equals(claims.get(CLAIM_TOKEN_TYPE, String.class));
-
-        }catch(JwtException | IllegalArgumentException e){
-            logger.warn("Access token validation failed: {}", e.getMessage());
-            return false;
-
-        }
-
-
+    /**
+     * Validates an <b>already-parsed</b> access token. Lets callers verify the signature
+     * exactly once via {@link #extractAllClaims(String)} and then reuse the claims, instead
+     * of re-parsing (and re-verifying the signature) for every check.
+     */
+    public boolean isAccessClaimsValid(Claims claims) {
+        return claims != null
+                && claims.getSubject() != null
+                && isNotExpired(claims)
+                && isNotBeforeValid(claims)
+                && TYPE_ACCESS.equals(claims.get(CLAIM_TOKEN_TYPE, String.class));
     }
 
     public boolean isRefreshTokenValid(String token, String expectedEmail){
@@ -95,27 +93,6 @@ public class JwtService {
     public String extractSubject(String token){
         return extractAllClaims(token).getSubject();
     }
-
-    public boolean isAccessToken(String token){
-        try{
-            return TYPE_ACCESS.equals(extractAllClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
-
-        }catch (JwtException e){
-            return false;
-        }
-
-    }
-
-    public boolean isRefreshToken(String token){
-        try{
-            return TYPE_REFRESH.equals(extractAllClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
-
-        }catch (JwtException e){
-            return false;
-        }
-
-    }
-
 
     /**
      *Internal Helpers

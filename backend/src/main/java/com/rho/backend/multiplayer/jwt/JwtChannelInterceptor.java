@@ -2,6 +2,8 @@ package com.rho.backend.multiplayer.jwt;
 
 import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.service.JwtService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,13 +42,27 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
 
             logger.info("STOMP CONNECT - token present: {}", token != null);
 
-            if (token == null || !jwtService.isAccessToken(token)) {
-                logger.warn("STOMP CONNECT - rejected: invalid token");
+            if (token == null) {
+                logger.warn("STOMP CONNECT - rejected: missing token");
+                throw new MessagingException("Invalid or missing token");
+            }
+
+            // Parse + verify the signature once, then reuse the claims.
+            final Claims claims;
+            try {
+                claims = jwtService.extractAllClaims(token);
+            } catch (JwtException | IllegalArgumentException e) {
+                logger.warn("STOMP CONNECT - rejected: unparseable token");
+                throw new MessagingException("Invalid or missing token");
+            }
+
+            if (!jwtService.isAccessClaimsValid(claims)) {
+                logger.warn("STOMP CONNECT - rejected: not a valid access token");
                 throw new MessagingException("Invalid or missing token");
             }
 
             try {
-                String email = jwtService.extractSubject(token);
+                String email = claims.getSubject();
                 var userDetails = userDetailsService.loadUserByUsername(email);
                 if (userDetails instanceof CustomUserDetails customUser) {
                     Long userId = customUser.getUserId();

@@ -2,8 +2,9 @@ package com.rho.backend.filter;
 
 
 import com.rho.backend.redis.RedisTokenStore;
-import com.rho.backend.repository.UserRepository;
 import com.rho.backend.service.JwtService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +17,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -31,7 +33,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
     private final RedisTokenStore redisTokenStore;
-    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -56,45 +57,43 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 2. Reject refresh tokens submitted to regular API endpoints
-        if (jwtService.isRefreshToken(jwt)) {
-            logger.warn("Refresh token submitted to non-refresh endpoint — rejected.");
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // 3. Extract subject (parses + verifies signature)
-        final String userEmail;
+        // 2. Parse + verify the signature ONCE and reuse the claims for every check below.
+        final Claims claims;
         try {
-            userEmail = jwtService.extractSubject(jwt);
-        } catch (Exception e) {
-            logger.warn("Could not extract subject from JWT: {}", e.getMessage());
+            claims = jwtService.extractAllClaims(jwt);
+        } catch (JwtException | IllegalArgumentException e) {
+            logger.warn("Invalid JWT: {}", e.getMessage());
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 4. Verify the user still exists in the database
-        if (userEmail != null && !userRepository.existsByEmail(userEmail)) {
-            logger.warn("JWT presented for deleted user: {}", userEmail);
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User account not found");
+        // 3. Reject refresh tokens, expired tokens, or any non-ACCESS token
+        if (!jwtService.isAccessClaimsValid(claims)) {
+            logger.warn("JWT is not a valid access token — rejected.");
+            filterChain.doFilter(request, response);
             return;
         }
 
-        // 5. Authenticate if not already done for this request
-        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+        final String userEmail = claims.getSubject();
 
-            if (jwtService.isAccessTokenValid(jwt, userDetails)) {
-                var authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            } else {
-                logger.warn("JWT validation failed for user: {}", userEmail);
+        // 4. Authenticate if not already done for this request
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            final UserDetails userDetails;
+            try {
+                userDetails = userDetailsService.loadUserByUsername(userEmail);
+            } catch (UsernameNotFoundException e) {
+                logger.warn("JWT presented for unknown/deleted user: {}", userEmail);
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User account not found");
+                return;
             }
+
+            var authToken = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
+                    userDetails.getAuthorities()
+            );
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
         }
 
         filterChain.doFilter(request, response);

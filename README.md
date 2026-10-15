@@ -67,6 +67,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | # | Change | Architecture pattern | Details |
 |---|---|---|---|
 | 1.1 | Race room live-state store + delta progress broadcasts | In-memory live state with write-through persistence; delta (event) broadcast | [`docs/refactors/01-race-room-live-store.md`](docs/refactors/01-race-room-live-store.md) |
+| 2.1 | JWT parsed once; redundant auth DB/Redis work removed | Single-pass token validation (parse-once, reuse claims) | [`docs/refactors/02-jwt-single-parse.md`](docs/refactors/02-jwt-single-parse.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -83,6 +84,21 @@ that the client merges into its last full snapshot.
 **Impact:** removes two Redis round-trips plus full-room serialization per tick per participant,
 fixes the concurrent lost-update bug, and drops the per-tick payload from O(participants) to a
 constant-size delta.
+
+### 2.1 — JWT parsed once; redundant auth DB/Redis work removed
+
+**Before:** every authenticated request verified the JWT signature **three times**
+(`isRefreshToken` → `extractSubject` → `isAccessTokenValid`) and hit the database **twice**
+(`existsByEmail` then `loadUserByUsername`), because `JwtService` only exposed
+string-in/boolean-out helpers that each re-parsed the token.
+
+**After:** the filter parses/verifies the token once and reuses the `Claims`
+(`isAccessClaimsValid(Claims)`), and loads the user once instead of an existence check plus a load.
+The STOMP `CONNECT` interceptor does the same and now also enforces expiry. Re-parsing helpers
+were deleted.
+
+**Impact:** 3 → 1 signature verifications and 2 → 1 DB queries per authenticated request; the
+STOMP handshake gains expiry validation it previously lacked.
 
 ## Limitations
 
