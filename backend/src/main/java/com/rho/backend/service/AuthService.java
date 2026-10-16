@@ -111,12 +111,12 @@ public class AuthService {
     // ── Refresh (with rotation) ───────────────────────────────────────────────
 
     /**
-     * Validates the refresh token against Redis (not just the JWT signature),
-     * then rotates it: issues a new access + refresh token pair, revokes the old
-     * refresh token.
+     * Validates the refresh token, then rotates it: the old token is consumed
+     * atomically (Redis GETDEL, so it can be redeemed at most once) and a fresh
+     * access + refresh pair is issued.
      *
-     * If an attacker uses a stolen refresh token first, the legitimate user's
-     * next refresh attempt will fail — their old token has been rotated away.
+     * If an attacker uses a stolen refresh token, the legitimate user's next
+     * refresh finds the token already gone and every session is revoked.
      */
     public AuthResponseDTO refresh(String refreshToken) {
         // 1. Verify JWT structure and signature
@@ -135,21 +135,21 @@ public class AuthService {
         User user = userRepository.findByEmailWithRole(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
-        // 3. Verify token exists in Redis — rejects revoked tokens even if JWT is valid
-        if (!redisTokenStore.isRefreshTokenValid(user.getUserId(), refreshToken)) {
+        // 3. Atomically consume the old refresh token (GETDEL). Only the caller holding a
+        //    live token wins; a concurrent request — or a replay of a stolen token — sees it
+        //    already gone and is treated as theft.
+        if (!redisTokenStore.consumeRefreshToken(user.getUserId(), refreshToken)) {
             // Token was already used or explicitly revoked — possible theft
             logger.warn("Refresh token not found in store for userId={} ({}). Possible token theft — revoking all.", user.getUserId(), user.getEmail());
             redisTokenStore.revokeAllRefreshTokens(user.getUserId());
             throw new IllegalArgumentException("Refresh token is invalid or has already been used.");
         }
 
-        // 4. Generate new token pair
+        // 4. Generate and store the new token pair (the old one is already consumed)
         String newAccessToken   = jwtService.generateAccessToken(user);
         String newRefreshToken  = jwtService.generateRefreshToken(user);
         Date   newRefreshExpiry = jwtService.extractExpiration(newRefreshToken);
-
-        // 5. Rotate: delete old, store new — atomically from the client's perspective
-        redisTokenStore.rotateRefreshToken(user.getUserId(), refreshToken, newRefreshToken, newRefreshExpiry);
+        redisTokenStore.storeRefreshToken(user.getUserId(), newRefreshToken, newRefreshExpiry);
 
         logger.info("Token pair rotated for userId={}", user.getUserId());
         return buildAuthResponse(newAccessToken, newRefreshToken, user);

@@ -239,6 +239,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | # | Change | Architecture pattern | Details |
 |---|---|---|---|
 | CR-1.2 | OAuth tokens no longer travel in the redirect query string | Out-of-band handoff via a short-lived, single-use exchange code | [`docs/refactors/12-oauth-token-query-string.md`](docs/refactors/12-oauth-token-query-string.md) |
+| CR-1.3 | Refresh-token rotation is atomic (single-use via GETDEL) | Atomic check-and-consume (single-use token) | [`docs/refactors/13-refresh-token-atomic-rotation.md`](docs/refactors/13-refresh-token-atomic-rotation.md) |
 
 ### CR-1.2 — OAuth tokens off the redirect URL
 
@@ -253,6 +254,19 @@ existing `issueTokenPair` path mints the pair in the response body.
 
 **Impact:** tokens never appear in a URL; a leaked redirect exposes at most a one-shot code that
 expires in a minute. OAuth now shares the same token-minting path as password login/register.
+
+### CR-1.3 — Atomic refresh-token rotation
+
+**Before:** `AuthService.refresh` verified the refresh token (`EXISTS`) and then rotated it
+(`DEL` + `SET`) in separate Redis calls, leaving a check-then-act window in which the same token
+could be redeemed twice and the revoke-on-reuse theft detection could silently miss.
+
+**After:** `RedisTokenStore.consumeRefreshToken` performs a single atomic `GETDEL` — only one caller
+can win; every other caller is treated as theft and has all sessions revoked. The new pair is then
+stored. The now-redundant `isRefreshTokenValid`/`rotateRefreshToken` methods are removed.
+
+**Impact:** a refresh token is redeemable exactly once under concurrency, theft detection is
+reliable, and each refresh costs one fewer Redis round-trip.
 
 ## Limitations
 

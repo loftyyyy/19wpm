@@ -25,9 +25,9 @@ import java.util.Optional;
  *
  * Refresh token store:
  *   On login/register, the refresh token is written here with its full TTL.
- *   On refresh, we verify the token exists here before issuing a new access token.
+ *   On refresh, the old token is consumed atomically (GETDEL) and the new one is
+ *   written, so a given token can be redeemed exactly once even under concurrency.
  *   On logout, we delete it — making it immediately unusable regardless of expiry.
- *   On rotation, old token is deleted and new token is written atomically.
  *
  * OAuth exchange codes:
  *   The OAuth success handler never puts tokens in the redirect URL. It mints a
@@ -81,13 +81,6 @@ public class RedisTokenStore {
     }
 
     /**
-     * Returns true if this refresh token was issued by us and hasn't been revoked.
-     */
-    public boolean isRefreshTokenValid(Long userId, String token) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(RedisKeys.refreshToken(userId, token)));
-    }
-
-    /**
      * Revokes a specific refresh token (single-device logout).
      */
     public void revokeRefreshToken(Long userId, String token) {
@@ -96,19 +89,18 @@ public class RedisTokenStore {
     }
 
     /**
-     * Rotates a refresh token atomically:
-     *   1. Deletes the old token
-     *   2. Stores the new token with its TTL
-     *
-     * If an attacker steals a refresh token and uses it first, the legitimate
-     * user's next request will fail because the old token is gone — detecting
-     * the theft immediately.
+     * Atomically consumes a refresh token (GETDEL), returning true only for the
+     * caller that actually won the race. Any other holder of the same token — a
+     * concurrent refresh request or an attacker replaying a stolen token — gets
+     * false, which the caller treats as theft.
      */
-    public void rotateRefreshToken(Long userId, String oldToken,
-                                   String newToken, Date newExpiresAt) {
-        redisTemplate.delete(RedisKeys.refreshToken(userId, oldToken));
-        storeRefreshToken(userId, newToken, newExpiresAt);
-        logger.info("Refresh token rotated for userId={}", userId);
+    public boolean consumeRefreshToken(Long userId, String token) {
+        boolean consumed = redisTemplate.opsForValue()
+                .getAndDelete(RedisKeys.refreshToken(userId, token)) != null;
+        if (consumed) {
+            logger.debug("Refresh token consumed for userId={}", userId);
+        }
+        return consumed;
     }
 
     /**
