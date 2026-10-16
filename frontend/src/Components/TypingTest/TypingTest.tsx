@@ -2,6 +2,7 @@
 import { animate } from 'animejs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
+import TypedWord from './TypedWord';
 import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
@@ -9,6 +10,7 @@ import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseL
 
 const wordCounts: WordCount[] = [10, 25, 50, 100];
 const PREFERENCES_KEY = 'typing_preferences';
+const NO_EXTRA_CHARS: string[] = [];
 
 function loadPreferences() {
   try {
@@ -45,7 +47,13 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
   const caretAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
   const isFirstPositionRef = useRef(true);
   const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
-  const useRightEdgeRef = useRef(false);
+
+  const setCurrentCharRef = useCallback((el: HTMLSpanElement | null) => {
+    currentCharRef.current = el;
+  }, []);
+  const setLastCharRef = useCallback((el: HTMLSpanElement | null) => {
+    lastCharRef.current = el;
+  }, []);
 
   const saved = useMemo(loadPreferences, []);
 
@@ -137,7 +145,6 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleRestart = useCallback(() => {
     isFirstPositionRef.current = true;
-    useRightEdgeRef.current = false;
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
@@ -161,7 +168,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       isFirstPositionRef.current = true;
-      useRightEdgeRef.current = false;
       reset();
       navigatedRef.current = false;
       containerRef.current?.focus();
@@ -202,7 +208,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       contentRef.current.style.marginTop = '0px';
     }
     isFirstPositionRef.current = true;
-    useRightEdgeRef.current = false;
   }, [passage]);
 
   useLayoutEffect(() => {
@@ -259,7 +264,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       let targetEl: HTMLSpanElement | null = null;
       let useRightEdge = false;
 
-      const shouldUseRightEdge = isAtEnd || useRightEdgeRef.current;
+      const shouldUseRightEdge = isAtEnd || passage?.text[state.currentIndex] === ' ';
 
       if (shouldUseRightEdge && (lastCharRef.current || currentCharRef.current)) {
         targetEl = currentCharRef.current ?? lastCharRef.current;
@@ -326,6 +331,17 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
   const timerDisplay = state.timeLeft >= 60
     ? `${Math.floor(state.timeLeft / 60)}:${String(Math.floor(state.timeLeft % 60)).padStart(2, '0')}`
     : `${Math.floor(state.timeLeft)}`;
+
+  const passageText = passage?.text ?? '';
+  const passageLength = passageText.length;
+  const isAtEnd = state.currentIndex >= passageLength;
+  const currentCharIsSpace = passageText[state.currentIndex] === ' ';
+  const activeGlobalIdx = isAtEnd
+    ? -1
+    : currentCharIsSpace
+      ? state.currentIndex - 1
+      : state.currentIndex;
+  const lastGlobalIdx = passageLength - 1;
 
   return (
     <div className="min-h-screen bg-surface transition-theme flex flex-col">
@@ -424,74 +440,30 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
                     }}
                     className={isTypingActive ? '' : 'animate-blink'}
                   />
-{passageWords.map((word, wi) => {
-                  const { chars } = word;
-                  const nonSpaceChars = chars.filter(c => c.char !== ' ');
-                  const wordEnd = nonSpaceChars.length > 0
-                    ? nonSpaceChars[nonSpaceChars.length - 1].globalIdx
-                    : chars[chars.length - 1].globalIdx;
-                  const isPastWord = state.lockedIndex > wordEnd;
-                  const hasError = state.mistakeWordIndices.has(wi);
-                  const wordErrorClass = isPastWord && hasError
-                    ? 'underline decoration-error decoration-2'
-                    : '';
-                  return (
-                  <span key={wi} ref={el => { wordRefs.current[wi] = el; }} className={`flex ${wordErrorClass}`}>
-                    {chars.map(({ char, globalIdx }) => {
-                      const typed = state.typedChars[globalIdx];
-                      const passageLength = passage?.text.length ?? 0;
-                      const isAtEnd = state.currentIndex >= passageLength;
-                      const isLastChar = globalIdx === passageLength - 1;
-
-                      // Check if currentIndex points to a space after this char
-                      const passageText = passage?.text ?? '';
-                      const currentIndexOnSpace =
-                        passageText[state.currentIndex] === ' ' &&
-                        globalIdx === state.currentIndex - 1;
-
-                      const isCurrent = !isAtEnd && (
-                        globalIdx === state.currentIndex ||
-                        currentIndexOnSpace
-                      );
-
-                      // Tell cursor positioning to use right edge when
-                      // currentIndex is on a space (end of word)
-                      if (currentIndexOnSpace) {
-                        useRightEdgeRef.current = true;
-                      } else if (globalIdx === state.currentIndex) {
-                        useRightEdgeRef.current = false;
-                      }
-                      const isSkipped = typed === '';
-                      const isCorrect = typed !== undefined && typed !== '' && typed === char;
-                      const isIncorrect = typed !== undefined && (typed !== '' ? typed !== char : true);
-
-                      let cls = 'char-untyped';
-                      if (isCorrect) cls = 'char-correct';
-                      if (isIncorrect || isSkipped) cls = 'char-incorrect';
-
-                      // Skipped chars show original char in red (not the typed char)
-                      const displayChar = (isIncorrect && typed !== undefined && typed !== '')
-                        ? typed
-                        : char;
-                      return (
-                        <span
-                          key={globalIdx}
-                          ref={el => {
-                            if (isCurrent) currentCharRef.current = el;
-                            if (isLastChar) lastCharRef.current = el;
-                          }}
-                          className={cls}
-                        >
-                          {displayChar}
-                        </span>
-                      );
-                    })}
-                    {wi === currentWordIndex && state.extraChars.map((ch, i) => (
-                      <span key={`ex-${i}`} className="char-incorrect">{ch}</span>
-                    ))}
-</span>
-                );
-              })}
+                  {passageWords.map((word, wi) => {
+                    const { chars } = word;
+                    const start = chars[0].globalIdx;
+                    const end = start + chars.length;
+                    const showExtra = wi === currentWordIndex;
+                    return (
+                      <TypedWord
+                        key={wi}
+                        chars={chars}
+                        start={start}
+                        end={end}
+                        typedChars={state.typedChars}
+                        isPastWord={state.lockedIndex >= end}
+                        hasError={state.mistakeWordIndices.has(wi)}
+                        showExtra={showExtra}
+                        activeGlobalIdx={activeGlobalIdx}
+                        lastGlobalIdx={lastGlobalIdx}
+                        extraChars={showExtra ? state.extraChars : NO_EXTRA_CHARS}
+                        onWordRef={el => { wordRefs.current[wi] = el; }}
+                        onCurrentCharRef={setCurrentCharRef}
+                        onLastCharRef={setLastCharRef}
+                      />
+                    );
+                  })}
               </div>
             </div>
           )}

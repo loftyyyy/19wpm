@@ -238,10 +238,26 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 
 | # | Change | Architecture pattern | Details |
 |---|---|---|---|
+| CR-1.1 | Only the current word re-renders per keystroke | Memoized leaf component with a custom comparator | [`docs/refactors/16-memoized-typed-word-rendering.md`](docs/refactors/16-memoized-typed-word-rendering.md) |
 | CR-1.2 | OAuth tokens no longer travel in the redirect query string | Out-of-band handoff via a short-lived, single-use exchange code | [`docs/refactors/12-oauth-token-query-string.md`](docs/refactors/12-oauth-token-query-string.md) |
 | CR-1.3 | Refresh-token rotation is atomic (single-use via GETDEL) | Atomic check-and-consume (single-use token) | [`docs/refactors/13-refresh-token-atomic-rotation.md`](docs/refactors/13-refresh-token-atomic-rotation.md) |
 | CR-1.4 | Content writes require auth; user-scoped reads no longer 500 | Deny-by-default allowlist + method guards | [`docs/refactors/14-content-endpoint-authorization.md`](docs/refactors/14-content-endpoint-authorization.md) |
 | CR-1.5 | Client errors return 400/401/403 instead of 500 | Explicit exception→status mapping + guarded catch-all | [`docs/refactors/15-exception-handler-status-mapping.md`](docs/refactors/15-exception-handler-status-mapping.md) |
+
+### CR-1.1 — Only the current word re-renders per keystroke
+
+**Before:** `TypingTest.tsx` and `Race.tsx` inlined the whole passage render, so every keypress
+rebuilt **every word and every character** — O(n) over the passage — even though only the current
+word can change. The loop also recomputed `passageLength`/`passageText` per character and called
+`chars.filter(...)` per word, and mutated a ref (`useRightEdgeRef`) during render.
+
+**After:** a shared memoized `TypedWord` renders one word with precomputed props, and a custom
+`areEqual` comparator only inspects that word's slice of `typedChars`, so untouched words bail out.
+The per-render invariants are hoisted above the loop, `NO_EXTRA_CHARS` keeps the `extraChars` prop
+reference stable, and the render-time ref mutation is replaced by a value derived where it is used.
+
+**Impact:** per-keystroke render work drops from O(n) across the passage to O(word length), and ~200
+lines of duplicated render logic collapse into one component shared by both surfaces.
 
 ### CR-1.2 — OAuth tokens off the redirect URL
 

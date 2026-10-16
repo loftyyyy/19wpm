@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } fr
 import { animate } from 'animejs';
 import { useNavigate } from 'react-router-dom';
 import { useTypingEngine } from '../hooks/useTypingEngine';
+import TypedWord from '../Components/TypingTest/TypedWord';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
 import Lobby from '../Components/Race/Lobby';
@@ -15,6 +16,7 @@ import type { TextType } from '../types/race';
 import type { Passage, TestResult, WpmPoint } from '../types';
 
 const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
+const NO_EXTRA_CHARS: string[] = [];
 
 export default function Race() {
   const navigate = useNavigate();
@@ -454,11 +456,17 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
   const caretAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
   const isFirstPositionRef = useRef(true);
   const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
-  const useRightEdgeRef = useRef(false);
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
   const finishReportedRef = useRef(false);
   const onProgressRef = useRef(onProgress);
   const onFinishRef = useRef(onFinish);
+
+  const setCurrentCharRef = useCallback((el: HTMLSpanElement | null) => {
+    currentCharRef.current = el;
+  }, []);
+  const setLastCharRef = useCallback((el: HTMLSpanElement | null) => {
+    lastCharRef.current = el;
+  }, []);
 
   const passageObj = useMemo<Passage>(
     () => ({ title: '', text: passage, author: '', source: '' }),
@@ -560,7 +568,6 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       contentRef.current.style.marginTop = '0px';
     }
     isFirstPositionRef.current = true;
-    useRightEdgeRef.current = false;
   }, [passage]);
 
   useLayoutEffect(() => {
@@ -617,7 +624,7 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       let targetEl: HTMLSpanElement | null = null;
       let useRightEdge = false;
 
-      const shouldUseRightEdge = isAtEnd || useRightEdgeRef.current;
+      const shouldUseRightEdge = isAtEnd || passage[state.currentIndex] === ' ';
 
       if (shouldUseRightEdge && (lastCharRef.current || currentCharRef.current)) {
         targetEl = currentCharRef.current ?? lastCharRef.current;
@@ -682,6 +689,16 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
     handleKeyDown(e);
   }, [handleKeyDown]);
 
+  const passageLength = passage.length;
+  const isAtEnd = state.currentIndex >= passageLength;
+  const currentCharIsSpace = passage[state.currentIndex] === ' ';
+  const activeGlobalIdx = isAtEnd
+    ? -1
+    : currentCharIsSpace
+      ? state.currentIndex - 1
+      : state.currentIndex;
+  const lastGlobalIdx = passageLength - 1;
+
   return (
     <div
       ref={containerRef}
@@ -715,69 +732,27 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
           />
           {passageWords.map((word, wi) => {
             const { chars } = word;
-            const nonSpaceChars = chars.filter(c => c.char !== ' ');
-            const wordEnd = nonSpaceChars.length > 0
-              ? nonSpaceChars[nonSpaceChars.length - 1].globalIdx
-              : chars[chars.length - 1].globalIdx;
-            const isPastWord = state.lockedIndex > wordEnd;
-            const hasError = state.mistakeWordIndices.has(wi);
-            const wordErrorClass = isPastWord && hasError
-              ? 'underline decoration-error decoration-2'
-              : '';
+            const start = chars[0].globalIdx;
+            const end = start + chars.length;
+            const showExtra = wi === currentWordIndex;
             return (
-              <span
+              <TypedWord
                 key={wi}
-                ref={el => { wordRefs.current[wi] = el; }}
-                className={`flex ${wordErrorClass}`}
-              >
-                {chars.map(({ char, globalIdx }) => {
-                  const typed = state.typedChars[globalIdx];
-                  const isAtEnd = state.currentIndex >= passage.length;
-                  const isLastChar = globalIdx === passage.length - 1;
-                  const currentIndexOnSpace =
-                    passage[state.currentIndex] === ' ' &&
-                    globalIdx === state.currentIndex - 1;
-                  const isCurrent = !isAtEnd && (
-                    globalIdx === state.currentIndex ||
-                    currentIndexOnSpace
-                  );
-                  if (currentIndexOnSpace) {
-                    useRightEdgeRef.current = true;
-                  } else if (globalIdx === state.currentIndex) {
-                    useRightEdgeRef.current = false;
-                  }
-                  const isSkipped = typed === '';
-                  const isCorrect = typed !== undefined && typed !== '' && typed === char;
-                  const isIncorrect = typed !== undefined && (typed !== '' ? typed !== char : true);
-                  let cls = 'char-untyped';
-                  if (isCorrect) cls = 'char-correct';
-                  if (isIncorrect || isSkipped) cls = 'char-incorrect';
-                  const displayChar = (isIncorrect && typed !== undefined && typed !== '')
-                    ? typed
-                    : char;
-                  return (
-                    <span
-                      key={globalIdx}
-                      ref={el => {
-                        if (isCurrent) currentCharRef.current = el;
-                        if (isLastChar) lastCharRef.current = el;
-                      }}
-                      className={cls}
-                    >
-                      {displayChar}
-                    </span>
-                  );
-                })}
-                {wi === currentWordIndex && state.extraChars.map((ch, i) => (
-                  <span
-                    key={`ex-${i}`}
-                    className="char-incorrect"
-                    style={{ color: 'var(--error)', backgroundColor: 'var(--error)' }}
-                  >
-                    <span style={{ color: '#fff' }}>{ch}</span>
-                  </span>
-                ))}
-              </span>
+                chars={chars}
+                start={start}
+                end={end}
+                typedChars={state.typedChars}
+                isPastWord={state.lockedIndex >= end}
+                hasError={state.mistakeWordIndices.has(wi)}
+                showExtra={showExtra}
+                activeGlobalIdx={activeGlobalIdx}
+                lastGlobalIdx={lastGlobalIdx}
+                extraChars={showExtra ? state.extraChars : NO_EXTRA_CHARS}
+                extraVariant="block"
+                onWordRef={el => { wordRefs.current[wi] = el; }}
+                onCurrentCharRef={setCurrentCharRef}
+                onLastCharRef={setLastCharRef}
+              />
             );
           })}
         </div>
