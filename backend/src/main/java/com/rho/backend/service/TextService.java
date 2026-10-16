@@ -41,37 +41,15 @@ public class TextService {
             throw new UnauthorizedResourceException("You cannot perform this action");
         }
 
-        if(textRequestDTO.content() == null || textRequestDTO.content().isBlank()){
-            throw new InvalidResourceException("Content cannot be empty");
-        }
-        if(textRequestDTO.title() == null || textRequestDTO.title().isBlank()){
-            throw new InvalidResourceException("Title cannot be empty");
-        }
-        if(textRequestDTO.language() == null || textRequestDTO.language().isBlank()){
-            throw new InvalidResourceException("Language cannot be empty");
-        }
-
-        String content = textRequestDTO.content();
-        int wordCount = wordCountCalculator(content);
-
-        Text text = Text.builder()
-                .isCustom(false)
-                .createdBy(id)
-                .title(textRequestDTO.title())
-                .author(textRequestDTO.author())
-                .source(textRequestDTO.source())
-                .language(textRequestDTO.language())
-                .content(content)
-                .wordCount(wordCount)
-                .charLength(content.length())
-                .type(determineType(content.length()))
-                .build();
-
-        return new TextResponseDTO(textRepository.save(text));
+        return buildAndSaveText(textRequestDTO, id, false);
     }
 
     @CacheEvict(cacheNames = CacheConfig.TEXT_CATALOGUE, allEntries = true)
     public TextResponseDTO saveCustomText(TextRequestDTO textRequestDTO, Long id){
+        return buildAndSaveText(textRequestDTO, id, true);
+    }
+
+    private TextResponseDTO buildAndSaveText(TextRequestDTO textRequestDTO, Long id, boolean isCustom){
         if(textRequestDTO.content() == null || textRequestDTO.content().isBlank()){
             throw new InvalidResourceException("Content cannot be empty");
         }
@@ -86,7 +64,7 @@ public class TextService {
         int wordCount = wordCountCalculator(content);
 
         Text text = Text.builder()
-                .isCustom(true)
+                .isCustom(isCustom)
                 .createdBy(id)
                 .title(textRequestDTO.title())
                 .author(textRequestDTO.author())

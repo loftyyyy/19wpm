@@ -248,6 +248,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-3.1 | Durable rooms reference the passage by id instead of embedding it | Durable projection with `textId` + rehydrate on load | [`docs/refactors/18-race-room-persist-text-reference.md`](docs/refactors/18-race-room-persist-text-reference.md) |
 | CR-2.1 | Solo test and race share one typing viewport instead of two copies | Single presentational component + extracted hook | [`docs/refactors/20-shared-typing-viewport.md`](docs/refactors/20-shared-typing-viewport.md) |
 | CR-2.2 | Removed two unused, misleading imports from `TextService` | Dead-code removal | [`docs/refactors/21-textservice-dead-imports.md`](docs/refactors/21-textservice-dead-imports.md) |
+| CR-2.3 | Admin and custom text creation share one build path | Extract invariant + parameterize `isCustom` | [`docs/refactors/22-textservice-create-dedup.md`](docs/refactors/22-textservice-create-dedup.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -383,6 +384,18 @@ which was used; the latter was actively misleading because the class pages with 
 **After:** both imports are removed; `PageRequest` is the only paging type referenced.
 
 **Impact:** no behaviour change — the class no longer implies Tomcat/AWT dependencies it does not have.
+
+### CR-2.3 — Collapse duplicated text-create paths
+
+**Before:** `TextService.saveText` (admin) and `saveCustomText` (per-user) were identical apart from a
+single `isCustom` flag and an admin guard, so every validation rule and builder field was maintained
+twice and could drift.
+
+**After:** a private `buildAndSaveText(dto, id, isCustom)` holds the single copy; `saveText` keeps its
+admin guard and delegates with `false`, `saveCustomText` with `true`. Both retain their `@CacheEvict`.
+
+**Impact:** ~35 duplicated lines removed; the two create paths can no longer diverge, with cache
+eviction and behaviour unchanged.
 
 ## Limitations
 
