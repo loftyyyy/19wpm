@@ -57,8 +57,15 @@ public class SecurityFilterChainConfig {
                                 "/api/v1/auth/logout",
                                 "/api/v1/auth/oauth/exchange",
                                 "/ws/**",
-                                "/api/v1/texts/**",
-                                "/api/v1/words/**"
+                                "/api/v1/words",
+                                "/api/v1/texts",
+                                "/api/v1/texts/preset-texts",
+                                "/api/v1/texts/random",
+                                "/api/v1/texts/language",
+                                "/api/v1/texts/short",
+                                "/api/v1/texts/medium",
+                                "/api/v1/texts/long",
+                                "/api/v1/texts/thicc"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

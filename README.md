@@ -240,6 +240,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 |---|---|---|---|
 | CR-1.2 | OAuth tokens no longer travel in the redirect query string | Out-of-band handoff via a short-lived, single-use exchange code | [`docs/refactors/12-oauth-token-query-string.md`](docs/refactors/12-oauth-token-query-string.md) |
 | CR-1.3 | Refresh-token rotation is atomic (single-use via GETDEL) | Atomic check-and-consume (single-use token) | [`docs/refactors/13-refresh-token-atomic-rotation.md`](docs/refactors/13-refresh-token-atomic-rotation.md) |
+| CR-1.4 | Content writes require auth; user-scoped reads no longer 500 | Deny-by-default allowlist + method guards | [`docs/refactors/14-content-endpoint-authorization.md`](docs/refactors/14-content-endpoint-authorization.md) |
 
 ### CR-1.2 — OAuth tokens off the redirect URL
 
@@ -267,6 +268,20 @@ stored. The now-redundant `isRefreshTokenValid`/`rotateRefreshToken` methods are
 
 **Impact:** a refresh token is redeemable exactly once under concurrency, theft detection is
 reliable, and each refresh costs one fewer Redis round-trip.
+
+### CR-1.4 — Authorize user-scoped content endpoints
+
+**Before:** the filter chain permitted the whole `/api/v1/texts/**` subtree. That exposed
+`POST /api/v1/texts/custom-text` as an anonymous write path and let `GET /texts/{id}` /
+`GET /texts/user-texts` dereference a `null` principal (NPE → 500).
+
+**After:** `permitAll` is now an explicit allowlist of the read-only content paths (random words,
+random/preset texts, size buckets, language filter). The user-scoped handlers require authentication
+both at the filter (falling through to `anyRequest().authenticated()`) and via
+`@PreAuthorize("isAuthenticated()")`.
+
+**Impact:** anonymous content writes are blocked and principal-dependent reads return 401 instead of
+500; guest solo typing is unchanged because every endpoint it uses stays public.
 
 ## Limitations
 

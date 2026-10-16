@@ -25,6 +25,7 @@ public class TextController {
         this.textService = textService;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{textId}")
     public ResponseEntity<TextResponseDTO> getTextById(
             @PathVariable long textId,
@@ -48,6 +49,7 @@ public class TextController {
         return ResponseEntity.ok(textService.getPresetTexts());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/user-texts")
     public ResponseEntity<List<TextResponseDTO>> getUserTexts(
             @AuthenticationPrincipal CustomUserDetails customUserDetails){
@@ -97,6 +99,7 @@ public class TextController {
         return ResponseEntity.status(HttpStatus.CREATED).body(textService.saveText(textRequestDTO, customUserDetails.getUserId()));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/custom-text")
     public ResponseEntity<TextResponseDTO> createCustomText(
             @Valid @RequestBody TextRequestDTO textRequestDTO,
@@ -104,6 +107,7 @@ public class TextController {
         return ResponseEntity.status(HttpStatus.CREATED).body(textService.saveCustomText(textRequestDTO, customUserDetails.getUserId()));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{textId}")
     public ResponseEntity<TextResponseDTO> modifyText(
             @Valid @RequestBody TextUpdateRequestDTO textUpdateRequestDTO,
