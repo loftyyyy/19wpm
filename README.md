@@ -247,6 +247,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-3.2 | Live race-room store sits behind a seam; single-instance constraint documented | Port/adaptor seam (distributed store deferred) | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
 | CR-3.1 | Durable rooms reference the passage by id instead of embedding it | Durable projection with `textId` + rehydrate on load | [`docs/refactors/18-race-room-persist-text-reference.md`](docs/refactors/18-race-room-persist-text-reference.md) |
 | CR-2.1 | Solo test and race share one typing viewport instead of two copies | Single presentational component + extracted hook | [`docs/refactors/20-shared-typing-viewport.md`](docs/refactors/20-shared-typing-viewport.md) |
+| CR-2.2 | Removed two unused, misleading imports from `TextService` | Dead-code removal | [`docs/refactors/21-textservice-dead-imports.md`](docs/refactors/21-textservice-dead-imports.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -372,6 +373,16 @@ Each page keeps only its container, its Tab/Enter/Escape policy, and its engine 
 
 **Impact:** ~300 duplicated lines removed; caret/scroll fixes now apply to both views at once, with the
 solo test and race keeping their distinct extra-character variants and keyboard behaviour.
+
+### CR-2.2 — Remove dead imports from `TextService`
+
+**Before:** `TextService` imported `org.apache.coyote.Response` and `java.awt.print.Pageable`, neither of
+which was used; the latter was actively misleading because the class pages with Spring Data's
+`PageRequest`.
+
+**After:** both imports are removed; `PageRequest` is the only paging type referenced.
+
+**Impact:** no behaviour change — the class no longer implies Tomcat/AWT dependencies it does not have.
 
 ## Limitations
 
