@@ -26,15 +26,20 @@ export default function OAuth2Callback() {
 
     setTokens(accessToken, refreshToken);
 
-    apiGetSessionUser().then(async user => {
-      if (user) {
-        await setupFromOAuth(user);
-        navigate('/dashboard', { replace: true });
-      } else {
+    apiGetSessionUser()
+      .then(async user => {
+        if (user) {
+          await setupFromOAuth(user);
+          navigate('/dashboard', { replace: true });
+        } else {
+          clearTokens();
+          navigate('/login?oauth_error=Failed+to+load+user+profile.', { replace: true });
+        }
+      })
+      .catch(() => {
         clearTokens();
-        navigate('/login?oauth_error=Failed+to+load+user+profile.', { replace: true });
-      }
-    });
+        navigate('/login?oauth_error=Failed+to+complete+authentication.+Please+try+again.', { replace: true });
+      });
   }, []);
 
   return (
