@@ -1,8 +1,6 @@
 package com.rho.backend.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.race.PersistedRaceRoom;
 import com.rho.backend.race.RaceRoom;
@@ -23,10 +21,10 @@ public class RaceRoomRepository {
 
     private final ObjectMapper objectMapper;
 
-    public RaceRoomRepository(RedisTemplate<String, String> redisTemplate, TextRepository textRepository){
+    public RaceRoomRepository(RedisTemplate<String, String> redisTemplate, TextRepository textRepository, ObjectMapper objectMapper){
         this.redisTemplate = redisTemplate;
         this.textRepository = textRepository;
-        this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule()).disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        this.objectMapper = objectMapper;
     }
 
     public void save(RaceRoom room){
@@ -36,7 +34,7 @@ public class RaceRoomRepository {
             Duration ttl = room.isPrivate() ? PRIVATE_TTL : PUBLIC_TTL;
             redisTemplate.opsForValue().set(key,json,ttl);
         } catch (Exception e){
-            throw new RuntimeException("Failed to save RacRoom: " + room.getRoomCode() + ". Error: " + e.getMessage() );
+            throw new RuntimeException("Failed to save RaceRoom: " + room.getRoomCode(), e);
         }
     }
 
@@ -51,7 +49,7 @@ public class RaceRoomRepository {
                     : textRepository.findByTextId(persisted.textId()).map(TextResponseDTO::new).orElse(null);
             return Optional.of(persisted.toRoom(text));
         }catch (Exception e){
-            throw new RuntimeException("Failed to read code: " + roomCode + ". Error: " + e.getMessage());
+            throw new RuntimeException("Failed to read race room: " + roomCode, e);
         }
 
     }

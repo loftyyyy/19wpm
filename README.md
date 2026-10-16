@@ -250,6 +250,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-2.2 | Removed two unused, misleading imports from `TextService` | Dead-code removal | [`docs/refactors/21-textservice-dead-imports.md`](docs/refactors/21-textservice-dead-imports.md) |
 | CR-2.3 | Admin and custom text creation share one build path | Extract invariant + parameterize `isCustom` | [`docs/refactors/22-textservice-create-dedup.md`](docs/refactors/22-textservice-create-dedup.md) |
 | CR-2.4 | `logoutAll` failures keep their original cause | Exception chaining | [`docs/refactors/23-logoutall-preserve-cause.md`](docs/refactors/23-logoutall-preserve-cause.md) |
+| CR-2.5 | `RaceRoomRepository` injects the shared mapper and keeps failure causes | DI over ad-hoc construction + exception chaining | [`docs/refactors/24-raceroom-repository-mapper-cause.md`](docs/refactors/24-raceroom-repository-mapper-cause.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -407,6 +408,18 @@ no root condition in the stack trace.
 **After:** the original exception is chained as the cause; the client-facing message is unchanged.
 
 **Impact:** the real failure is preserved for logs and debugging; no API behaviour change.
+
+### CR-2.5 — Inject the mapper and keep the cause in `RaceRoomRepository`
+
+**Before:** the repository built a private `ObjectMapper` (duplicating the app's JSON config) and its
+catch-alls rethrew a `RuntimeException` with only `getMessage()` pasted into the text, losing the real
+cause.
+
+**After:** the Spring-managed `ObjectMapper` is injected, and both `save`/`findByCode` failures chain
+the original exception as the cause.
+
+**Impact:** JSON configuration lives in one place and infrastructure failures keep their stack traces;
+the happy path is unchanged.
 
 ## Limitations
 
