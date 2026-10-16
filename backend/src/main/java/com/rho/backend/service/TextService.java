@@ -20,7 +20,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class TextService {
@@ -189,18 +188,10 @@ public class TextService {
             throw new InvalidResourceException("Type cannot be null");
         }
 
-        Long maxId = textRepository.findMaxPresetIdByType(type)
+        Text text = textRepository.findRandomPresetByType(type.name())
                 .orElseThrow(() -> new ResourceNotFoundException("No texts found for type: " + type));
 
-        Long randId = ThreadLocalRandom.current().nextLong(1, maxId + 1);
-
-        List<Text> results = textRepository.findFirstPresetByIdGreaterThanEqualAndType(randId, type, PageRequest.of(0, 1));
-
-        if (results.isEmpty()) {
-            results = textRepository.findFirstPresetByIdGreaterThanEqualAndType(1L, type, PageRequest.of(0, 1));
-        }
-
-        return new TextResponseDTO(results.get(0));
+        return new TextResponseDTO(text);
     }
 
     @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'short'")
@@ -228,18 +219,10 @@ public class TextService {
     }
 
     public TextResponseDTO getRandomText() {
-        Long maxId = textRepository.findMaxPresetId()
+        Text text = textRepository.findRandomPreset()
                 .orElseThrow(() -> new ResourceNotFoundException("No preset texts found"));
 
-        Long randId = ThreadLocalRandom.current().nextLong(1, maxId + 1);
-
-        List<Text> results = textRepository.findFirstPresetByIdGreaterThanEqual(randId, PageRequest.of(0, 1));
-
-        if (results.isEmpty()) {
-            results = textRepository.findFirstPresetByIdGreaterThanEqual(1L, PageRequest.of(0, 1));
-        }
-
-        return new TextResponseDTO(results.get(0));
+        return new TextResponseDTO(text);
     }
 
     private TextType determineType(int charLength){

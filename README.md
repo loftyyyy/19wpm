@@ -251,6 +251,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-2.3 | Admin and custom text creation share one build path | Extract invariant + parameterize `isCustom` | [`docs/refactors/22-textservice-create-dedup.md`](docs/refactors/22-textservice-create-dedup.md) |
 | CR-2.4 | `logoutAll` failures keep their original cause | Exception chaining | [`docs/refactors/23-logoutall-preserve-cause.md`](docs/refactors/23-logoutall-preserve-cause.md) |
 | CR-2.5 | `RaceRoomRepository` injects the shared mapper and keeps failure causes | DI over ad-hoc construction + exception chaining | [`docs/refactors/24-raceroom-repository-mapper-cause.md`](docs/refactors/24-raceroom-repository-mapper-cause.md) |
+| CR-3.3 | Random preset text is sampled uniformly in one query | Push sampling into the datastore (`ORDER BY random()`) | [`docs/refactors/25-uniform-random-text-selection.md`](docs/refactors/25-uniform-random-text-selection.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -420,6 +421,18 @@ the original exception as the cause.
 
 **Impact:** JSON configuration lives in one place and infrastructure failures keep their stack traces;
 the happy path is unchanged.
+
+### CR-3.3 — Uniform random text selection without the id-probe double query
+
+**Before:** `getRandomTextByType` / `getRandomText` picked a random id in `[1, maxId]` and fetched the
+first row with `textId >= randId`, retrying from `1` on a miss. Selection was weighted by id *gaps*
+(not row count) and sometimes cost two queries.
+
+**After:** sampling is delegated to the database with `ORDER BY random() LIMIT 1` — the same pattern the
+catalogue already used for language+type. The four id-probe queries and the unused imports are gone.
+
+**Impact:** uniform selection in a single query; ~25 lines of probing logic and four dead repository
+methods removed.
 
 ## Limitations
 
