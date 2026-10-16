@@ -243,7 +243,7 @@ public class AuthService {
             redisTokenStore.revokeAllRefreshTokens(user.getUserId());
             logger.info("All sessions revoked for userId={}", user.getUserId());
         } catch (Exception e) {
-            throw new IllegalArgumentException("Could not process logout-all request.");
+            throw new IllegalArgumentException("Could not process logout-all request.", e);
         }
     }
 

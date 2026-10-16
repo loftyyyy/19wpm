@@ -249,6 +249,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-2.1 | Solo test and race share one typing viewport instead of two copies | Single presentational component + extracted hook | [`docs/refactors/20-shared-typing-viewport.md`](docs/refactors/20-shared-typing-viewport.md) |
 | CR-2.2 | Removed two unused, misleading imports from `TextService` | Dead-code removal | [`docs/refactors/21-textservice-dead-imports.md`](docs/refactors/21-textservice-dead-imports.md) |
 | CR-2.3 | Admin and custom text creation share one build path | Extract invariant + parameterize `isCustom` | [`docs/refactors/22-textservice-create-dedup.md`](docs/refactors/22-textservice-create-dedup.md) |
+| CR-2.4 | `logoutAll` failures keep their original cause | Exception chaining | [`docs/refactors/23-logoutall-preserve-cause.md`](docs/refactors/23-logoutall-preserve-cause.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -396,6 +397,16 @@ admin guard and delegates with `false`, `saveCustomText` with `true`. Both retai
 
 **Impact:** ~35 duplicated lines removed; the two create paths can no longer diverge, with cache
 eviction and behaviour unchanged.
+
+### CR-2.4 — Preserve the cause when `logoutAll` fails
+
+**Before:** `AuthService.logoutAll` caught every exception and rethrew a generic
+`IllegalArgumentException` without the cause, so a Redis/JWT/DB failure surfaced as an opaque error with
+no root condition in the stack trace.
+
+**After:** the original exception is chained as the cause; the client-facing message is unchanged.
+
+**Impact:** the real failure is preserved for logs and debugging; no API behaviour change.
 
 ## Limitations
 
