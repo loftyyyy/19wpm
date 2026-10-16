@@ -243,6 +243,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-1.3 | Refresh-token rotation is atomic (single-use via GETDEL) | Atomic check-and-consume (single-use token) | [`docs/refactors/13-refresh-token-atomic-rotation.md`](docs/refactors/13-refresh-token-atomic-rotation.md) |
 | CR-1.4 | Content writes require auth; user-scoped reads no longer 500 | Deny-by-default allowlist + method guards | [`docs/refactors/14-content-endpoint-authorization.md`](docs/refactors/14-content-endpoint-authorization.md) |
 | CR-1.5 | Client errors return 400/401/403 instead of 500 | Explicit exception→status mapping + guarded catch-all | [`docs/refactors/15-exception-handler-status-mapping.md`](docs/refactors/15-exception-handler-status-mapping.md) |
+| CR-1.6 | Auth hot path no longer reloads the user from the DB on every request | Short-TTL read-through cache (failures uncached) | [`docs/refactors/19-cached-user-details.md`](docs/refactors/19-cached-user-details.md) |
 | CR-3.2 | Live race-room store sits behind a seam; single-instance constraint documented | Port/adaptor seam (distributed store deferred) | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
 | CR-3.1 | Durable rooms reference the passage by id instead of embedding it | Durable projection with `textId` + rehydrate on load | [`docs/refactors/18-race-room-persist-text-reference.md`](docs/refactors/18-race-room-persist-text-reference.md) |
 
@@ -314,6 +315,21 @@ body — logged once with a stack trace — for anything genuinely unexpected.
 
 **Impact:** the API reports client errors accurately, the frontend can react to them, and 5xx
 alerting no longer fires on ordinary validation/authorization failures.
+
+### CR-1.6 — Cache resolved user details on the auth hot path
+
+**Before:** every authenticated request and every STOMP connect ran
+`userDetailsService.loadUserByUsername(...)` — a database query with a role `JOIN FETCH` — just to
+re-resolve an identity that changes only rarely.
+
+**After:** a new `UserDetailsCache` serves resolved `UserDetails` from a Caffeine cache (per email,
+60 s TTL, 10k entries). Only the two read-only consumers (the JWT filter and the STOMP channel
+interceptor) use it; the login flow still resolves a fresh, managed entity because it mutates the
+user's timezone on login. Unknown users are never cached, so `UsernameNotFoundException` still
+rejects deleted accounts on every request.
+
+**Impact:** one fewer DB query per authenticated request/connection; account and role changes
+propagate within 60 s.
 
 ### CR-3.2 — Live race-room store seam
 

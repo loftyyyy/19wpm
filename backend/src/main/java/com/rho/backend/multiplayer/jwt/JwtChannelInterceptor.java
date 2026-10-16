@@ -1,6 +1,7 @@
 package com.rho.backend.multiplayer.jwt;
 
 import com.rho.backend.config.CustomUserDetails;
+import com.rho.backend.config.UserDetailsCache;
 import com.rho.backend.service.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -14,7 +15,6 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -25,11 +25,11 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
     private static final Logger logger = LoggerFactory.getLogger(JwtChannelInterceptor.class);
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
+    private final UserDetailsCache userDetailsCache;
 
-    public JwtChannelInterceptor(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtChannelInterceptor(JwtService jwtService, UserDetailsCache userDetailsCache) {
         this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
+        this.userDetailsCache = userDetailsCache;
     }
 
     @Override
@@ -63,7 +63,7 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
 
             try {
                 String email = claims.getSubject();
-                var userDetails = userDetailsService.loadUserByUsername(email);
+                var userDetails = userDetailsCache.get(email);
                 if (userDetails instanceof CustomUserDetails customUser) {
                     Long userId = customUser.getUserId();
                     accessor.setUser(() -> userId.toString());

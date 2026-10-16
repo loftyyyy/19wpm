@@ -1,6 +1,7 @@
 package com.rho.backend.filter;
 
 
+import com.rho.backend.config.UserDetailsCache;
 import com.rho.backend.redis.RedisTokenStore;
 import com.rho.backend.service.JwtService;
 import io.jsonwebtoken.Claims;
@@ -16,7 +17,6 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -31,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
+    private final UserDetailsCache userDetailsCache;
     private final RedisTokenStore redisTokenStore;
 
     @Override
@@ -80,7 +80,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
             final UserDetails userDetails;
             try {
-                userDetails = userDetailsService.loadUserByUsername(userEmail);
+                userDetails = userDetailsCache.get(userEmail);
             } catch (UsernameNotFoundException e) {
                 logger.warn("JWT presented for unknown/deleted user: {}", userEmail);
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User account not found");
