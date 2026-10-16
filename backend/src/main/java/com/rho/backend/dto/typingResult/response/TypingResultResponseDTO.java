@@ -33,22 +33,22 @@ public record TypingResultResponseDTO(
         return WHITESPACE.split(content.trim()).length;
     }
 
-    public TypingResultResponseDTO(TypingResult typingResult){
+    public TypingResultResponseDTO(TypingResultProjection projection){
         this(
-                typingResult.getTypingResultId(),
-                typingResult.getUser().getUserId(),
-                typingResult.getUser().getUsername(),
-                typingResult.getTextId(),
-                typingResult.getFinishedAt(),
-                typingResult.getDurationMs(),
-                typingResult.getTimeConstraintMs(),
-                typingResult.getWpm(),
-                typingResult.getAccuracy(),
-                typingResult.getCreatedAt(),
-                typingResult.getTextTitle(),
-                typingResult.getTextContent(),
-                typingResult.getMode(),
-                wordCount(typingResult.getTextContent()),
+                projection.getTypingResultId(),
+                projection.getUserId(),
+                projection.getUsername(),
+                projection.getTextId(),
+                projection.getFinishedAt(),
+                projection.getDurationMs(),
+                projection.getTimeConstraintMs(),
+                projection.getWpm(),
+                projection.getAccuracy(),
+                projection.getCreatedAt(),
+                projection.getTextTitle(),
+                projection.getTextContent(),
+                projection.getMode(),
+                wordCount(projection.getTextContent()),
                 null
         );
     }

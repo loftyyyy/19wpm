@@ -252,6 +252,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-2.4 | `logoutAll` failures keep their original cause | Exception chaining | [`docs/refactors/23-logoutall-preserve-cause.md`](docs/refactors/23-logoutall-preserve-cause.md) |
 | CR-2.5 | `RaceRoomRepository` injects the shared mapper and keeps failure causes | DI over ad-hoc construction + exception chaining | [`docs/refactors/24-raceroom-repository-mapper-cause.md`](docs/refactors/24-raceroom-repository-mapper-cause.md) |
 | CR-3.3 | Random preset text is sampled uniformly in one query | Push sampling into the datastore (`ORDER BY random()`) | [`docs/refactors/25-uniform-random-text-selection.md`](docs/refactors/25-uniform-random-text-selection.md) |
+| CR-3.4 | Result history reads a projection instead of whole entities | Read-model projection | [`docs/refactors/26-typing-result-projection.md`](docs/refactors/26-typing-result-projection.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -433,6 +434,17 @@ catalogue already used for language+type. The four id-probe queries and the unus
 
 **Impact:** uniform selection in a single query; ~25 lines of probing logic and four dead repository
 methods removed.
+
+### CR-3.4 — Project the result history instead of fetching whole entities
+
+**Before:** the paginated history query fetched full `TypingResult` entities with `JOIN FETCH tr.user`,
+materializing a `User` entity and every column per row just to read `userId`/`username`.
+
+**After:** an interface projection (`TypingResultProjection`) selects only the result fields plus
+`userId`/`username`; the DTO maps from it and the unused entity constructor is removed.
+
+**Impact:** no `User` entity per row and a leaner SELECT; the page envelope (and JSON shape) is
+unchanged, so the frontend contract is untouched.
 
 ## Limitations
 
