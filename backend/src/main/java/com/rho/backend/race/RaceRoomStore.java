@@ -1,61 +1,36 @@
 package com.rho.backend.race;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.rho.backend.repository.RaceRoomRepository;
-import org.springframework.stereotype.Component;
-
-import java.time.Duration;
 import java.util.Optional;
 
 /**
- * In-memory, single-node store for live race rooms.
+ * Abstraction over the live race-room store: the authoritative home of in-flight room state.
  *
- * <p>Live room state is mutated in memory so that high-frequency progress updates never
- * round-trip the whole room through Redis. Redis is retained as a persistence layer and is
- * written on room lifecycle transitions only (create / join / start / racing / finish /
- * disconnect) via {@link #persist(RaceRoom)}.
+ * <p>Two distinct concerns are deliberately separated by this seam. Live room state is held by
+ * {@link #get(String)} / {@link #put(RaceRoom)} (fast, mutable, read on every progress tick),
+ * whereas {@link #persist(RaceRoom)} is the durable write-through to Redis that is only invoked on
+ * room lifecycle transitions (create / join / start / racing / finish / disconnect), never per
+ * progress tick.
  *
- * <p>Callers must guard multi-field mutations with {@code synchronized (room)} on the
- * instance returned by {@link #get(String)} so that concurrent updates cannot be lost.
+ * <p>The only implementation today, {@link InMemoryRaceRoomStore}, keeps that authoritative state
+ * in a single JVM. The application therefore assumes a <strong>single backend instance</strong>
+ * (or sticky routing of a room's participants to one instance). Swapping in a distributed
+ * implementation — shared state plus cross-instance broadcast — is the scale-out path; see
+ * {@code docs/refactors/17-race-room-store-seam.md}.
  */
-@Component
-public class RaceRoomStore {
+public interface RaceRoomStore {
 
-    private final Cache<String, RaceRoom> liveRooms;
-    private final RaceRoomRepository raceRoomRepository;
+    /** Returns the live room, transparently loading it from the durable layer on a miss. */
+    Optional<RaceRoom> get(String roomCode);
 
-    public RaceRoomStore(RaceRoomRepository raceRoomRepository) {
-        this.raceRoomRepository = raceRoomRepository;
-        this.liveRooms = Caffeine.newBuilder()
-                .expireAfterAccess(Duration.ofMinutes(30))
-                .maximumSize(10_000)
-                .build();
-    }
+    /** Returns whether a room exists, either live or in the durable layer. */
+    boolean exists(String roomCode);
 
-    /** Returns the live room, transparently loading it from Redis on a cache miss. */
-    public Optional<RaceRoom> get(String roomCode) {
-        RaceRoom room = liveRooms.get(roomCode, code ->
-                raceRoomRepository.findByCode(code).orElse(null));
-        return Optional.ofNullable(room);
-    }
+    /** Registers a freshly created room as live. Call {@link #persist(RaceRoom)} to make it durable. */
+    void put(RaceRoom room);
 
-    public boolean exists(String roomCode) {
-        return liveRooms.getIfPresent(roomCode) != null || raceRoomRepository.exists(roomCode);
-    }
+    /** Writes the room through to the durable layer. Call on lifecycle transitions, not per tick. */
+    void persist(RaceRoom room);
 
-    /** Registers a freshly created room in memory. Call {@link #persist(RaceRoom)} to make it durable. */
-    public void put(RaceRoom room) {
-        liveRooms.put(room.getRoomCode(), room);
-    }
-
-    /** Writes the room through to Redis. Call on lifecycle transitions, not per progress tick. */
-    public void persist(RaceRoom room) {
-        raceRoomRepository.save(room);
-    }
-
-    public void remove(String roomCode) {
-        liveRooms.invalidate(roomCode);
-        raceRoomRepository.delete(roomCode);
-    }
+    /** Removes the room from both the live and durable layers. */
+    void remove(String roomCode);
 }

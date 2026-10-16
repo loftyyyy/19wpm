@@ -243,6 +243,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-1.3 | Refresh-token rotation is atomic (single-use via GETDEL) | Atomic check-and-consume (single-use token) | [`docs/refactors/13-refresh-token-atomic-rotation.md`](docs/refactors/13-refresh-token-atomic-rotation.md) |
 | CR-1.4 | Content writes require auth; user-scoped reads no longer 500 | Deny-by-default allowlist + method guards | [`docs/refactors/14-content-endpoint-authorization.md`](docs/refactors/14-content-endpoint-authorization.md) |
 | CR-1.5 | Client errors return 400/401/403 instead of 500 | Explicit exception→status mapping + guarded catch-all | [`docs/refactors/15-exception-handler-status-mapping.md`](docs/refactors/15-exception-handler-status-mapping.md) |
+| CR-3.2 | Live race-room store sits behind a seam; single-instance constraint documented | Port/adaptor seam (distributed store deferred) | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -313,9 +314,25 @@ body — logged once with a stack trace — for anything genuinely unexpected.
 **Impact:** the API reports client errors accurately, the frontend can react to them, and 5xx
 alerting no longer fires on ordinary validation/authorization failures.
 
+### CR-3.2 — Live race-room store seam
+
+**Before:** `RaceRoomStore` was a concrete `@Component` holding authoritative live room state in a
+process-local cache, and every caller depended on that class directly — baking the single-instance
+assumption into the callers and leaving it undocumented.
+
+**After:** `RaceRoomStore` is now an interface with the existing behavior moved to
+`InMemoryRaceRoomStore`. Callers are unchanged (same package/name resolves to the interface) and
+behavior is identical; the fast live path (`get`/`put`) and the durable write-through (`persist`)
+are now explicit. The distributed implementation is deferred and its scale-out path (shared Redis
+state, cross-instance broadcast, distributed coordination, routing) is written up.
+
+**Impact:** no behavior change, but the store is now swappable and the single-instance deployment
+requirement is an explicit, documented constraint rather than an accidental one.
+
 ## Limitations
 
 - Guest results live in localStorage only. Clearing site data removes them permanently.
+- Live race rooms are held in a single backend instance, so the backend must run one replica (or route a room's participants to one instance) until a distributed room store is added.
 - Mobile works for typing but keyboard shortcuts (Tab, Enter) require a physical keyboard.
 - Word lists and phrase content are seeded at deploy time and cannot be edited through the UI.
 - No offline support. Both frontend and backend must be reachable for authenticated sessions.

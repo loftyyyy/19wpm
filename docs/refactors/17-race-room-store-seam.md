@@ -1,0 +1,104 @@
+# Refactor CR-3.2 — Extract a `RaceRoomStore` seam and document single-instance scaling
+
+**Area:** Live race-room state (`RaceRoomStore`, `RaceService`, `RaceRestController`, `WebSocketDisconnectHandler`)
+**Architecture pattern:** Port/adaptor seam over the live-room store (dependency inversion)
+**Status:** Done (seam); distributed implementation deferred
+
+## Bottleneck / anti-pattern (before)
+
+`RaceRoomStore` was a concrete `@Component` that held authoritative live room state in a
+process-local Caffeine cache and wrote through to Redis only on lifecycle transitions:
+
+```java
+@Component
+public class RaceRoomStore {
+    private final Cache<String, RaceRoom> liveRooms;   // process-local, authoritative
+    ...
+}
+```
+
+Consumers (`RaceService`, `RaceRestController`, `WebSocketDisconnectHandler`) depended directly on
+that concrete class. This is not a correctness bug on the current single-replica deployment, but it
+**hard-codes the single-node assumption into every caller**, and the constraint was undocumented:
+
+- Live state is authoritative in one JVM; a room served by instance B never sees mutations made on
+  instance A.
+- Broadcasts use `SimpMessagingTemplate` with **no broker relay**, so `/topic/room/{code}` messages
+  only reach STOMP sessions attached to the publishing instance.
+- The countdown→RACING transition is scheduled on an instance-local `TaskScheduler`
+  (`RaceStompController`), and `MatchmakingService`'s `ReentrantLock` is documented as depending on
+  the single-instance assumption too.
+
+So scaling the backend horizontally would silently split race rooms across instances unless the
+store and the messaging layer change together.
+
+## Solution / enhancement (after)
+
+Introduce a seam: `RaceRoomStore` becomes an **interface** describing the store contract, and the
+existing behavior moves to `InMemoryRaceRoomStore`:
+
+```java
+public interface RaceRoomStore {
+    Optional<RaceRoom> get(String roomCode);
+    boolean exists(String roomCode);
+    void put(RaceRoom room);       // live, fast
+    void persist(RaceRoom room);   // durable write-through, lifecycle only
+    void remove(String roomCode);
+}
+```
+
+```java
+@Component
+public class InMemoryRaceRoomStore implements RaceRoomStore { /* unchanged behavior */ }
+```
+
+Because the interface keeps the same package and name, every consumer keeps its existing
+`import com.rho.backend.race.RaceRoomStore` and resolves it to the interface — **no caller changes
+and no behavior change**. The seam separates the two concerns the store already mixed: the fast,
+mutable live path (`get`/`put`) and the durable write-through (`persist`).
+
+The remaining work — a distributed implementation — is deliberately **deferred** because it is a
+coordinated change, not a drop-in adaptor. The scale-out path, recorded here for when it is needed:
+
+1. **Shared state.** Back live rooms with Redis (e.g. a hash / JSON doc per room) or a Redis-locked
+   read-modify-write, so any instance can load and mutate a room.
+2. **Cross-instance fan-out.** Route `/topic/room/{code}` through a Redis pub/sub bridge (or enable a
+   STOMP broker relay) so broadcasts reach participants on every instance, not just the publisher.
+3. **Distributed coordination.** Replace the instance-local countdown `TaskScheduler` with a
+   scheduled, idempotent transition guarded by a distributed lock, and replace
+   `MatchmakingService`'s `ReentrantLock` with a Redis lock (or Lua) so overlapping matches across
+   instances cannot pop the same player twice.
+4. **Routing.** Either keep sticky routing of a room's participants to one instance (cheapest, the
+   current implicit assumption) or complete 1–3 for full load-balancing.
+
+Until then the deployment must remain single-replica, which is now an explicit, documented
+constraint rather than an accidental one.
+
+## Architecture pattern
+
+- **Port/adaptor seam (dependency inversion):** callers depend on a `RaceRoomStore` port; the
+  in-memory cache is one adaptor, and a distributed store can be added as another without touching
+  callers.
+
+## Impact
+
+- Zero behavior change; callers are now decoupled from the concrete store and can be pointed at a
+  distributed implementation later.
+- The single-instance constraint and the concrete scale-out path are documented instead of implicit.
+
+## Files changed
+
+- `backend/.../race/RaceRoomStore.java` — now the store **interface** (with the single-instance note).
+- `backend/.../race/InMemoryRaceRoomStore.java` — **new** `@Component` holding the previous
+  Caffeine + Redis write-through logic.
+
+## Verification
+
+- Compile: `./mvnw -q -DskipTests compile` (green).
+- Wiring: single `RaceRoomStore` bean (`InMemoryRaceRoomStore`); `RaceService`,
+  `RaceRestController`, and `WebSocketDisconnectHandler` inject the interface unchanged.
+
+## Rollback
+
+Revert this commit — folds the interface and implementation back into the original concrete
+`RaceRoomStore` class.
