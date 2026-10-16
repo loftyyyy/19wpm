@@ -7,6 +7,7 @@ import type {
   ApiUserUpdateRequest,
   ApiUserDeactivateRequest,
   ApiLogoutRequest,
+  ApiOAuthCodeExchangeRequest,
 } from '../types/api';
 import { api, setTokens, clearTokens, getAccessToken, getStoredUserId } from './api';
 
@@ -150,6 +151,19 @@ export async function apiRegister(
     return { user, error: null };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Registration failed';
+    return { user: null, error: msg };
+  }
+}
+
+export async function apiExchangeOAuthCode(code: string): Promise<{ user: User | null; error: string | null }> {
+  try {
+    const body: ApiOAuthCodeExchangeRequest = { code };
+    const data = await api.post<ApiAuthResponse>('/auth/oauth/exchange', body);
+    setTokens(data.accessToken, data.refreshToken, data.userResponseDTO.id);
+    const user = mapMinimalUserToUser(data.userResponseDTO);
+    return { user, error: null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'OAuth exchange failed';
     return { user: null, error: msg };
   }
 }

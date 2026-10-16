@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { setTokens, clearTokens } from '../../services/api';
-import { apiGetSessionUser } from '../../services/auth';
+import { clearTokens } from '../../services/api';
+import { apiExchangeOAuthCode, apiGetSessionUser } from '../../services/auth';
 import { useAuth } from '../../context/AuthContext';
 
 export default function OAuth2Callback() {
@@ -10,8 +10,7 @@ export default function OAuth2Callback() {
   const { setupFromOAuth } = useAuth();
 
   useEffect(() => {
-    const accessToken = searchParams.get('accessToken');
-    const refreshToken = searchParams.get('refreshToken');
+    const code = searchParams.get('code');
     const error = searchParams.get('error');
 
     if (error) {
@@ -19,17 +18,23 @@ export default function OAuth2Callback() {
       return;
     }
 
-    if (!accessToken || !refreshToken) {
+    if (!code) {
       navigate('/login?oauth_error=Authentication+failed.+Please+try+again.', { replace: true });
       return;
     }
 
-    setTokens(accessToken, refreshToken);
-
-    apiGetSessionUser()
-      .then(async user => {
-        if (user) {
-          await setupFromOAuth(user);
+    // The code is short-lived and single-use — it is exchanged for the token pair
+    // over POST so tokens never travel in the browser's URL.
+    apiExchangeOAuthCode(code)
+      .then(async ({ user, error: exchangeError }) => {
+        if (exchangeError || !user) {
+          clearTokens();
+          navigate('/login?oauth_error=Failed+to+complete+authentication.+Please+try+again.', { replace: true });
+          return;
+        }
+        const profile = await apiGetSessionUser();
+        if (profile) {
+          await setupFromOAuth(profile);
           navigate('/dashboard', { replace: true });
         } else {
           clearTokens();

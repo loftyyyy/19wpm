@@ -6,7 +6,6 @@ import com.rho.backend.config.OAuth2TimezoneRequestResolver;
 import com.rho.backend.model.User;
 import com.rho.backend.redis.RedisTokenStore;
 import com.rho.backend.repository.UserRepository;
-import com.rho.backend.service.JwtService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -19,15 +18,20 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.ZoneId;
-import java.util.Date;
+import java.util.Base64;
 
 @Component
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private static final Logger logger = LoggerFactory.getLogger(OAuth2SuccessHandler.class);
 
-    private final JwtService jwtService;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int OAUTH_CODE_BYTES = 32; // 256 bits of entropy
+    private static final Duration OAUTH_CODE_TTL = Duration.ofSeconds(60);
+
     private final RedisTokenStore redisTokenStore;
     private final UserRepository userRepository;
 
@@ -43,16 +47,20 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         refreshTimezone(request, user);
 
-        String accessToken  = jwtService.generateAccessToken(user);
-        String refreshToken = jwtService.generateRefreshToken(user);
-        Date   refreshExpiry = jwtService.extractExpiration(refreshToken);
+        // Never place tokens in the redirect URL — they leak through browser history,
+        // server logs and Referer headers. Hand the browser a short-lived, single-use
+        // code instead; the frontend redeems it over POST for the actual token pair.
+        String code = generateExchangeCode();
+        redisTokenStore.storeOAuthCode(code, user.getUserId(), OAUTH_CODE_TTL);
 
-        redisTokenStore.storeRefreshToken(user.getUserId(), refreshToken, refreshExpiry);
-
-        String redirectUrl = frontendUrl + "/oauth2/callback"
-                + "?accessToken="  + accessToken
-                + "&refreshToken=" + refreshToken;
+        String redirectUrl = frontendUrl + "/oauth2/callback" + "?code=" + code;
         response.sendRedirect(redirectUrl);
+    }
+
+    private String generateExchangeCode() {
+        byte[] bytes = new byte[OAUTH_CODE_BYTES];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private void refreshTimezone(HttpServletRequest request, User user) {

@@ -155,6 +155,29 @@ public class AuthService {
         return buildAuthResponse(newAccessToken, newRefreshToken, user);
     }
 
+    // ── OAuth code exchange ───────────────────────────────────────────────────
+
+    /**
+     * Redeems a single-use code minted by the OAuth success handler for a fresh
+     * token pair. The code is consumed atomically (GETDEL) so it cannot be replayed,
+     * and it never appears in a redirect URL — tokens are only returned in the
+     * response body to the POST that presents the code.
+     */
+    public AuthResponseDTO exchangeOAuthCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Missing OAuth exchange code.");
+        }
+
+        Long userId = redisTokenStore.consumeOAuthCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth exchange code."));
+
+        User user = userRepository.findByIdWithRole(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+
+        logger.info("OAuth exchange code redeemed for userId={}", userId);
+        return issueTokenPair(user);
+    }
+
     // ── Logout (single device) ────────────────────────────────────────────────
 
     /**

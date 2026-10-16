@@ -230,6 +230,30 @@ the atomic streak update. `updatedRows == 0` preserves the "not found" behaviour
 
 **Impact:** concurrent result submissions no longer clobber each other's count/average.
 
+## Code Review Remediation
+
+Follow-up fixes from a full-codebase review (security, correctness, and cleanliness). Each is an
+isolated commit so it can be reverted on its own. Per-change write-ups live in
+[`docs/refactors/`](docs/refactors/).
+
+| # | Change | Architecture pattern | Details |
+|---|---|---|---|
+| CR-1.2 | OAuth tokens no longer travel in the redirect query string | Out-of-band handoff via a short-lived, single-use exchange code | [`docs/refactors/12-oauth-token-query-string.md`](docs/refactors/12-oauth-token-query-string.md) |
+
+### CR-1.2 — OAuth tokens off the redirect URL
+
+**Before:** the OAuth2 success handler appended the access **and** 30-day refresh token to the
+`/oauth2/callback` redirect (`?accessToken=…&refreshToken=…`), so the tokens were written to browser
+history, forwardable via `Referer`, and logged by any proxy/CDN on the frontend origin.
+
+**After:** the handler mints a 256-bit `SecureRandom` code, stores `oauth:code:{code} → userId` in
+Redis for 60 s, and redirects with `?code=…` only. The frontend `POST`s the code to
+`/api/v1/auth/oauth/exchange`, where `consumeOAuthCode` redeems it with `GETDEL` (single-use) and the
+existing `issueTokenPair` path mints the pair in the response body.
+
+**Impact:** tokens never appear in a URL; a leaked redirect exposes at most a one-shot code that
+expires in a minute. OAuth now shares the same token-minting path as password login/register.
+
 ## Limitations
 
 - Guest results live in localStorage only. Clearing site data removes them permanently.

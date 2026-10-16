@@ -11,6 +11,7 @@ package com.rho.backend.redis;
  * Key design:
  *  blocklist:access:{token}       → access tokens invalidated via logout
  *  refresh:{userId}:{token}       → valid refresh tokens (revoked on logout/rotation)
+ *  oauth:code:{code}              → single-use OAuth exchange codes (redeemed once, ~60s TTL)
  *  ratelimit:login:{ip}           → login attempt counter per IP
  *  ratelimit:refresh:{ip}         → refresh attempt counter per IP
  */
@@ -23,6 +24,9 @@ public final class RedisKeys {
 
     // ── Refresh token store ───────────────────────────────────────────────────
     private static final String REFRESH_TOKEN     = "refresh:";
+
+    // ── OAuth exchange codes ──────────────────────────────────────────────────
+    private static final String OAUTH_CODE        = "oauth:code:";
 
     // ── Rate limiting ─────────────────────────────────────────────────────────
     private static final String RATE_LOGIN        = "ratelimit:login:";
@@ -40,6 +44,14 @@ public final class RedisKeys {
      */
     public static String refreshToken(Long userId, String token) {
         return REFRESH_TOKEN + userId + ":" + token;
+    }
+
+    /**
+     * Single-use OAuth exchange code → userId. Consumed atomically so a code
+     * minted by the OAuth success handler can be redeemed at most once.
+     */
+    public static String oauthCode(String code) {
+        return OAUTH_CODE + code;
     }
 
     public static String rateLimitLogin(String ip) {

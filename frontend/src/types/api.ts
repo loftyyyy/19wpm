@@ -61,6 +61,10 @@ export interface ApiLogoutRequest {
   refreshToken: string;
 }
 
+export interface ApiOAuthCodeExchangeRequest {
+  code: string;
+}
+
 export interface ApiTextResponse {
   textId: number;
   isCustom: boolean;

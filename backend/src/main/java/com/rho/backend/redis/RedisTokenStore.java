@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Owns all token state in Redis.
@@ -27,6 +28,11 @@ import java.util.List;
  *   On refresh, we verify the token exists here before issuing a new access token.
  *   On logout, we delete it — making it immediately unusable regardless of expiry.
  *   On rotation, old token is deleted and new token is written atomically.
+ *
+ * OAuth exchange codes:
+ *   The OAuth success handler never puts tokens in the redirect URL. It mints a
+ *   short-lived, single-use code bound to the userId; the frontend redeems that
+ *   code over POST. consumeOAuthCode uses GETDEL so a code can be used at most once.
  */
 @Service
 @RequiredArgsConstructor
@@ -128,6 +134,34 @@ public class RedisTokenStore {
         if (!keysToDelete.isEmpty()) {
             redisTemplate.delete(keysToDelete);
             logger.info("All {} refresh tokens revoked for userId={}", keysToDelete.size(), userId);
+        }
+    }
+
+    // ── OAuth exchange codes ──────────────────────────────────────────────────
+
+    /**
+     * Stores a short-lived OAuth exchange code bound to the user id.
+     * The code is the only thing that travels back to the browser.
+     */
+    public void storeOAuthCode(String code, Long userId, Duration ttl) {
+        redisTemplate.opsForValue().set(RedisKeys.oauthCode(code), String.valueOf(userId), ttl);
+        logger.debug("OAuth exchange code stored for userId={}, TTL={}s", userId, ttl.toSeconds());
+    }
+
+    /**
+     * Atomically consumes an OAuth exchange code, returning the bound user id.
+     * Uses GETDEL so concurrent redemptions can never both succeed.
+     */
+    public Optional<Long> consumeOAuthCode(String code) {
+        String value = redisTemplate.opsForValue().getAndDelete(RedisKeys.oauthCode(code));
+        if (value == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Long.valueOf(value));
+        } catch (NumberFormatException e) {
+            logger.warn("Malformed OAuth exchange code payload: {}", value);
+            return Optional.empty();
         }
     }
 }

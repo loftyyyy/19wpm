@@ -55,6 +55,7 @@ public class SecurityFilterChainConfig {
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
+                                "/api/v1/auth/oauth/exchange",
                                 "/ws/**",
                                 "/api/v1/texts/**",
                                 "/api/v1/words/**"

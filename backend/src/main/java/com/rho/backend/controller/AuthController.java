@@ -3,6 +3,7 @@ package com.rho.backend.controller;
 import com.rho.backend.config.CustomUserDetails;
 import com.rho.backend.dto.auth.request.AuthRequestDTO;
 import com.rho.backend.dto.auth.request.LogoutRequestDTO;
+import com.rho.backend.dto.auth.request.OAuthCodeExchangeRequestDTO;
 import com.rho.backend.dto.auth.request.RegisterRequestDTO;
 import com.rho.backend.dto.auth.response.AuthResponseDTO;
 import com.rho.backend.dto.auth.token.request.TokenRefreshRequestDTO;
@@ -86,6 +87,13 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(authService.refresh(tokenRefreshRequestDTO.refreshToken()));
+    }
+
+    // POST /api/v1/auth/oauth/exchange
+    // Redeems the short-lived, single-use code from the OAuth redirect for a token pair.
+    @PostMapping("/oauth/exchange")
+    public ResponseEntity<AuthResponseDTO> exchangeOAuthCode(@RequestBody OAuthCodeExchangeRequestDTO request) {
+        return ResponseEntity.ok(authService.exchangeOAuthCode(request.code()));
     }
 }
 
