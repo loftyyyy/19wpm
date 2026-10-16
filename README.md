@@ -246,6 +246,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-1.6 | Auth hot path no longer reloads the user from the DB on every request | Short-TTL read-through cache (failures uncached) | [`docs/refactors/19-cached-user-details.md`](docs/refactors/19-cached-user-details.md) |
 | CR-3.2 | Live race-room store sits behind a seam; single-instance constraint documented | Port/adaptor seam (distributed store deferred) | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
 | CR-3.1 | Durable rooms reference the passage by id instead of embedding it | Durable projection with `textId` + rehydrate on load | [`docs/refactors/18-race-room-persist-text-reference.md`](docs/refactors/18-race-room-persist-text-reference.md) |
+| CR-2.1 | Solo test and race share one typing viewport instead of two copies | Single presentational component + extracted hook | [`docs/refactors/20-shared-typing-viewport.md`](docs/refactors/20-shared-typing-viewport.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -358,6 +359,19 @@ collapses to `textId`; `findByCode` rehydrates the passage from the catalogue on
 
 **Impact:** Redis values no longer embed (or repeatedly rewrite) passage content; the catalogue
 remains the single source of truth for text.
+
+### CR-2.1 — Extract a shared typing viewport
+
+**Before:** `TypingTest.tsx` and `Race.tsx` (`RaceTypingInput`) each inlined the same typing surface —
+word/character layout, the caret effect, the line-tracking scroll animation, the idle-blink timer, and
+the `TypedWord` loop — as two near-identical ~300-line copies that had already begun to drift.
+
+**After:** a shared `TypingViewport` component owns the caret, scroll, and render loop through props
+(`extraVariant`, `resetKey`, `measureKey`), and a `useTypingActivity` hook owns the idle-blink timer.
+Each page keeps only its container, its Tab/Enter/Escape policy, and its engine wiring.
+
+**Impact:** ~300 duplicated lines removed; caret/scroll fixes now apply to both views at once, with the
+solo test and race keeping their distinct extra-character variants and keyboard behaviour.
 
 ## Limitations
 

@@ -1,8 +1,8 @@
-﻿import { useEffect, useRef, useMemo, useCallback, useLayoutEffect, useState } from 'react';
-import { animate } from 'animejs';
+﻿import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
-import TypedWord from './TypedWord';
+import TypingViewport from './TypingViewport';
+import { useTypingActivity } from '../../hooks/useTypingActivity';
 import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
@@ -10,7 +10,6 @@ import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseL
 
 const wordCounts: WordCount[] = [10, 25, 50, 100];
 const PREFERENCES_KEY = 'typing_preferences';
-const NO_EXTRA_CHARS: string[] = [];
 
 function loadPreferences() {
   try {
@@ -34,26 +33,10 @@ export default function TypingTest() {
   const navigate = useNavigate();
   const { addResult } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
-const restartBtnRef = useRef<HTMLButtonElement>(null);
+  const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
-  const cursorRef = useRef<HTMLDivElement>(null);
-  const currentCharRef = useRef<HTMLSpanElement | null>(null);
-  const lastCharRef = useRef<HTMLSpanElement | null>(null);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isTypingActive, setIsTypingActive] = useState(false);
-  const caretAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
-  const isFirstPositionRef = useRef(true);
-  const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
-
-  const setCurrentCharRef = useCallback((el: HTMLSpanElement | null) => {
-    currentCharRef.current = el;
-  }, []);
-  const setLastCharRef = useCallback((el: HTMLSpanElement | null) => {
-    lastCharRef.current = el;
-  }, []);
+  const [resetKey, setResetKey] = useState(0);
+  const { isTypingActive, markActive } = useTypingActivity();
 
   const saved = useMemo(loadPreferences, []);
 
@@ -109,48 +92,14 @@ const restartBtnRef = useRef<HTMLButtonElement>(null);
     duration, testMode, wordCount, contentType
   );
 
-  const passageWords = useMemo(() => {
-    if (!passage) return [];
-    const words: { chars: { char: string; globalIdx: number }[] }[] = [];
-    let globalIdx = 0;
-    const parts = passage.text.split('');
-    let currentWord: { char: string; globalIdx: number }[] = [];
-    for (const ch of parts) {
-      if (ch === ' ') {
-        if (currentWord.length > 0) {
-          words.push({ chars: currentWord });
-          currentWord = [];
-        }
-        globalIdx++;
-      } else {
-        currentWord.push({ char: ch, globalIdx });
-        globalIdx++;
-      }
-    }
-    if (currentWord.length > 0) words.push({ chars: currentWord });
-    return words;
-  }, [passage]);
-
-  const currentWordIndex = useMemo(() => {
-    if (passageWords.length === 0) return 0;
-    for (let i = 0; i < passageWords.length; i++) {
-      const word = passageWords[i];
-      const first = word.chars[0].globalIdx;
-      const last = word.chars[word.chars.length - 1].globalIdx;
-      if (state.currentIndex >= first && state.currentIndex <= last) return i;
-      if (i > 0 && state.currentIndex === first - 1) return i - 1;
-    }
-    return Math.max(0, passageWords.length - 1);
-  }, [state.currentIndex, passageWords]);
-
   const handleRestart = useCallback(() => {
-    isFirstPositionRef.current = true;
+    setResetKey(k => k + 1);
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
   }, [reset]);
 
-const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
       e.preventDefault();
       handleRestart();
@@ -160,6 +109,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
       e.preventDefault();
       const nextPassage = next();
       if (nextPassage) setPassage(nextPassage);
+      setResetKey(k => k + 1);
       reset();
       navigatedRef.current = false;
       containerRef.current?.focus();
@@ -167,18 +117,15 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      isFirstPositionRef.current = true;
+      setResetKey(k => k + 1);
       reset();
       navigatedRef.current = false;
       containerRef.current?.focus();
       return;
     }
-    setIsTypingActive(true);
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => 
-      setIsTypingActive(false), 500);
+    markActive();
     handleKeyDown(e);
-  }, [handleKeyDown, handleRestart, next, reset, state.isRunning]);
+  }, [handleKeyDown, handleRestart, markActive, next, reset, state.isRunning]);
 
   useEffect(() => {
     if (state.isFinished && !navigatedRef.current) {
@@ -195,128 +142,7 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
 
   useEffect(() => {
     containerRef.current?.focus();
-    return () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    };
   }, []);
-
-  const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
-
-  useEffect(() => {
-    lineCacheRef.current = null;
-    if (contentRef.current) {
-      contentRef.current.style.marginTop = '0px';
-    }
-    isFirstPositionRef.current = true;
-  }, [passage]);
-
-  useLayoutEffect(() => {
-    const elements = wordRefs.current;
-    if (!elements.length || !contentRef.current || !viewportRef.current) return;
-
-    if (!lineCacheRef.current) {
-      const tops = new Set<number>();
-      elements.forEach(el => { if (el) tops.add(el.offsetTop); });
-      const sortedTops = [...tops].sort((a, b) => a - b);
-      if (sortedTops.length < 2) return;
-      const lineHeight = sortedTops[1] - sortedTops[0];
-      viewportRef.current.style.height = `${lineHeight * 3}px`;
-      lineCacheRef.current = { sortedTops, lineHeight };
-    }
-
-    const { sortedTops } = lineCacheRef.current;
-    const currentEl = elements[currentWordIndex];
-    if (!currentEl) return;
-
-    const lineIdx = sortedTops.indexOf(currentEl.offsetTop);
-    if (lineIdx < 0) return;
-
-    // Show current word on line 2 (index 1), like Monkeytype
-    const targetLine = Math.max(0, lineIdx - 1);
-    const newMarginTop = -sortedTops[targetLine];
-
-    const currentMarginTop = parseFloat(
-      contentRef.current.style.marginTop || '0'
-    );
-
-    if (Math.abs(newMarginTop - currentMarginTop) < 1) return;
-
-    // Cancel in-flight scroll animation
-    scrollAnimationRef.current?.pause();
-
-    // Animate marginTop at 125ms like Monkeytype
-    scrollAnimationRef.current = animate(contentRef.current, {
-      marginTop: newMarginTop,
-      duration: 125,
-      ease: 'inOut(2)',
-    });
-  }, [currentWordIndex, passageWords.length, mode]);
-
-  useEffect(() => {
-    const rafId = requestAnimationFrame(() => {
-      const cursorEl = cursorRef.current;
-      const containerEl = contentRef.current;
-      if (!cursorEl || !containerEl) return;
-
-      const passageLength = passage?.text.length ?? 0;
-      const isAtEnd = state.currentIndex >= passageLength;
-
-      let targetEl: HTMLSpanElement | null = null;
-      let useRightEdge = false;
-
-      const shouldUseRightEdge = isAtEnd || passage?.text[state.currentIndex] === ' ';
-
-      if (shouldUseRightEdge && (lastCharRef.current || currentCharRef.current)) {
-        targetEl = currentCharRef.current ?? lastCharRef.current;
-        useRightEdge = true;
-      } else if (currentCharRef.current) {
-        targetEl = currentCharRef.current;
-        useRightEdge = false;
-      }
-
-      if (!targetEl) return;
-
-      // Use offsetLeft/offsetTop relative to contentRef
-      // like Monkeytype does, NOT getBoundingClientRect
-      let el: HTMLElement | null = targetEl;
-      let left = useRightEdge ? el.offsetWidth : 0;
-      let top = 0;
-      while (el && el !== containerEl) {
-        left += el.offsetLeft;
-        top += el.offsetTop;
-        el = el.offsetParent as HTMLElement;
-      }
-
-      // Center vertically like Monkeytype:
-      // top += (letterHeight - caretHeight) / 2
-      const caretHeight = parseFloat(
-        getComputedStyle(cursorEl).height
-      );
-      top += (targetEl.offsetHeight - caretHeight) / 2;
-      // Shift left by half caret width to sit between chars
-      left -= 1;
-
-      if (isFirstPositionRef.current) {
-        // Teleport on first render — no animation
-        isFirstPositionRef.current = false;
-        cursorEl.style.left = `${left}px`;
-        cursorEl.style.top = `${top}px`;
-        return;
-      }
-
-      // Cancel any in-flight animation
-      caretAnimationRef.current?.pause();
-
-      // Animate with Monkeytype's exact easing
-      caretAnimationRef.current = animate(cursorEl, {
-        left,
-        top,
-        duration: 85,
-        ease: 'inOut(1.25)',
-      });
-    });
-    return () => cancelAnimationFrame(rafId);
-  }, [state.currentIndex, passage]);
 
   const totalWords = state.wordBoundaries.length;
   const displayCompleted = state.isFinished ? totalWords : state.completedWords;
@@ -331,17 +157,6 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
   const timerDisplay = state.timeLeft >= 60
     ? `${Math.floor(state.timeLeft / 60)}:${String(Math.floor(state.timeLeft % 60)).padStart(2, '0')}`
     : `${Math.floor(state.timeLeft)}`;
-
-  const passageText = passage?.text ?? '';
-  const passageLength = passageText.length;
-  const isAtEnd = state.currentIndex >= passageLength;
-  const currentCharIsSpace = passageText[state.currentIndex] === ' ';
-  const activeGlobalIdx = isAtEnd
-    ? -1
-    : currentCharIsSpace
-      ? state.currentIndex - 1
-      : state.currentIndex;
-  const lastGlobalIdx = passageLength - 1;
 
   return (
     <div className="min-h-screen bg-surface transition-theme flex flex-col">
@@ -422,50 +237,18 @@ const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
             </div>
           ) : null}
           {passage && (
-                  <div ref={viewportRef} className="overflow-hidden">
-                    <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
-                  <div
-                    ref={cursorRef}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '2px',
-                      height: '1.2em',
-                      backgroundColor: 'var(--accent)',
-                      borderRadius: '1px',
-                      pointerEvents: 'none',
-                      zIndex: 10,
-                      display: state.isFinished ? 'none' : 'block',
-                    }}
-                    className={isTypingActive ? '' : 'animate-blink'}
-                  />
-                  {passageWords.map((word, wi) => {
-                    const { chars } = word;
-                    const start = chars[0].globalIdx;
-                    const end = start + chars.length;
-                    const showExtra = wi === currentWordIndex;
-                    return (
-                      <TypedWord
-                        key={wi}
-                        chars={chars}
-                        start={start}
-                        end={end}
-                        typedChars={state.typedChars}
-                        isPastWord={state.lockedIndex >= end}
-                        hasError={state.mistakeWordIndices.has(wi)}
-                        showExtra={showExtra}
-                        activeGlobalIdx={activeGlobalIdx}
-                        lastGlobalIdx={lastGlobalIdx}
-                        extraChars={showExtra ? state.extraChars : NO_EXTRA_CHARS}
-                        onWordRef={el => { wordRefs.current[wi] = el; }}
-                        onCurrentCharRef={setCurrentCharRef}
-                        onLastCharRef={setLastCharRef}
-                      />
-                    );
-                  })}
-              </div>
-            </div>
+            <TypingViewport
+              charsText={passage.text}
+              typedChars={state.typedChars}
+              currentIndex={state.currentIndex}
+              lockedIndex={state.lockedIndex}
+              mistakeWordIndices={state.mistakeWordIndices}
+              extraChars={state.extraChars}
+              isFinished={state.isFinished}
+              isTypingActive={isTypingActive}
+              resetKey={resetKey}
+              measureKey={mode}
+            />
           )}
         </div>
 
