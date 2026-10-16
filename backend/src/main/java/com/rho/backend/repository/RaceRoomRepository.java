@@ -3,8 +3,9 @@ package com.rho.backend.repository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.race.PersistedRaceRoom;
 import com.rho.backend.race.RaceRoom;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -18,18 +19,20 @@ public class RaceRoomRepository {
     private static final Duration PUBLIC_TTL = Duration.ofMinutes(10);
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final TextRepository textRepository;
 
     private final ObjectMapper objectMapper;
 
-    public RaceRoomRepository(RedisTemplate<String, String> redisTemplate){
+    public RaceRoomRepository(RedisTemplate<String, String> redisTemplate, TextRepository textRepository){
         this.redisTemplate = redisTemplate;
+        this.textRepository = textRepository;
         this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule()).disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     public void save(RaceRoom room){
         try{
             String key = toKey(room.getRoomCode());
-            String json = objectMapper.writeValueAsString(room);
+            String json = objectMapper.writeValueAsString(PersistedRaceRoom.from(room));
             Duration ttl = room.isPrivate() ? PRIVATE_TTL : PUBLIC_TTL;
             redisTemplate.opsForValue().set(key,json,ttl);
         } catch (Exception e){
@@ -43,7 +46,10 @@ public class RaceRoomRepository {
             if(json == null){
                 return Optional.empty();
             }
-            return Optional.of(objectMapper.readValue(json, RaceRoom.class));
+            PersistedRaceRoom persisted = objectMapper.readValue(json, PersistedRaceRoom.class);
+            TextResponseDTO text = persisted.textId() == null ? null
+                    : textRepository.findByTextId(persisted.textId()).map(TextResponseDTO::new).orElse(null);
+            return Optional.of(persisted.toRoom(text));
         }catch (Exception e){
             throw new RuntimeException("Failed to read code: " + roomCode + ". Error: " + e.getMessage());
         }

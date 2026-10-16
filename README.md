@@ -244,6 +244,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-1.4 | Content writes require auth; user-scoped reads no longer 500 | Deny-by-default allowlist + method guards | [`docs/refactors/14-content-endpoint-authorization.md`](docs/refactors/14-content-endpoint-authorization.md) |
 | CR-1.5 | Client errors return 400/401/403 instead of 500 | Explicit exception→status mapping + guarded catch-all | [`docs/refactors/15-exception-handler-status-mapping.md`](docs/refactors/15-exception-handler-status-mapping.md) |
 | CR-3.2 | Live race-room store sits behind a seam; single-instance constraint documented | Port/adaptor seam (distributed store deferred) | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
+| CR-3.1 | Durable rooms reference the passage by id instead of embedding it | Durable projection with `textId` + rehydrate on load | [`docs/refactors/18-race-room-persist-text-reference.md`](docs/refactors/18-race-room-persist-text-reference.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -328,6 +329,19 @@ state, cross-instance broadcast, distributed coordination, routing) is written u
 
 **Impact:** no behavior change, but the store is now swappable and the single-instance deployment
 requirement is an explicit, documented constraint rather than an accidental one.
+
+### CR-3.1 — Persist only the text reference for race rooms
+
+**Before:** `RaceRoomRepository.save` serialized the whole live `RaceRoom` to Redis, including the
+full passage content, and re-wrote it on every lifecycle transition (create, each join, start,
+finish) even though the passage is immutable and already lives in the `texts` table.
+
+**After:** a new `PersistedRaceRoom` projection stores every room field except the passage, which
+collapses to `textId`; `findByCode` rehydrates the passage from the catalogue on load. The live
+`RaceRoom` is unchanged, so in-memory progress validation and STOMP broadcasts are untouched.
+
+**Impact:** Redis values no longer embed (or repeatedly rewrite) passage content; the catalogue
+remains the single source of truth for text.
 
 ## Limitations
 
