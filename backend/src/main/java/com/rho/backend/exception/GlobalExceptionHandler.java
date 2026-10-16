@@ -1,5 +1,6 @@
 package com.rho.backend.exception;
 
+import com.rho.backend.exception.credential.PasswordException;
 import com.rho.backend.exception.user.DuplicateResourceException;
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import org.slf4j.Logger;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -55,5 +57,35 @@ public class GlobalExceptionHandler {
         logger.error("Database operation failed", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", "Internal Server Error", "message", "Database operation failed"));
+    }
+
+    @ExceptionHandler(InvalidResourceException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidResource(InvalidResourceException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "Bad Request", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(UnauthorizedResourceException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorizedResource(UnauthorizedResourceException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "Forbidden", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(PasswordException.class)
+    public ResponseEntity<Map<String, String>> handlePassword(PasswordException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Unauthorized", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleUnexpected(Exception ex) {
+        if (ex instanceof ErrorResponse errorResponse) {
+            HttpStatus status = HttpStatus.valueOf(errorResponse.getStatusCode().value());
+            String message = ex.getMessage() != null ? ex.getMessage() : status.getReasonPhrase();
+            return ResponseEntity.status(status).body(Map.of("error", status.getReasonPhrase(), "message", message));
+        }
+        logger.error("Unhandled exception", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Internal Server Error", "message", "An unexpected error occurred"));
     }
 }

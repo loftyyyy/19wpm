@@ -241,6 +241,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-1.2 | OAuth tokens no longer travel in the redirect query string | Out-of-band handoff via a short-lived, single-use exchange code | [`docs/refactors/12-oauth-token-query-string.md`](docs/refactors/12-oauth-token-query-string.md) |
 | CR-1.3 | Refresh-token rotation is atomic (single-use via GETDEL) | Atomic check-and-consume (single-use token) | [`docs/refactors/13-refresh-token-atomic-rotation.md`](docs/refactors/13-refresh-token-atomic-rotation.md) |
 | CR-1.4 | Content writes require auth; user-scoped reads no longer 500 | Deny-by-default allowlist + method guards | [`docs/refactors/14-content-endpoint-authorization.md`](docs/refactors/14-content-endpoint-authorization.md) |
+| CR-1.5 | Client errors return 400/401/403 instead of 500 | Explicit exception→status mapping + guarded catch-all | [`docs/refactors/15-exception-handler-status-mapping.md`](docs/refactors/15-exception-handler-status-mapping.md) |
 
 ### CR-1.2 — OAuth tokens off the redirect URL
 
@@ -282,6 +283,19 @@ both at the filter (falling through to `anyRequest().authenticated()`) and via
 
 **Impact:** anonymous content writes are blocked and principal-dependent reads return 401 instead of
 500; guest solo typing is unchanged because every endpoint it uses stays public.
+
+### CR-1.5 — Map client errors to correct HTTP statuses
+
+**Before:** `InvalidResourceException`, `UnauthorizedResourceException`, and `PasswordException`
+were thrown across the services but had no handler, so bad input returned 500 instead of 400,
+ownership failures 500 instead of 403, and failed credential checks 500 instead of 401.
+
+**After:** each exception now maps to its correct status, with a guarded `Exception` catch-all that
+preserves framework statuses (404 unknown route, 405 wrong method) and returns a consistent JSON 500
+body — logged once with a stack trace — for anything genuinely unexpected.
+
+**Impact:** the API reports client errors accurately, the frontend can react to them, and 5xx
+alerting no longer fires on ordinary validation/authorization failures.
 
 ## Limitations
 
