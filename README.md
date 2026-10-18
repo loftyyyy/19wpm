@@ -253,6 +253,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-2.5 | `RaceRoomRepository` injects the shared mapper and keeps failure causes | DI over ad-hoc construction + exception chaining | [`docs/refactors/24-raceroom-repository-mapper-cause.md`](docs/refactors/24-raceroom-repository-mapper-cause.md) |
 | CR-3.3 | Random preset text is sampled uniformly in one query | Push sampling into the datastore (`ORDER BY random()`) | [`docs/refactors/25-uniform-random-text-selection.md`](docs/refactors/25-uniform-random-text-selection.md) |
 | CR-3.4 | Result history reads a projection instead of whole entities | Read-model projection | [`docs/refactors/26-typing-result-projection.md`](docs/refactors/26-typing-result-projection.md) |
+| Fix | `OAuth2SuccessHandlerTest` synced to the exchange-code handler (CR-1.2 follow-up) | Test double aligned to the current collaborator seam | [`docs/refactors/27-oauth-success-handler-test-sync.md`](docs/refactors/27-oauth-success-handler-test-sync.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -445,6 +446,19 @@ materializing a `User` entity and every column per row just to read `userId`/`us
 
 **Impact:** no `User` entity per row and a leaner SELECT; the page envelope (and JSON shape) is
 unchanged, so the frontend contract is untouched.
+
+### Build fix — `OAuth2SuccessHandlerTest` synced to the exchange-code handler
+
+**Before:** CR-1.2 moved the handler from issuing JWTs to minting a short-lived exchange code, changing
+its constructor to `(RedisTokenStore, UserRepository)`. The companion unit test still passed a
+`JwtService`, so it compiled only under `src/main` and broke the image build's `maven.test-compile`
+stage.
+
+**After:** the test constructs the handler with its real collaborators and asserts
+`redisTokenStore.storeOAuthCode(...)` plus the `/oauth2/callback?code=…` redirect.
+
+**Impact:** the repository compiles end to end (`./mvnw clean test-compile`), so `dockerfile`'s
+test-compile stage and `mvn package` succeed again.
 
 ## Limitations
 

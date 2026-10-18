@@ -7,7 +7,6 @@ import com.rho.backend.model.Role;
 import com.rho.backend.model.User;
 import com.rho.backend.redis.RedisTokenStore;
 import com.rho.backend.repository.UserRepository;
-import com.rho.backend.service.JwtService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -19,20 +18,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Date;
+import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OAuth2SuccessHandlerTest {
 
-    @Mock
-    private JwtService jwtService;
     @Mock
     private RedisTokenStore redisTokenStore;
     @Mock
@@ -66,15 +63,12 @@ class OAuth2SuccessHandlerTest {
                 .build();
         principal = new CustomOAuth2User(user, Map.of());
 
-        handler = new OAuth2SuccessHandler(jwtService, redisTokenStore, userRepository);
+        handler = new OAuth2SuccessHandler(redisTokenStore, userRepository);
         ReflectionTestUtils.setField(handler, "frontendUrl", "http://localhost:5173");
     }
 
     private void stubOAuthFlow() {
         when(authentication.getPrincipal()).thenReturn(principal);
-        when(jwtService.generateAccessToken(user)).thenReturn("access-token");
-        when(jwtService.generateRefreshToken(user)).thenReturn("refresh-token");
-        when(jwtService.extractExpiration("refresh-token")).thenReturn(new Date());
     }
 
     @Test
@@ -87,7 +81,7 @@ class OAuth2SuccessHandlerTest {
 
         verify(userRepository).save(user);
         assertThat(user.getTimezone()).isEqualTo("Asia/Manila");
-        verify(redisTokenStore).storeRefreshToken(eq(user.getUserId()), eq("refresh-token"), any(Date.class));
+        verify(redisTokenStore).storeOAuthCode(anyString(), any(), any(Duration.class));
         verify(response).sendRedirect(startsWith("http://localhost:5173/oauth2/callback"));
     }
 
