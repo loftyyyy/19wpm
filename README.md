@@ -255,6 +255,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-3.4 | Result history reads a projection instead of whole entities | Read-model projection | [`docs/refactors/26-typing-result-projection.md`](docs/refactors/26-typing-result-projection.md) |
 | Fix | `OAuth2SuccessHandlerTest` synced to the exchange-code handler (CR-1.2 follow-up) | Test double aligned to the current collaborator seam | [`docs/refactors/27-oauth-success-handler-test-sync.md`](docs/refactors/27-oauth-success-handler-test-sync.md) |
 | Fix | `RaceRoomRepository` injects Boot 4's Jackson 3 mapper (CR-2.5 follow-up) | Inject the container-managed bean type | [`docs/refactors/28-raceroom-jackson3-mapper.md`](docs/refactors/28-raceroom-jackson3-mapper.md) |
+| Fix | Race countdown synced to the server clock (was desynced / stuck on `GO!`) | Clock-offset estimation (NTP-style round trip) over STOMP | [`docs/refactors/29-server-clock-offset-sync.md`](docs/refactors/29-server-clock-offset-sync.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -472,6 +473,21 @@ which already handles Java-time, so the durable record's `Instant` fields serial
 
 **Impact:** the context starts and the Container App revision becomes healthy; race rooms use the
 same container-managed mapper as the HTTP layer.
+
+### Fix — Race countdown synced to the server clock
+
+**Before:** the countdown anchored to a server-minted `countdownStartTime` but rendered against each
+client's local `Date.now()`. Players' clocks disagree, so the timers desynced and the `GO!` moments
+diverged; a client clock ahead of the server by more than the 3500 ms window jumped straight to
+`GO!` (the `GO!, GO!, GO!` symptom). Step thresholds were also hardcoded to 3500 ms.
+
+**After:** a STOMP `/app/time` → `/user/queue/time` echo lets each client estimate its clock offset
+from a four-timestamp round trip (keeping the lowest-RTT sample); `Countdown` renders on the
+server-corrected clock and derives its steps from `durationMs`.
+
+**Impact:** the digits stay in step across players and `GO!` fires together, independent of device
+clock skew; the step sequence scales with the countdown duration. Reverting is safe — the frontend
+falls back to offset `0` without the endpoint.
 
 ## Limitations
 

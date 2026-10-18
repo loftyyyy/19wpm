@@ -12,6 +12,7 @@ interface UseRaceSocketOpts {
 export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts) {
   const [room, setRoom] = useState<RaceRoom | null>(null);
   const [raceStreak, setRaceStreak] = useState<number | null>(null);
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
   const [prevRoomCode, setPrevRoomCode] = useState(roomCode);
   if (prevRoomCode !== roomCode) {
     setPrevRoomCode(roomCode);
@@ -24,6 +25,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const hasJoinedRef = useRef(false);
+  const bestRttRef = useRef(Number.POSITIVE_INFINITY);
   const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number } | null>(null);
 
   useEffect(() => {
@@ -75,6 +77,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     if (!isTokenReady) return;
 
     hasJoinedRef.current = false;
+    let active = true;
     const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
     const client = new Client({
       webSocketFactory: () => new SockJS(
@@ -95,6 +98,29 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     client.onConnect = () => {
       console.info('[race-socket] connected to message broker');
       setConnected(true);
+
+      bestRttRef.current = Number.POSITIVE_INFINITY;
+      client.subscribe('/user/queue/time', (message) => {
+        const sample: { clientSentAt: number; serverReceivedAt: number; serverSentAt: number } =
+          JSON.parse(message.body);
+        const t4 = Date.now();
+        const roundTrip = (t4 - sample.clientSentAt) - (sample.serverSentAt - sample.serverReceivedAt);
+        const offset = ((sample.serverReceivedAt - sample.clientSentAt) + (sample.serverSentAt - t4)) / 2;
+        if (roundTrip < bestRttRef.current) {
+          bestRttRef.current = roundTrip;
+          setServerOffsetMs(Math.round(offset));
+        }
+      });
+      [0, 200, 400].forEach((delay) => {
+        setTimeout(() => {
+          if (active && client.connected) {
+            client.publish({
+              destination: '/app/time',
+              body: JSON.stringify({ clientSentAt: Date.now() }),
+            });
+          }
+        }, delay);
+      });
 
       if (roomCode) {
         client.subscribe(`/topic/room/${roomCode}`, (message) => {
@@ -179,6 +205,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     clientRef.current = client;
 
     return () => {
+      active = false;
       hasJoinedRef.current = false;
       pendingFinishRef.current = null;
       client.deactivate();
@@ -214,5 +241,5 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     });
   }, [roomCode]);
 
-  return { room, connected, raceStreak, sendProgress, sendFinish, sendStart };
+  return { room, connected, raceStreak, serverOffsetMs, sendProgress, sendFinish, sendStart };
 }

@@ -1,29 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface Props {
   startTime: string;
   durationMs: number;
+  offsetMs?: number;
   onComplete: () => void;
 }
 
-function stepFor(remaining: number): string {
-  if (remaining > 2500) return '3';
-  if (remaining > 1500) return '2';
-  if (remaining > 500) return '1';
+const DEFAULT_DURATION_MS = 3500;
+
+function stepFor(remaining: number, durationMs: number): string {
+  if (remaining > (durationMs * 5) / 7) return '3';
+  if (remaining > (durationMs * 3) / 7) return '2';
+  if (remaining > durationMs / 7) return '1';
   return 'GO!';
 }
 
-export default function Countdown({ startTime, durationMs, onComplete }: Props) {
+export default function Countdown({ startTime, durationMs, offsetMs = 0, onComplete }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
   const firedRef = useRef(false);
 
-  const startMs = new Date(startTime).getTime();
-  const deadline = Number.isNaN(startMs)
-    ? Date.now() + (durationMs > 0 ? durationMs : 3500)
-    : startMs + durationMs;
-  const remaining = Math.max(0, deadline - now);
+  const duration = durationMs > 0 ? durationMs : DEFAULT_DURATION_MS;
+
+  const deadline = useMemo(() => {
+    const startMs = new Date(startTime).getTime();
+    return Number.isNaN(startMs)
+      ? Date.now() + offsetMs + duration
+      : startMs + duration;
+  }, [startTime, duration, offsetMs]);
+
+  const remaining = Math.max(0, deadline - (now + offsetMs));
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 100);
@@ -39,7 +47,7 @@ export default function Countdown({ startTime, durationMs, onComplete }: Props) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface">
       <span className="text-8xl font-display font-bold text-accent animate-ping">
-        {stepFor(remaining)}
+        {stepFor(remaining, duration)}
       </span>
     </div>
   );

@@ -336,6 +336,7 @@ export default function Race() {
         <Countdown
           startTime={socket.room?.countdownStartTime ?? new Date().toISOString()}
           durationMs={socket.room?.countdownDurationMs ?? 3500}
+          offsetMs={socket.serverOffsetMs}
           onComplete={handleCountdownComplete}
         />
       );
