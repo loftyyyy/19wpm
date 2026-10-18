@@ -1,6 +1,6 @@
 package com.rho.backend.repository;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.race.PersistedRaceRoom;
 import com.rho.backend.race.RaceRoom;

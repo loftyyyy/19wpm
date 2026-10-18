@@ -254,6 +254,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | CR-3.3 | Random preset text is sampled uniformly in one query | Push sampling into the datastore (`ORDER BY random()`) | [`docs/refactors/25-uniform-random-text-selection.md`](docs/refactors/25-uniform-random-text-selection.md) |
 | CR-3.4 | Result history reads a projection instead of whole entities | Read-model projection | [`docs/refactors/26-typing-result-projection.md`](docs/refactors/26-typing-result-projection.md) |
 | Fix | `OAuth2SuccessHandlerTest` synced to the exchange-code handler (CR-1.2 follow-up) | Test double aligned to the current collaborator seam | [`docs/refactors/27-oauth-success-handler-test-sync.md`](docs/refactors/27-oauth-success-handler-test-sync.md) |
+| Fix | `RaceRoomRepository` injects Boot 4's Jackson 3 mapper (CR-2.5 follow-up) | Inject the container-managed bean type | [`docs/refactors/28-raceroom-jackson3-mapper.md`](docs/refactors/28-raceroom-jackson3-mapper.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -459,6 +460,18 @@ stage.
 
 **Impact:** the repository compiles end to end (`./mvnw clean test-compile`), so `dockerfile`'s
 test-compile stage and `mvn package` succeed again.
+
+### Build fix — `RaceRoomRepository` injects Boot 4's Jackson 3 mapper
+
+**Before:** CR-2.5 injected `com.fasterxml.jackson.databind.ObjectMapper` (Jackson 2). Spring Boot 4
+manages Jackson 3 (`tools.jackson.*`) and provides no Jackson 2 `ObjectMapper` bean, so the context
+failed to start (`APPLICATION FAILED TO START`, replica crash-looping).
+
+**After:** the repository injects `tools.jackson.databind.ObjectMapper` — Boot's managed mapper —
+which already handles Java-time, so the durable record's `Instant` fields serialize unchanged.
+
+**Impact:** the context starts and the Container App revision becomes healthy; race rooms use the
+same container-managed mapper as the HTTP layer.
 
 ## Limitations
 
