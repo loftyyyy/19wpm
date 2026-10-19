@@ -438,7 +438,7 @@ export default function Race() {
 
 interface RaceTypingInputProps {
   passage: string;
-  onProgress: (progressPercent: number, currentWpm: number, typedContent: string) => void;
+  onProgress: (progressPercent: number, currentWpm: number, errors: number) => void;
   onFinish: (finalWpm: number, errors: number, correctChars: number, wpmHistory: WpmPoint[], result: TestResult) => void;
   startTime: string;
 }
@@ -467,42 +467,26 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
     return Math.round(words / minutes);
   }, [startTime]);
 
-  const calcErrors = useCallback((typed: string) => {
-    let errors = 0;
-    for (let i = 0; i < typed.length; i++) {
-      if (i >= passage.length || typed[i] !== passage[i]) errors++;
-    }
-    return errors;
-  }, [passage]);
-
-  const calcCorrectChars = useCallback((typed: string) => {
-    let correct = 0;
-    for (let i = 0; i < typed.length; i++) {
-      if (i < passage.length && typed[i] === passage[i]) correct++;
-    }
-    return correct;
-  }, [passage]);
-
   useEffect(() => {
     const typed = state.typedChars.join('');
     onProgressRef.current(
       Math.min(state.currentIndex / passage.length, 1),
       calcWpm(typed),
-      typed
+      state.totalIncorrect
     );
-  }, [state.typedChars, state.currentIndex, passage, calcWpm]);
+  }, [state.typedChars, state.currentIndex, state.totalIncorrect, passage, calcWpm]);
 
   useEffect(() => {
     if (state.isFinished && !finishReportedRef.current) {
       finishReportedRef.current = true;
       const typed = state.typedChars.join('');
-      onProgressRef.current(1, calcWpm(typed), typed);
-      onFinishRef.current(calcWpm(typed), calcErrors(typed), calcCorrectChars(typed), state.wpmHistory, getResult());
+      onProgressRef.current(1, calcWpm(typed), state.totalIncorrect);
+      onFinishRef.current(calcWpm(typed), state.totalIncorrect, state.totalCorrect, state.wpmHistory, getResult());
     }
     if (!state.isFinished) {
       finishReportedRef.current = false;
     }
-  }, [state.isFinished, state.typedChars, state.wpmHistory, calcWpm, calcErrors, calcCorrectChars, getResult]);
+  }, [state.isFinished, state.typedChars, state.wpmHistory, state.totalIncorrect, state.totalCorrect, calcWpm, getResult]);
 
   useEffect(() => {
     containerRef.current?.focus();

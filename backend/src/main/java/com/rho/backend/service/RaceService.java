@@ -174,7 +174,7 @@ public class RaceService {
      * The room is intentionally NOT persisted to Redis here: this runs several times per
      * second per participant and only the final state matters.
      */
-    public RaceProgressDTO updateProgress(String roomCode, Long userId, double progressPercent, int currentWpm, String typedContent) {
+    public RaceProgressDTO updateProgress(String roomCode, Long userId, double progressPercent, int currentWpm, int errors) {
         RaceRoom raceRoom = getRoom(roomCode);
 
         synchronized (raceRoom) {
@@ -187,7 +187,6 @@ public class RaceService {
                 throw new ResourceNotFoundException("Participant not found in room");
             }
 
-            int errors = calculateErrors(typedContent, raceRoom.getText().content());
             raceParticipant.setProgressPercent(progressPercent);
             raceParticipant.setCurrentWpm(currentWpm);
             raceParticipant.setErrors(errors);
@@ -278,15 +277,6 @@ public class RaceService {
         return (int) Math.round(correctChars * 100.0 / total);
     }
 
-    private int calculateErrors(String typed, String passage) {
-        int errors = 0;
-        for (int i = 0; i < typed.length(); i++) {
-            if (i >= passage.length() || typed.charAt(i) != passage.charAt(i)) {
-                errors++;
-            }
-        }
-        return errors;
-    }
 
     private String generateRoomCode(){
         return RANDOM.ints(CODE_LENGTH, 0, ALPHANUMERIC.length())

@@ -213,11 +213,11 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     };
   }, [roomCode, opts?.onMatchmakingRoomCode, isTokenReady]);
 
-  const sendProgress = useCallback((progressPercent: number, currentWpm: number, typedContent: string) => {
+  const sendProgress = useCallback((progressPercent: number, currentWpm: number, errors: number) => {
     if (!clientRef.current?.connected || !roomCode) return;
     clientRef.current.publish({
       destination: `/app/room/${roomCode}/progress`,
-      body: JSON.stringify({ progressPercent, currentWpm, typedContent }),
+      body: JSON.stringify({ progressPercent, currentWpm, errors }),
     });
   }, [roomCode]);
 

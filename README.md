@@ -256,6 +256,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | Fix | `OAuth2SuccessHandlerTest` synced to the exchange-code handler (CR-1.2 follow-up) | Test double aligned to the current collaborator seam | [`docs/refactors/27-oauth-success-handler-test-sync.md`](docs/refactors/27-oauth-success-handler-test-sync.md) |
 | Fix | `RaceRoomRepository` injects Boot 4's Jackson 3 mapper (CR-2.5 follow-up) | Inject the container-managed bean type | [`docs/refactors/28-raceroom-jackson3-mapper.md`](docs/refactors/28-raceroom-jackson3-mapper.md) |
 | Fix | Race countdown synced to the server clock (was desynced / stuck on `GO!`) | Clock-offset estimation (NTP-style round trip) over STOMP | [`docs/refactors/29-server-clock-offset-sync.md`](docs/refactors/29-server-clock-offset-sync.md) |
+| Fix | Race accuracy counts corrected mistakes, matching practice mode | One accuracy definition (cumulative keystroke stats) across modes | [`docs/refactors/30-race-accuracy-keystroke.md`](docs/refactors/30-race-accuracy-keystroke.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -488,6 +489,20 @@ server-corrected clock and derives its steps from `durationMs`.
 **Impact:** the digits stay in step across players and `GO!` fires together, independent of device
 clock skew; the step sequence scales with the countdown duration. Reverting is safe — the frontend
 falls back to offset `0` without the endpoint.
+
+### Fix — Race accuracy counts corrected mistakes (matches practice)
+
+**Before:** practice scored accuracy from cumulative keystrokes (`totalIncorrect` never rolls back on a
+fix), but race compared the final typed string to the passage positionally — so a mistake that was
+backspaced and retyped correctly vanished, leaving accuracy at 100%. Accuracy only dropped when a
+mistake was left in place (typically the last word).
+
+**After:** the race path forwards the engine's cumulative `totalIncorrect` / `totalCorrect`; the server
+stores the client counts (`ProgressUpdateDTO.errors`, `RaceService.updateProgress`) instead of
+recomputing them from `typedContent`, which is removed along with `calculateErrors`.
+
+**Impact:** a corrected mistake still lowers race accuracy, matching practice mode, and live/final
+race figures agree. Reverting restores the positional (final-string) calculation.
 
 ## Limitations
 

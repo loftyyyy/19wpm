@@ -77,7 +77,7 @@ public class RaceStompController {
     @MessageMapping("/room/{code}/progress")
     public void updateProgress(@DestinationVariable String code, @Payload ProgressUpdateDTO progressUpdateDTO, Principal principal){
         Long userId = Long.parseLong(principal.getName());
-        RaceProgressDTO progress = raceService.updateProgress(code, userId, progressUpdateDTO.progressPercent(), progressUpdateDTO.currentWpm(), progressUpdateDTO.typedContent());
+        RaceProgressDTO progress = raceService.updateProgress(code, userId, progressUpdateDTO.progressPercent(), progressUpdateDTO.currentWpm(), progressUpdateDTO.errors());
         // Broadcast only the delta on the high-frequency path; full room state is reserved
         // for lifecycle events (join / start / racing / finish / disconnect).
         messagingTemplate.convertAndSend("/topic/room/" + code + "/progress", progress);
