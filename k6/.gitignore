@@ -1,0 +1,9 @@
+# Per-run result artifacts are kept locally only (raw JSON/TXT/logs).
+# Only the aggregated median summary is committed.
+results/*
+!results/median-summary.md
+
+# Raw k6 stdout logs / debug captures (defensive)
+results/**/run-*.log
+results/run-*.log
+results/**/*-raw.json
