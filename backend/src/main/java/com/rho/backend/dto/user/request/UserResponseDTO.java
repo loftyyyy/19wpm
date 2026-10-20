@@ -26,13 +26,13 @@ public record UserResponseDTO(
 )
 {
 
-        public static UserResponseDTO from(User user){
+        public static UserResponseDTO from(User user, int streak){
                 return new UserResponseDTO(
                         user.getUserId(),
                         user.getEmail(),
                         user.getUsername(),
                         user.getProvider().toString(),
-                        user.getStreak(),
+                        streak,
                         user.getTimezone()
                 );
 

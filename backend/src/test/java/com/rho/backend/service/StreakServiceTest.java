@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
@@ -195,5 +197,72 @@ public class StreakServiceTest {
 
         assertThatThrownBy(() -> streakService.recordActivity(99L))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @DisplayName("Current streak is 0 when the user has never played")
+    @Test
+    void currentStreakIsZeroWithoutLastPlayedDate() {
+        assertThat(streakService.currentStreak(new StreakState(null, null, "UTC"))).isZero();
+    }
+
+    @DisplayName("Current streak keeps the stored value when the user played today")
+    @Test
+    void currentStreakKeepsValueWhenPlayedToday() {
+        LocalDate today = LocalDate.now(UTC);
+
+        assertThat(streakService.currentStreak(new StreakState(9, today, "UTC"))).isEqualTo(9);
+    }
+
+    @DisplayName("Current streak keeps the stored value when the user played yesterday")
+    @Test
+    void currentStreakKeepsValueWhenPlayedYesterday() {
+        LocalDate yesterday = LocalDate.now(UTC).minusDays(1);
+
+        assertThat(streakService.currentStreak(new StreakState(9, yesterday, "UTC"))).isEqualTo(9);
+    }
+
+    @DisplayName("Current streak is 0 once a full local day has been missed")
+    @Test
+    void currentStreakIsZeroAfterMissedDay() {
+        LocalDate twoDaysAgo = LocalDate.now(UTC).minusDays(2);
+
+        assertThat(streakService.currentStreak(new StreakState(9, twoDaysAgo, "UTC"))).isZero();
+    }
+
+    @DisplayName("Current streak with a null stored value and a recent play is 1")
+    @Test
+    void currentStreakWithNullStoredValueIsOne() {
+        LocalDate today = LocalDate.now(UTC);
+
+        assertThat(streakService.currentStreak(new StreakState(null, today, "UTC"))).isEqualTo(1);
+    }
+
+    @DisplayName("Current streak day boundary follows the user's timezone")
+    @Test
+    void currentStreakUsesUserTimezone() {
+        Instant instant = Instant.parse("2026-08-11T21:00:00Z");
+        StreakService fixed = new StreakService(userRepository, Clock.fixed(instant, UTC));
+        LocalDate lastPlayed = LocalDate.of(2026, 8, 10);
+
+        assertThat(fixed.currentStreak(new StreakState(7, lastPlayed, "UTC"))).isEqualTo(7);
+        assertThat(fixed.currentStreak(new StreakState(7, lastPlayed, "Pacific/Kiritimati"))).isZero();
+    }
+
+    @DisplayName("Current streak stays alive when a backwards timezone move puts the last play in the future")
+    @Test
+    void currentStreakWithFutureLastPlayedDateStaysAlive() {
+        Instant instant = Instant.parse("2026-08-11T21:00:00Z");
+        StreakService fixed = new StreakService(userRepository, Clock.fixed(instant, UTC));
+
+        assertThat(fixed.currentStreak(new StreakState(7, LocalDate.of(2026, 8, 12), "UTC"))).isEqualTo(7);
+    }
+
+    @DisplayName("Current streak falls back to UTC for an invalid timezone")
+    @Test
+    void currentStreakInvalidTimezoneFallsBackToUtc() {
+        Instant instant = Instant.parse("2026-08-11T21:00:00Z");
+        StreakService fixed = new StreakService(userRepository, Clock.fixed(instant, UTC));
+
+        assertThat(fixed.currentStreak(new StreakState(7, LocalDate.of(2026, 8, 10), "Not/AZone"))).isEqualTo(7);
     }
 }

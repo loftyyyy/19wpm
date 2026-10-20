@@ -38,8 +38,9 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final RoleRepository roleRepository;
     private final UserStatService userStatService;
+    private final StreakService streakService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, RedisTokenStore redisTokenStore, AuthenticationManager authenticationManager, RoleRepository roleRepository, UserStatService userStatService){
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, RedisTokenStore redisTokenStore, AuthenticationManager authenticationManager, RoleRepository roleRepository, UserStatService userStatService, StreakService streakService){
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -47,6 +48,7 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
         this.roleRepository = roleRepository;
         this.userStatService = userStatService;
+        this.streakService = streakService;
     }
 
     // ── Register ──────────────────────────────────────────────────────────────
@@ -284,7 +286,7 @@ public class AuthService {
                 "Bearer",
                 accessToken,
                 refreshToken,
-                UserResponseDTO.from(user)
+                UserResponseDTO.from(user, streakService.currentStreak(user))
         );
     }
 }

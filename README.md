@@ -257,6 +257,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | Fix | `RaceRoomRepository` injects Boot 4's Jackson 3 mapper (CR-2.5 follow-up) | Inject the container-managed bean type | [`docs/refactors/28-raceroom-jackson3-mapper.md`](docs/refactors/28-raceroom-jackson3-mapper.md) |
 | Fix | Race countdown synced to the server clock (was desynced / stuck on `GO!`) | Clock-offset estimation (NTP-style round trip) over STOMP | [`docs/refactors/29-server-clock-offset-sync.md`](docs/refactors/29-server-clock-offset-sync.md) |
 | Fix | Race accuracy counts corrected mistakes, matching practice mode | One accuracy definition (cumulative keystroke stats) across modes | [`docs/refactors/30-race-accuracy-keystroke.md`](docs/refactors/30-race-accuracy-keystroke.md) |
+| Fix | Stale streak no longer shown after a missed day | Read-time derived view over the stored streak state | [`docs/refactors/31-streak-current-read-model.md`](docs/refactors/31-streak-current-read-model.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -503,6 +504,22 @@ recomputing them from `typedContent`, which is removed along with `calculateErro
 
 **Impact:** a corrected mistake still lowers race accuracy, matching practice mode, and live/final
 race figures agree. Reverting restores the positional (final-string) calculation.
+
+### Fix — Stale streak derived on read
+
+**Before:** `users.streak` was written only when a result or race finished, and every profile/auth/stat
+read returned it raw. After a missed day the dashboard kept showing the old value (e.g. `10 Day
+Streak`) until the user played again, because the write model intentionally leaves the stored streak
+untouched until the next activity resets it.
+
+**After:** `StreakService.currentStreak(User | StreakState)` derives the visible value from
+`lastPlayedDate` in the user's timezone: `0` when the last play is older than yesterday, otherwise
+`max(stored, 1)` (today, yesterday, or a future date after a backwards timezone move). `/auth/me`,
+auth responses, the user list, and user-stat reads now carry this value; the stored columns and write
+path are unchanged.
+
+**Impact:** a broken streak reads as `0` on the next fetch without any extra query or write, and
+consecutive-day increment/reset behaviour is untouched. No schema or response-shape change.
 
 ## Limitations
 

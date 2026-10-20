@@ -25,16 +25,19 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
+    private final StreakService streakService;
 
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, RoleRepository roleRepository){
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, RoleRepository roleRepository, StreakService streakService){
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.roleRepository = roleRepository;
+        this.streakService = streakService;
     }
 
     public UserResponseDTO getMe(Long id){
-        return new UserResponseDTO(userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found")));
+        User user = userRepository.findByIdWithRole(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        return new UserResponseDTO(user, streakService.currentStreak(user));
     }
 
     public UserResponseDTO modifyUser(UserUpdateRequestDTO userUpdateRequestDTO, Long id){
@@ -47,7 +50,8 @@ public class UserService {
         user.setFirstName(userUpdateRequestDTO.getFirstName());
         user.setLastName(userUpdateRequestDTO.getLastName());
 
-        return new UserResponseDTO(userRepository.save(user));
+        User saved = userRepository.save(user);
+        return new UserResponseDTO(saved, streakService.currentStreak(saved));
     }
 
     public void deactivateUser(UserDeactivateRequestDTO userDeactivateRequestDTO, Long id){
@@ -74,7 +78,9 @@ public class UserService {
 
         List<User> users = userRepository.findAllWithRole();
 
-        return users.stream().map(UserResponseDTO::new).toList();
+        return users.stream()
+                .map(listedUser -> new UserResponseDTO(listedUser, streakService.currentStreak(listedUser)))
+                .toList();
     }
 
 

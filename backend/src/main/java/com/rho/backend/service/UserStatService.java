@@ -16,10 +16,12 @@ public class UserStatService {
 
     private final UserStatRepository userStatRepository;
     private final UserRepository userRepository;
+    private final StreakService streakService;
 
-    public UserStatService(UserStatRepository userStatRepository, UserRepository userRepository){
+    public UserStatService(UserStatRepository userStatRepository, UserRepository userRepository, StreakService streakService){
         this.userStatRepository = userStatRepository;
         this.userRepository = userRepository;
+        this.streakService = streakService;
     }
 
 
@@ -38,7 +40,7 @@ public class UserStatService {
     @Transactional(readOnly = true)
     public UserStatResponseDTO getStat(long userId){
         UserStat userStat = userStatRepository.findByUser_UserId(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        return new UserStatResponseDTO(userStat);
+        return new UserStatResponseDTO(userStat, streakService.currentStreak(userStat.getUser()));
     }
 
 

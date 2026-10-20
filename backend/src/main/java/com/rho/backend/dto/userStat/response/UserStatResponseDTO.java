@@ -13,10 +13,10 @@ public record UserStatResponseDTO(
         BigDecimal lastSpeed,
         int textCompleted
 ) {
-    public UserStatResponseDTO(UserStat userStat){
+    public UserStatResponseDTO(UserStat userStat, int streak){
         this(
                 userStat.getUserStatsId(),
-                UserResponseDTO.from(userStat.getUser()),
+                UserResponseDTO.from(userStat.getUser(), streak),
                 userStat.getAverageSpeed(),
                 userStat.getBestSpeed(),
                 userStat.getLastSpeed(),
