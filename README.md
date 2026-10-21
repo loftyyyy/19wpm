@@ -83,6 +83,10 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 6.1 | Passage batches share a TTL cache and in-flight request map | TTL cache-aside with request coalescing | [`docs/refactors/35-passage-cache-inflight-dedupe.md`](docs/refactors/35-passage-cache-inflight-dedupe.md) |
 | 6.2 | Landing warms the passage cache on idle and start intent | Idle-time cache warming keyed by current preferences | [`docs/refactors/36-landing-idle-passage-prefetch.md`](docs/refactors/36-landing-idle-passage-prefetch.md) |
 | 6.3 | Typing page renders cached passages first and revalidates in the background | Stale-while-revalidate with an append-only queue | [`docs/refactors/37-passage-cache-first-swr.md`](docs/refactors/37-passage-cache-first-swr.md) |
+| 7.1 | Random words/texts use count + indexed offset instead of `ORDER BY random()` | Uniform sampling over an ordered index | [`docs/refactors/38-ordered-random-sampling.md`](docs/refactors/38-ordered-random-sampling.md) |
+| 7.2 | Word pools are cached per language/difficulty and shuffled in memory | Cache-aside for read-mostly data with bounded in-memory pools | [`docs/refactors/39-word-pool-cache.md`](docs/refactors/39-word-pool-cache.md) |
+| 7.3 | Batch content reuses the existing `count` parameters | Batch retrieval over a parameterized read | [`docs/refactors/40-batch-content-reuse.md`](docs/refactors/40-batch-content-reuse.md) |
+| 7.4 | Content endpoints report service time in `Server-Timing` | Per-route response-header instrumentation | [`docs/refactors/41-server-timing-telemetry.md`](docs/refactors/41-server-timing-telemetry.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -309,6 +313,53 @@ to the upcoming queue, so the passage already on screen cannot change.
 
 **Impact:** the landing warm-up becomes a real instant start, and stale passages remain available
 without blocking the test.
+
+### 7.1 - Indexed offset sampling for random content
+
+**Before:** random words and texts used `ORDER BY random()` (or function-based random ordering), so
+PostgreSQL sorted the whole matching set on every request; even cached galleries did not help the
+non-cached random paths.
+
+**After:** each request counts the matching rows, picks a random `OFFSET` in
+`[0, total - count]`, and reads one page ordered by the primary key. Dedicated indexes cover the
+language/difficulty and language/type predicates, so the count and page read stay index-only or
+index-range scans.
+
+**Impact:** request cost is proportional to the page size instead of the full content set, and the
+sampled rows are uniformly distributed without a sort.
+
+### 7.2 - Cached word pools
+
+**Before:** every word request ran a count plus a page query, even though seeded words change only
+through admin writes.
+
+**After:** a `wordPools` Caffeine region holds an immutable pool per `language:difficulty`, capped at
+5,000 words. Requests shuffle a copy in memory; oversized requests fall back to the indexed page
+query, and word writes evict the region.
+
+**Impact:** warm requests do no database work while preserving uniform sampling over the current
+5,000-word groups.
+
+### 7.3 - Reuse existing batch endpoints
+
+**Before:** the plan called for a batch content API, but `/words` and `/texts` already accepted
+`count`, and the frontend already requested `wordCount * 5` words or five texts per batch.
+
+**After:** kept the existing endpoints as the batch contract; no duplicate `/batch` route was added.
+Invalid counts and counts above the pool still return a client error.
+
+**Impact:** fewer routes to maintain and no change to the frontend's cache/queue batching.
+
+### 7.4 - Server-Timing telemetry
+
+**Before:** a slow passage request was indistinguishable from security, serialization, or network
+overhead in the browser and in k6 output.
+
+**After:** `/words`, `/texts`, `/texts/{id}`, and `/texts/random` return
+`Server-Timing: <metric>;dur=<ms>`, and CORS exposes the header to the frontend origin.
+
+**Impact:** cache hits, database reads, and sampling cost are visible per request without changing
+the response body; total client latency remains available from the browser or k6.
 
 ## Code Review Remediation
 
