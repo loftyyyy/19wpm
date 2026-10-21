@@ -82,6 +82,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 5.3 | First passage is deadline-bounded and falls back locally | Deadline-bounded remote read with an immediate local fallback | [`docs/refactors/34-passage-deadline-local-fallback.md`](docs/refactors/34-passage-deadline-local-fallback.md) |
 | 6.1 | Passage batches share a TTL cache and in-flight request map | TTL cache-aside with request coalescing | [`docs/refactors/35-passage-cache-inflight-dedupe.md`](docs/refactors/35-passage-cache-inflight-dedupe.md) |
 | 6.2 | Landing warms the passage cache on idle and start intent | Idle-time cache warming keyed by current preferences | [`docs/refactors/36-landing-idle-passage-prefetch.md`](docs/refactors/36-landing-idle-passage-prefetch.md) |
+| 6.3 | Typing page renders cached passages first and revalidates in the background | Stale-while-revalidate with an append-only queue | [`docs/refactors/37-passage-cache-first-swr.md`](docs/refactors/37-passage-cache-first-swr.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -296,6 +297,18 @@ the passage cache before the click navigates.
 
 **Impact:** a user who pauses on the landing page can arrive with the route and its first passage
 batch already available, while failures still fall back to the bounded typing-page fetch.
+
+### 6.3 - Cache-first passages with background revalidation
+
+**Before:** the typing page always started with an empty queue, even when the landing page had just
+prefetched the same preferences.
+
+**After:** `usePassageQueue` reads the cache synchronously on mount. A cache hit renders immediately;
+a stale hit is served while a forced batch revalidates in the background. Revalidation only appends
+to the upcoming queue, so the passage already on screen cannot change.
+
+**Impact:** the landing warm-up becomes a real instant start, and stale passages remain available
+without blocking the test.
 
 ## Code Review Remediation
 

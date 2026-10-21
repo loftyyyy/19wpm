@@ -7,7 +7,11 @@ import type {
   TextDifficulty,
   WordCount
 } from '../types';
-import { prefetchPassages } from '../services/passageCache';
+import {
+  getCachedPassages,
+  isPassageCacheStale,
+  prefetchPassages
+} from '../services/passageCache';
 import { generateTestPassage } from '../utils/passages';
 
 const PASSAGE_DEADLINE_MS = 1500;
@@ -81,14 +85,30 @@ export function usePassageQueue(
   useEffect(() => {
     requestIdRef.current += 1;
     isFetchingRef.current = false;
-    queueRef.current = [];
-    setIsLoading(true);
-    void fetchBatch();
+    const preferences = {
+      mode,
+      duration,
+      wordCount,
+      phraseLength,
+      difficulty
+    };
+    const cached = getCachedPassages(preferences);
+
+    queueRef.current = cached ?? [];
+    if (cached && cached.length > 0) {
+      setIsLoading(false);
+      if (isPassageCacheStale(preferences)) {
+        void fetchBatch();
+      }
+    } else {
+      setIsLoading(true);
+      void fetchBatch();
+    }
 
     return () => {
       requestIdRef.current += 1;
     };
-  }, [fetchBatch]);
+  }, [fetchBatch, mode, duration, wordCount, phraseLength, difficulty]);
 
   const next = useCallback((): Passage | null => {
     if (queueRef.current.length === 0) return null;
