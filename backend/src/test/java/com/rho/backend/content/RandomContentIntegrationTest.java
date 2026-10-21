@@ -1,13 +1,20 @@
 package com.rho.backend.content;
 
+import com.rho.backend.config.CacheConfig;
 import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.dto.word.request.WordRequestDTO;
 import com.rho.backend.dto.word.response.WordResponseDTO;
+import com.rho.backend.enums.AuthProvider;
 import com.rho.backend.enums.TextDifficulty;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.exception.InvalidResourceException;
+import com.rho.backend.model.Role;
 import com.rho.backend.model.Text;
+import com.rho.backend.model.User;
 import com.rho.backend.model.Word;
+import com.rho.backend.repository.RoleRepository;
 import com.rho.backend.repository.TextRepository;
+import com.rho.backend.repository.UserRepository;
 import com.rho.backend.repository.WordRepository;
 import com.rho.backend.service.TextService;
 import com.rho.backend.service.WordService;
@@ -15,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,10 +49,38 @@ class RandomContentIntegrationTest {
     @Autowired
     private TextRepository textRepository;
 
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private CacheManager cacheManager;
+
+    private long adminId;
+
     @BeforeEach
     void setUp() {
+        cacheManager.getCache(CacheConfig.WORD_POOLS).clear();
+        userRepository.deleteAll();
+        roleRepository.deleteAll();
         wordRepository.deleteAll();
         textRepository.deleteAll();
+
+        Role adminRole = roleRepository.save(Role.builder().name("ADMIN").build());
+        User admin = userRepository.save(User.builder()
+                .username("admin")
+                .firstName("Admin")
+                .lastName("User")
+                .country("PH")
+                .email("admin@example.com")
+                .isActive(true)
+                .provider(AuthProvider.LOCAL)
+                .timezone("UTC")
+                .role(adminRole)
+                .build());
+        adminId = admin.getUserId();
 
         wordRepository.saveAll(IntStream.range(0, 5)
                 .mapToObj(index -> Word.builder()
@@ -81,6 +117,18 @@ class RandomContentIntegrationTest {
     void rejectsWordCountAboveAvailablePool() {
         assertThatThrownBy(() -> wordService.getRandomWords("en", TextDifficulty.EASY, 6))
                 .isInstanceOf(InvalidResourceException.class);
+    }
+
+    @Test
+    void cachesWordPoolAndEvictsItWhenWordsChange() {
+        wordService.getRandomWords("en", TextDifficulty.EASY, 3);
+        var cache = cacheManager.getCache(CacheConfig.WORD_POOLS);
+        assertThat(cache.get("en:EASY")).isNotNull();
+
+        wordService.saveWord(new WordRequestDTO("fresh-word", "en", TextDifficulty.EASY), adminId);
+
+        assertThat(cache.get("en:EASY")).isNull();
+        assertThat(wordService.getRandomWords("en", TextDifficulty.EASY, 6)).hasSize(6);
     }
 
     @Test
