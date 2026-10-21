@@ -1,25 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
-import type { CSSProperties } from 'react';
 import { animate } from 'animejs';
 import Word from './Word';
 import { completeKeystroke, markPerformance, measurePerformance } from '../../utils/performance';
 
 const NO_EXTRA_CHARS: string[] = [];
-const CURSOR_STYLE: CSSProperties = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  width: '2px',
-  height: '1.2em',
-  backgroundColor: 'var(--accent)',
-  borderRadius: '1px',
-  pointerEvents: 'none',
-  zIndex: 10,
-};
-const CURSOR_HIDDEN_STYLE: CSSProperties = {
-  ...CURSOR_STYLE,
-  display: 'none',
-};
 
 interface TypingViewportProps {
   charsText: string;
@@ -200,20 +184,16 @@ export default function TypingViewport({
       left -= 1;
 
       if (isFirstPositionRef.current) {
-        // Teleport on first render — no animation
         isFirstPositionRef.current = false;
-        cursorEl.style.left = `${left}px`;
-        cursorEl.style.top = `${top}px`;
+        cursorEl.style.transform = `translate3d(${left}px, ${top}px, 0)`;
         return;
       }
 
-      // Cancel any in-flight animation
       caretAnimationRef.current?.pause();
 
-      // Animate with Monkeytype's exact easing
       caretAnimationRef.current = animate(cursorEl, {
-        left,
-        top,
+        translateX: left,
+        translateY: top,
         duration: 85,
         ease: 'inOut(1.25)',
       });
@@ -245,8 +225,7 @@ export default function TypingViewport({
       <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
         <div
           ref={cursorRef}
-          style={isFinished ? CURSOR_HIDDEN_STYLE : CURSOR_STYLE}
-          className={isTypingActive ? '' : 'animate-blink'}
+          className={`typing-cursor ${isFinished ? 'typing-cursor-hidden' : isTypingActive ? 'typing-cursor-active' : 'animate-blink'}`}
         />
         {passageWords.map((word, wi) => {
           const { chars } = word;
