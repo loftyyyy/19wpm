@@ -81,6 +81,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 5.2 | Solo route and passage loading use typing-shaped skeletons | Route-specific Suspense fallback plus content-shaped loading state | [`docs/refactors/33-typing-skeleton-fallback.md`](docs/refactors/33-typing-skeleton-fallback.md) |
 | 5.3 | First passage is deadline-bounded and falls back locally | Deadline-bounded remote read with an immediate local fallback | [`docs/refactors/34-passage-deadline-local-fallback.md`](docs/refactors/34-passage-deadline-local-fallback.md) |
 | 6.1 | Passage batches share a TTL cache and in-flight request map | TTL cache-aside with request coalescing | [`docs/refactors/35-passage-cache-inflight-dedupe.md`](docs/refactors/35-passage-cache-inflight-dedupe.md) |
+| 6.2 | Landing warms the passage cache on idle and start intent | Idle-time cache warming keyed by current preferences | [`docs/refactors/36-landing-idle-passage-prefetch.md`](docs/refactors/36-landing-idle-passage-prefetch.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -283,6 +284,18 @@ join an in-flight request, preventing duplicate passages from being appended.
 
 **Impact:** identical preference sets can share one network response, and a late response warms the
 cache for the next visit while the current queue keeps its 1.5-second local fallback.
+
+### 6.2 - Landing-page passage prefetch
+
+**Before:** the landing page prefetched the `/solo` route chunk but still left the first `/words` or
+`/texts` request to start after navigation.
+
+**After:** an idle callback prefetches the current preference set, and every preference change
+replaces the pending warm-up with one for the new key. Start-button intent warms both the route and
+the passage cache before the click navigates.
+
+**Impact:** a user who pauses on the landing page can arrive with the route and its first passage
+batch already available, while failures still fall back to the bounded typing-page fetch.
 
 ## Code Review Remediation
 
