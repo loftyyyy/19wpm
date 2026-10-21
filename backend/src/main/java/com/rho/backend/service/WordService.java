@@ -10,7 +10,6 @@ import com.rho.backend.model.User;
 import com.rho.backend.model.Word;
 import com.rho.backend.repository.UserRepository;
 import com.rho.backend.repository.WordRepository;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -78,15 +77,19 @@ public class WordService {
             throw new InvalidResourceException("Count must be greater than 0");
         }
 
-        List<Word> words = wordRepository.findRandomByLanguageAndDifficulty(
-                language.trim().toLowerCase(), difficulty.name(), count);
+        String normalizedLanguage = language.trim().toLowerCase();
+        long total = wordRepository.countByLanguageAndDifficulty(normalizedLanguage, difficulty);
 
-        if(words.isEmpty()){
+        if(total == 0){
             throw new ResourceNotFoundException("No words found for language: " + language + " and difficulty: " + difficulty);
         }
-        if(words.size() < count){
+        if(count > total){
             throw new InvalidResourceException("Count exceeds available words");
         }
+
+        long offset = ThreadLocalRandom.current().nextLong(total - count + 1);
+        List<Word> words = wordRepository.findPageByLanguageAndDifficulty(
+                normalizedLanguage, difficulty.name(), count, offset);
 
         return words.stream()
                 .map(WordResponseDTO::new)
