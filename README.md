@@ -80,6 +80,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 5.1 | Solo route chunk is fetched from landing intent instead of after navigation | Intent-based route prefetching over a memoized dynamic import | [`docs/refactors/32-solo-route-intent-prefetch.md`](docs/refactors/32-solo-route-intent-prefetch.md) |
 | 5.2 | Solo route and passage loading use typing-shaped skeletons | Route-specific Suspense fallback plus content-shaped loading state | [`docs/refactors/33-typing-skeleton-fallback.md`](docs/refactors/33-typing-skeleton-fallback.md) |
 | 5.3 | First passage is deadline-bounded and falls back locally | Deadline-bounded remote read with an immediate local fallback | [`docs/refactors/34-passage-deadline-local-fallback.md`](docs/refactors/34-passage-deadline-local-fallback.md) |
+| 6.1 | Passage batches share a TTL cache and in-flight request map | TTL cache-aside with request coalescing | [`docs/refactors/35-passage-cache-inflight-dedupe.md`](docs/refactors/35-passage-cache-inflight-dedupe.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -269,6 +270,19 @@ the queue can pass an `AbortSignal`.
 
 **Impact:** the first passage arrives within 1.5 seconds even when the API is slow or unavailable,
 and stale requests cannot mutate the queue.
+
+### 6.1 - Shared passage cache with request coalescing
+
+**Before:** every queue batch fetched `/words` or `/texts` directly, so the landing screen and the
+typing screen could not share work, and concurrent consumers could duplicate the same request.
+
+**After:** `passageCache.ts` owns word and phrase fetching behind five-minute, preference-keyed
+entries, a synchronous `getCachedPassages` lookup, and a `Map` of in-flight promises. Successful
+batches are cached; failures preserve the previous entry. Queue refills force a new batch but still
+join an in-flight request, preventing duplicate passages from being appended.
+
+**Impact:** identical preference sets can share one network response, and a late response warms the
+cache for the next visit while the current queue keeps its 1.5-second local fallback.
 
 ## Code Review Remediation
 
