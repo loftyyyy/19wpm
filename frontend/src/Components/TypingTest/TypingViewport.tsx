@@ -1,9 +1,25 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { animate } from 'animejs';
-import TypedWord from './TypedWord';
+import Word from './Word';
 import { completeKeystroke, markPerformance, measurePerformance } from '../../utils/performance';
 
 const NO_EXTRA_CHARS: string[] = [];
+const CURSOR_STYLE: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '2px',
+  height: '1.2em',
+  backgroundColor: 'var(--accent)',
+  borderRadius: '1px',
+  pointerEvents: 'none',
+  zIndex: 10,
+};
+const CURSOR_HIDDEN_STYLE: CSSProperties = {
+  ...CURSOR_STYLE,
+  display: 'none',
+};
 
 interface TypingViewportProps {
   charsText: string;
@@ -51,6 +67,9 @@ export default function TypingViewport({
   }, []);
   const setLastCharRef = useCallback((el: HTMLSpanElement | null) => {
     lastCharRef.current = el;
+  }, []);
+  const setWordRef = useCallback((index: number, el: HTMLSpanElement | null) => {
+    wordRefs.current[index] = el;
   }, []);
 
   const passageWords = useMemo(() => {
@@ -226,27 +245,16 @@ export default function TypingViewport({
       <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
         <div
           ref={cursorRef}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '2px',
-            height: '1.2em',
-            backgroundColor: 'var(--accent)',
-            borderRadius: '1px',
-            pointerEvents: 'none',
-            zIndex: 10,
-            display: isFinished ? 'none' : 'block',
-          }}
+          style={isFinished ? CURSOR_HIDDEN_STYLE : CURSOR_STYLE}
           className={isTypingActive ? '' : 'animate-blink'}
         />
         {passageWords.map((word, wi) => {
           const { chars } = word;
           const start = chars[0].globalIdx;
           const end = start + chars.length;
-          const showExtra = wi === currentWordIndex;
+          const isActive = wi === currentWordIndex;
           return (
-            <TypedWord
+            <Word
               key={wi}
               chars={chars}
               start={start}
@@ -254,12 +262,13 @@ export default function TypingViewport({
               typedChars={typedChars}
               isPastWord={lockedIndex >= end}
               hasError={mistakeWordIndices.has(wi)}
-              showExtra={showExtra}
-              activeGlobalIdx={activeGlobalIdx}
+              isActive={isActive}
+              activeCharIndex={isActive ? activeGlobalIdx : -1}
               lastGlobalIdx={lastGlobalIdx}
-              extraChars={showExtra ? extraChars : NO_EXTRA_CHARS}
+              extraChars={isActive ? extraChars : NO_EXTRA_CHARS}
               extraVariant={extraVariant}
-              onWordRef={el => { wordRefs.current[wi] = el; }}
+              wordIndex={wi}
+              onWordRef={setWordRef}
               onCurrentCharRef={setCurrentCharRef}
               onLastCharRef={setLastCharRef}
             />
