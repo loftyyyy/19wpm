@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
+import { preloadSolo } from '../routes/preloadSolo';
 import type { Duration, Mode, WordCount, PhraseLength, TextDifficulty } from '../types';
 import English from '../assets/English.svg';
 import Type from '../assets/TYPEIMAGE.png';
@@ -58,6 +59,14 @@ export default function LandingPage() {
   const [wordCount, setWordCount] = useState<WordCount>(initial.wordCount);
   const [phraseLength, setPhraseLength] = useState<PhraseLength>(initial.phraseLength);
   const [selectedDifficulty, setSelectedDifficulty] = useState<TextDifficulty>(initial.difficulty);
+  const [isStarting, setIsStarting] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void preloadSolo();
+    }, 800);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
@@ -72,6 +81,9 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   const handleStart = () => {
+    if (isStarting) return;
+    setIsStarting(true);
+    void preloadSolo();
     navigate(`/solo?${buildQuery(mode, selectedDuration, wordCount, phraseLength, selectedDifficulty)}`);
   };
 
@@ -94,9 +106,14 @@ export default function LandingPage() {
           <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <button
               onClick={handleStart}
-              className="px-8 py-4 bg-accent text-white rounded-xl font-sans font-semibold text-sm hover:bg-accent-hover transition-colors hover:cursor-pointer shadow-sm"
+              onPointerEnter={() => { void preloadSolo(); }}
+              onFocus={() => { void preloadSolo(); }}
+              onTouchStart={() => { void preloadSolo(); }}
+              disabled={isStarting}
+              aria-busy={isStarting}
+              className="px-8 py-4 bg-accent text-white rounded-xl font-sans font-semibold text-sm hover:bg-accent-hover transition-colors hover:cursor-pointer shadow-sm active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait"
             >
-              Start Typing
+              {isStarting ? 'Loading...' : 'Start Typing'}
             </button>
             <button
               onClick={() => navigate('/race')}

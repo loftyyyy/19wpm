@@ -77,6 +77,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
 | 4.1 | Random word/text selection done in the database | Push selection down to the database (set-based random sampling) | [`docs/refactors/05-word-text-random-selection.md`](docs/refactors/05-word-text-random-selection.md) |
 | 4.2 | User-stats update is a single atomic SQL statement | Atomic state transition (single-statement read-modify-write) | [`docs/refactors/06-user-stat-atomic-update.md`](docs/refactors/06-user-stat-atomic-update.md) |
+| 5.1 | Solo route chunk is fetched from landing intent instead of after navigation | Intent-based route prefetching over a memoized dynamic import | [`docs/refactors/32-solo-route-intent-prefetch.md`](docs/refactors/32-solo-route-intent-prefetch.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -229,6 +230,19 @@ computes everything against the row's current values in one row-locked statement
 the atomic streak update. `updatedRows == 0` preserves the "not found" behaviour.
 
 **Impact:** concurrent result submissions no longer clobber each other's count/average.
+
+### 5.1 - Solo route chunk is fetched from landing intent
+
+**Before:** the lazy `/solo` route downloaded `TypingTest` only after navigation, so the global
+page spinner stood between the click and the typing page.
+
+**After:** `preloadSolo()` memoizes the route import and is called after an 800 ms idle window, on
+start-button pointer/focus/touch intent, and on click. `App.tsx` reuses the same import for the lazy
+route, and the start button exposes a busy state while the transition begins.
+
+**Impact:** the route chunk can download while the user configures the test, removing one serial
+step from the click-to-type path. A slow or missing prefetch still falls back to normal Suspense
+loading.
 
 ## Code Review Remediation
 
