@@ -79,6 +79,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 4.2 | User-stats update is a single atomic SQL statement | Atomic state transition (single-statement read-modify-write) | [`docs/refactors/06-user-stat-atomic-update.md`](docs/refactors/06-user-stat-atomic-update.md) |
 | 5.1 | Solo route chunk is fetched from landing intent instead of after navigation | Intent-based route prefetching over a memoized dynamic import | [`docs/refactors/32-solo-route-intent-prefetch.md`](docs/refactors/32-solo-route-intent-prefetch.md) |
 | 5.2 | Solo route and passage loading use typing-shaped skeletons | Route-specific Suspense fallback plus content-shaped loading state | [`docs/refactors/33-typing-skeleton-fallback.md`](docs/refactors/33-typing-skeleton-fallback.md) |
+| 5.3 | First passage is deadline-bounded and falls back locally | Deadline-bounded remote read with an immediate local fallback | [`docs/refactors/34-passage-deadline-local-fallback.md`](docs/refactors/34-passage-deadline-local-fallback.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -254,6 +255,20 @@ passage card showed a single "Loading passage..." line before expanding into the
 a reusable passage skeleton. Both expose a polite status label and keep the final layout stable.
 
 **Impact:** removes the full-screen spinner flash and the layout jump between loading and typing.
+
+### 5.3 - Deadline-bounded passage loading
+
+**Before:** the first `/words` or `/texts` request had no time bound. A slow backend could leave the
+typing page loading indefinitely, and a late response could still write to the queue after a
+preference change or unmount.
+
+**After:** each passage batch is aborted at 1.5 seconds and replaced with a synchronously generated
+local passage. One quick retry is allowed while enough deadline remains, and request ids invalidate
+stale work after preference changes or unmounts. `api.get` now accepts an optional `RequestInit` so
+the queue can pass an `AbortSignal`.
+
+**Impact:** the first passage arrives within 1.5 seconds even when the API is slow or unavailable,
+and stale requests cannot mutate the queue.
 
 ## Code Review Remediation
 

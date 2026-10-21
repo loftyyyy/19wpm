@@ -177,8 +177,8 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(endpoint: string, responseType: 'json' | 'text' = 'json') =>
-    request<T>(endpoint, {}, responseType),
+  get: <T>(endpoint: string, responseType: 'json' | 'text' = 'json', options: RequestInit = {}) =>
+    request<T>(endpoint, options, responseType),
 
   post: <T>(endpoint: string, body?: unknown, responseType: 'json' | 'text' = 'json') =>
     request<T>(endpoint, {
