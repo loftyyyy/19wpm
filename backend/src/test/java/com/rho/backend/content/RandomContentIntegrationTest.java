@@ -24,15 +24,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
 @Transactional
 class RandomContentIntegrationTest {
@@ -58,10 +63,16 @@ class RandomContentIntegrationTest {
     @Autowired
     private CacheManager cacheManager;
 
+    @Autowired
+    private WebApplicationContext webApplicationContext;
+
+    private MockMvc mockMvc;
+
     private long adminId;
 
     @BeforeEach
     void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
         cacheManager.getCache(CacheConfig.WORD_POOLS).clear();
         userRepository.deleteAll();
         roleRepository.deleteAll();
@@ -151,5 +162,33 @@ class RandomContentIntegrationTest {
         TextResponseDTO text = textService.getRandomTextByType(TextType.SHORT);
 
         assertThat(text.textId()).isNotNull();
+    }
+
+    @Test
+    void wordEndpointEmitsServerTimingHeader() throws Exception {
+        String header = mockMvc.perform(get("/api/v1/words")
+                        .param("language", "en")
+                        .param("difficulty", "EASY")
+                        .param("count", "3"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getHeader("Server-Timing");
+
+        assertThat(header).matches("words;dur=\\d+");
+    }
+
+    @Test
+    void textBatchEndpointEmitsServerTimingHeader() throws Exception {
+        String header = mockMvc.perform(get("/api/v1/texts")
+                        .param("language", "en")
+                        .param("textType", "SHORT")
+                        .param("count", "2"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getHeader("Server-Timing");
+
+        assertThat(header).matches("texts;dur=\\d+");
     }
 }

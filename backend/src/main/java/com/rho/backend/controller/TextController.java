@@ -7,6 +7,7 @@ import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.enums.TextDifficulty;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.service.TextService;
+import com.rho.backend.util.ServerTiming;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +31,11 @@ public class TextController {
     public ResponseEntity<TextResponseDTO> getTextById(
             @PathVariable long textId,
             @AuthenticationPrincipal CustomUserDetails customUserDetails){
-        return ResponseEntity.ok(textService.getTextById(textId, customUserDetails.getUserId()));
+        long startNanos = System.nanoTime();
+        TextResponseDTO text = textService.getTextById(textId, customUserDetails.getUserId());
+        return ResponseEntity.ok()
+                .header(ServerTiming.HEADER, ServerTiming.measure("text", startNanos))
+                .body(text);
     }
 
     @GetMapping
@@ -39,7 +44,11 @@ public class TextController {
             @RequestParam TextType textType,
             @RequestParam int count)
     {
-        return ResponseEntity.ok(textService.getRandomTexts(language, textType, count));
+        long startNanos = System.nanoTime();
+        List<TextResponseDTO> texts = textService.getRandomTexts(language, textType, count);
+        return ResponseEntity.ok()
+                .header(ServerTiming.HEADER, ServerTiming.measure("texts", startNanos))
+                .body(texts);
     }
 
 
@@ -65,10 +74,13 @@ public class TextController {
     @GetMapping("/random")
     public ResponseEntity<TextResponseDTO> getRandomTextByType(
             @RequestParam(required = false) TextType type){
-        if(type == null){
-            return ResponseEntity.ok(textService.getRandomText());
-        }
-        return ResponseEntity.ok(textService.getRandomTextByType(type));
+        long startNanos = System.nanoTime();
+        TextResponseDTO text = type == null
+                ? textService.getRandomText()
+                : textService.getRandomTextByType(type);
+        return ResponseEntity.ok()
+                .header(ServerTiming.HEADER, ServerTiming.measure("text", startNanos))
+                .body(text);
     }
 
     @GetMapping("/short")
