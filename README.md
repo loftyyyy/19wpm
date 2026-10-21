@@ -78,6 +78,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 4.1 | Random word/text selection done in the database | Push selection down to the database (set-based random sampling) | [`docs/refactors/05-word-text-random-selection.md`](docs/refactors/05-word-text-random-selection.md) |
 | 4.2 | User-stats update is a single atomic SQL statement | Atomic state transition (single-statement read-modify-write) | [`docs/refactors/06-user-stat-atomic-update.md`](docs/refactors/06-user-stat-atomic-update.md) |
 | 5.1 | Solo route chunk is fetched from landing intent instead of after navigation | Intent-based route prefetching over a memoized dynamic import | [`docs/refactors/32-solo-route-intent-prefetch.md`](docs/refactors/32-solo-route-intent-prefetch.md) |
+| 5.2 | Solo route and passage loading use typing-shaped skeletons | Route-specific Suspense fallback plus content-shaped loading state | [`docs/refactors/33-typing-skeleton-fallback.md`](docs/refactors/33-typing-skeleton-fallback.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -243,6 +244,16 @@ route, and the start button exposes a busy state while the transition begins.
 **Impact:** the route chunk can download while the user configures the test, removing one serial
 step from the click-to-type path. A slow or missing prefetch still falls back to normal Suspense
 loading.
+
+### 5.2 - Typing-shaped loading skeletons
+
+**Before:** the `/solo` route used the global centered spinner while its chunk loaded, then the
+passage card showed a single "Loading passage..." line before expanding into the typing layout.
+
+**After:** the route has a specific Suspense fallback shaped like the typing page, and the card uses
+a reusable passage skeleton. Both expose a polite status label and keep the final layout stable.
+
+**Impact:** removes the full-screen spinner flash and the layout jump between loading and typing.
 
 ## Code Review Remediation
 

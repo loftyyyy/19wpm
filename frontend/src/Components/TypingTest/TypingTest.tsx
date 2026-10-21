@@ -2,6 +2,7 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
 import TypingViewport from './TypingViewport';
+import { TypingPassageSkeleton } from './TypingSkeleton';
 import { useTypingActivity } from '../../hooks/useTypingActivity';
 import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
@@ -230,7 +231,7 @@ export default function TypingTest() {
           className="w-full p-6 rounded-xl bg-card border border-line transition-theme focus:outline-none focus:ring-2 focus:ring-accent/30 font-mono text-xl md:text-2xl leading-relaxed cursor-text select-none"
         >
           {!passage ? (
-            <div className="text-center text-text-dim font-sans text-sm transition-theme">Loading passage...</div>
+            <TypingPassageSkeleton />
           ) : !state.isRunning && !state.isFinished ? (
             <div className="text-center text-text-dim font-sans text-sm mb-4 transition-theme">
               Start typing to begin &middot; Press Esc to restart

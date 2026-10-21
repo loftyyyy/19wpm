@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import PageFallback from './Components/PageFallback';
+import TypingSkeleton from './Components/TypingTest/TypingSkeleton';
 import { preloadSolo } from './routes/preloadSolo';
 
 const LandingPage = lazy(() => import('./LandingPage/Landing-page'));
@@ -21,7 +22,7 @@ export default function App() {
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/solo" element={<TypingTest />} />
+          <Route path="/solo" element={<Suspense fallback={<TypingSkeleton />}><TypingTest /></Suspense>} />
           <Route path="/results" element={<TestResults />} />
           <Route path="/login" element={<LoginContainer />} />
           <Route path="/oauth2/callback" element={<OAuth2Callback />} />
