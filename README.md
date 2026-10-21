@@ -87,6 +87,9 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 7.2 | Word pools are cached per language/difficulty and shuffled in memory | Cache-aside for read-mostly data with bounded in-memory pools | [`docs/refactors/39-word-pool-cache.md`](docs/refactors/39-word-pool-cache.md) |
 | 7.3 | Batch content reuses the existing `count` parameters | Batch retrieval over a parameterized read | [`docs/refactors/40-batch-content-reuse.md`](docs/refactors/40-batch-content-reuse.md) |
 | 7.4 | Content endpoints report service time in `Server-Timing` | Per-route response-header instrumentation | [`docs/refactors/41-server-timing-telemetry.md`](docs/refactors/41-server-timing-telemetry.md) |
+| 8.1 | Typing render path reports keystroke and viewport timing | User Timing marks around the keydown-to-commit path | [`docs/refactors/42-performance-instrumentation.md`](docs/refactors/42-performance-instrumentation.md) |
+| 8.2 | Inactive words stop re-rendering on every keystroke | Active-only prop boundary + strict leaf memoization | [`docs/refactors/43-strict-word-memoization.md`](docs/refactors/43-strict-word-memoization.md) |
+| 8.3 | Caret movement no longer triggers layout | Compositor-only transform animation | [`docs/refactors/44-cursor-transform-animation.md`](docs/refactors/44-cursor-transform-animation.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -360,6 +363,40 @@ overhead in the browser and in k6 output.
 
 **Impact:** cache hits, database reads, and sampling cost are visible per request without changing
 the response body; total client latency remains available from the browser or k6.
+
+### 8.1 - Typing render instrumentation
+
+**Before:** slow keystrokes could not be attributed to the engine, React rendering, or caret layout.
+
+**After:** `19wpm:keystroke` measures keydown through the first committed viewport update, and
+`19wpm:viewport` measures render through the final layout effect. Both are exposed through the
+browser's User Timing API and remain enabled in production builds.
+
+**Impact:** the production-preview baseline for a 240-word timed passage was 0.8 ms p50 / 1.2 ms p95
+per keystroke and 0.6 ms p50 / 1.0 ms p95 per viewport render.
+
+### 8.2 - Active-only word memoization
+
+**Before:** `TypedWord` was memoized, but every word received the changing `activeGlobalIdx`, so the
+comparator invalidated every word and React reconciled the whole passage on each keystroke.
+
+**After:** only the active word receives the cursor index; inactive words receive `-1` and skip the
+typed-segment comparison. The leaf is now `Word`, with a stable word ref callback and character refs
+only on the current and last characters.
+
+**Impact:** keystroke timing fell to 0.3 ms p50 / 0.5 ms p95 and viewport timing to 0.2 ms p50 /
+0.3 ms p95, roughly a 60–70% reduction.
+
+### 8.3 - Transform-based caret
+
+**Before:** the caret animated `left` and `top`, forcing layout work on every animation frame.
+
+**After:** the caret is positioned once with `translate3d` and subsequent moves animate
+`translateX`/`translateY`. Invariant geometry moved to `.typing-cursor`, and the conflicting CSS
+transition and unused keyframes were removed.
+
+**Impact:** cursor motion stays on the compositor; typing timings were unchanged because the
+benchmark markers do not include paint or compositing.
 
 ## Code Review Remediation
 
