@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { animate } from 'animejs';
 import TypedWord from './TypedWord';
+import { completeKeystroke, markPerformance, measurePerformance } from '../../utils/performance';
 
 const NO_EXTRA_CHARS: string[] = [];
 
@@ -41,6 +42,9 @@ export default function TypingViewport({
   const isFirstPositionRef = useRef(true);
   const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
+  const renderStartMarkRef = useRef<string | null>(null);
+
+  renderStartMarkRef.current = markPerformance('viewport:start');
 
   const setCurrentCharRef = useCallback((el: HTMLSpanElement | null) => {
     currentCharRef.current = el;
@@ -197,6 +201,15 @@ export default function TypingViewport({
     });
     return () => cancelAnimationFrame(rafId);
   }, [currentIndex, charsText]);
+
+  useLayoutEffect(() => {
+    const startMark = renderStartMarkRef.current;
+    if (startMark) {
+      measurePerformance('viewport', startMark);
+      renderStartMarkRef.current = null;
+    }
+    completeKeystroke();
+  });
 
   const passageLength = charsText.length;
   const isAtEnd = currentIndex >= passageLength;

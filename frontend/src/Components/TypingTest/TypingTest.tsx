@@ -7,6 +7,7 @@ import { useTypingActivity } from '../../hooks/useTypingActivity';
 import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
+import { beginKeystroke } from '../../utils/performance';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
 
 const wordCounts: WordCount[] = [10, 25, 50, 100];
@@ -123,6 +124,9 @@ export default function TypingTest() {
       navigatedRef.current = false;
       containerRef.current?.focus();
       return;
+    }
+    if (e.key.length === 1 || e.key === 'Backspace') {
+      beginKeystroke();
     }
     markActive();
     handleKeyDown(e);
