@@ -1,0 +1,86 @@
+location: ${AZURE_LOCATION}
+name: ${APP_NAME}
+type: Microsoft.App/containerApps
+tags:
+  app: 19wpm
+  component: backend
+properties:
+  managedEnvironmentId: ${AZURE_CONTAINERAPPS_ENVIRONMENT_ID}
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 8080
+      transport: auto
+      allowInsecure: false
+      traffic:
+        - latestRevision: true
+          weight: 100
+    secrets:
+      - name: db-password
+        value: ${SPRING_DATASOURCE_PASSWORD}
+      - name: redis-password
+        value: ${SPRING_DATA_REDIS_PASSWORD}
+      - name: jwt-secret
+        value: ${JWT_SECRET}
+      - name: github-client-secret
+        value: ${GITHUB_CLIENT_SECRET}
+      - name: google-client-secret
+        value: ${GOOGLE_CLIENT_SECRET}
+  template:
+    containers:
+      - name: backend
+        image: ${BACKEND_IMAGE}
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: prod
+          - name: SPRING_DATASOURCE_URL
+            value: ${SPRING_DATASOURCE_URL}
+          - name: SPRING_DATASOURCE_USERNAME
+            value: ${SPRING_DATASOURCE_USERNAME}
+          - name: SPRING_DATASOURCE_PASSWORD
+            secretRef: db-password
+          - name: SPRING_DATA_REDIS_HOST
+            value: ${SPRING_DATA_REDIS_HOST}
+          - name: SPRING_DATA_REDIS_PORT
+            value: ${SPRING_DATA_REDIS_PORT}
+          - name: SPRING_DATA_REDIS_PASSWORD
+            secretRef: redis-password
+          - name: JWT_SECRET
+            secretRef: jwt-secret
+          - name: FRONTEND_URL
+            value: ${FRONTEND_URL}
+          - name: GITHUB_CLIENT_ID
+            value: ${GITHUB_CLIENT_ID}
+          - name: GITHUB_CLIENT_SECRET
+            secretRef: github-client-secret
+          - name: GITHUB_REDIRECT_URI
+            value: ${GITHUB_REDIRECT_URI}
+          - name: GOOGLE_CLIENT_ID
+            value: ${GOOGLE_CLIENT_ID}
+          - name: GOOGLE_CLIENT_SECRET
+            secretRef: google-client-secret
+          - name: GOOGLE_REDIRECT_URI
+            value: ${GOOGLE_REDIRECT_URI}
+          - name: DB_POOL_MAX
+            value: "10"
+          - name: DB_POOL_MIN
+            value: "2"
+          - name: DB_CONNECTION_TIMEOUT_MS
+            value: "5000"
+          - name: DB_VALIDATION_TIMEOUT_MS
+            value: "2000"
+          - name: DB_KEEPALIVE_MS
+            value: "120000"
+          - name: REDIS_POOL_MAX
+            value: "8"
+          - name: REDIS_POOL_MAX_IDLE
+            value: "8"
+          - name: REDIS_POOL_MIN_IDLE
+            value: "1"
+        resources:
+          cpu: 1.0
+          memory: 2Gi
+    scale:
+      minReplicas: 1
+      maxReplicas: 1
