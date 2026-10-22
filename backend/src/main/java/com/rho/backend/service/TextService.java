@@ -13,6 +13,7 @@ import com.rho.backend.model.Text;
 import com.rho.backend.model.User;
 import com.rho.backend.repository.TextRepository;
 import com.rho.backend.repository.UserRepository;
+import io.micrometer.observation.annotation.Observed;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -121,6 +122,7 @@ public class TextService {
     }
 
 
+    @Observed(name = "texts.random.batch")
     public List<TextResponseDTO> getRandomTexts(String language, TextType textType , int count){
         if(language == null || language.isBlank()){
             throw new InvalidResourceException("Language cannot be empty");
@@ -150,6 +152,7 @@ public class TextService {
                 .map(TextResponseDTO::new)
                 .toList();
     }
+    @Observed(name = "texts.by.id")
     public TextResponseDTO getTextById(Long textId, Long id){
         Text text = textRepository.findById(textId).orElseThrow(() -> new ResourceNotFoundException("Text not found"));
 
@@ -166,6 +169,7 @@ public class TextService {
         return new TextResponseDTO(text);
     }
 
+    @Observed(name = "texts.preset")
     @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'preset'")
     public List<TextResponseDTO> getPresetTexts(){
         List<Text> texts = textRepository.findByIsCustomFalse();
@@ -186,6 +190,7 @@ public class TextService {
         return texts.stream().map(TextResponseDTO::new).toList();
     }
 
+    @Observed(name = "texts.random.type")
     public TextResponseDTO getRandomTextByType(TextType type) {
         if(type == null){
             throw new InvalidResourceException("Type cannot be null");
@@ -203,29 +208,34 @@ public class TextService {
     }
 
     @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'short'")
+    @Observed(name = "texts.short")
     public List<TextResponseDTO> getShortTexts(){
         List<Text> smallTexts = textRepository.findByType(TextType.SHORT);
         return smallTexts.stream().map(TextResponseDTO::new).toList();
     }
 
     @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'medium'")
+    @Observed(name = "texts.medium")
     public List<TextResponseDTO> getMediumTexts(){
         List<Text> mediumTexts = textRepository.findByType(TextType.MEDIUM);
         return mediumTexts.stream().map(TextResponseDTO::new).toList();
     }
 
     @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'long'")
+    @Observed(name = "texts.long")
     public List<TextResponseDTO> getLongTexts(){
         List<Text> longTexts = textRepository.findByType(TextType.LONG);
         return longTexts.stream().map(TextResponseDTO::new).toList();
     }
 
     @Cacheable(cacheNames = CacheConfig.TEXT_CATALOGUE, key = "'thicc'")
+    @Observed(name = "texts.thicc")
     public List<TextResponseDTO> getThiccTexts(){
         List<Text> thiccTexts = textRepository.findByType(TextType.THICC);
         return thiccTexts.stream().map(TextResponseDTO::new).toList();
     }
 
+    @Observed(name = "texts.random")
     public TextResponseDTO getRandomText() {
         long total = textRepository.countByIsCustomFalse();
         if(total == 0){

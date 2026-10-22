@@ -28,7 +28,8 @@ public class CacheConfig {
         CaffeineCacheManager manager = new CaffeineCacheManager(TEXT_CATALOGUE, WORD_POOLS);
         manager.setCaffeine(Caffeine.newBuilder()
                 .maximumSize(1_000)
-                .expireAfterWrite(Duration.ofMinutes(30)));
+                .expireAfterWrite(Duration.ofMinutes(30))
+                .recordStats());
         return manager;
     }
 }

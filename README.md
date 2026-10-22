@@ -94,6 +94,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 9.2 | Multi-replica audit confirms race rooms and STOMP remain instance-local | Explicit single-replica capacity constraint | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
 | 9.3 | k6 suite validated against the optimized read endpoints | Scripted arrival-rate load testing with thresholds | [`k6/README.md`](k6/README.md) |
 | 10.1 | Pull requests enforce bundle and Lighthouse performance budgets | Automated performance budgets in CI | [`docs/refactors/46-ci-performance-regression-gates.md`](docs/refactors/46-ci-performance-regression-gates.md) |
+| 10.2 | Backend requests, services, and repositories emit Actuator, Prometheus, and OTLP telemetry | Automatic HTTP instrumentation + declarative observations at service and repository boundaries | [`docs/refactors/47-backend-telemetry.md`](docs/refactors/47-backend-telemetry.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
