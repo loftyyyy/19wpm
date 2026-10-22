@@ -19,7 +19,7 @@ public record UserResponseDTO (
     LocalDateTime deactivatedAt
     ){
 
-    public UserResponseDTO(User user) {
+    public UserResponseDTO(User user, int streak) {
         this(
                 user.getUserId(),
                 user.getUsername(),
@@ -29,7 +29,7 @@ public record UserResponseDTO (
                 user.getCountry(),
                 user.getTimezone(),
                 user.getAvatar(),
-                user.getStreak(),
+                streak,
                 user.getIsActive(),
                 user.getCreatedAt(),
                 user.getUpdatedAt(),

@@ -5,6 +5,7 @@ import com.rho.backend.dto.word.request.WordRequestDTO;
 import com.rho.backend.dto.word.response.WordResponseDTO;
 import com.rho.backend.enums.TextDifficulty;
 import com.rho.backend.service.WordService;
+import com.rho.backend.util.ServerTiming;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,7 +43,11 @@ public class WordController {
             @RequestParam String language,
             @RequestParam TextDifficulty difficulty,
             @RequestParam int count){
-        return ResponseEntity.ok(wordService.getRandomWords(language, difficulty, count));
+        long startNanos = System.nanoTime();
+        List<WordResponseDTO> words = wordService.getRandomWords(language, difficulty, count);
+        return ResponseEntity.ok()
+                .header(ServerTiming.HEADER, ServerTiming.measure("words", startNanos))
+                .body(words);
     }
 
     @PreAuthorize("hasRole('ADMIN')")

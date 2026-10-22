@@ -1,0 +1,56 @@
+name: Performance regression
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/performance.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/performance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  performance:
+    name: Bundle and Lighthouse budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Enforce bundle size budgets
+        working-directory: frontend
+        run: npm run perf:bundle
+
+      - name: Run Lighthouse CI assertions
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: ./frontend/lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true

@@ -20,12 +20,25 @@ public interface TextRepository extends JpaRepository<Text, Long> {
 
     Optional<Text> findByTextId(Long textId);
 
-    @Query(value = "SELECT * FROM texts WHERE is_custom = false ORDER BY random() LIMIT 1", nativeQuery = true)
-    Optional<Text> findRandomPreset();
+    long countByIsCustomFalse();
 
-    @Query(value = "SELECT * FROM texts WHERE is_custom = false AND type = :type ORDER BY random() LIMIT 1", nativeQuery = true)
-    Optional<Text> findRandomPresetByType(@Param("type") String type);
+    long countByIsCustomFalseAndType(TextType type);
 
-    @Query(value = "SELECT * FROM texts WHERE language = :language AND type = :type ORDER BY random() LIMIT :count", nativeQuery = true)
-    List<Text> findRandomByLanguageAndType(@Param("language") String language, @Param("type") String type, @Param("count") int count);
+    long countByLanguageAndType(String language, TextType type);
+
+    @Query(value = "SELECT * FROM texts WHERE is_custom = false ORDER BY text_id LIMIT :count OFFSET :offset", nativeQuery = true)
+    List<Text> findPresetPage(@Param("count") int count, @Param("offset") long offset);
+
+    @Query(value = "SELECT * FROM texts WHERE is_custom = false AND type = :type ORDER BY text_id LIMIT :count OFFSET :offset", nativeQuery = true)
+    List<Text> findPresetPageByType(
+            @Param("type") String type,
+            @Param("count") int count,
+            @Param("offset") long offset);
+
+    @Query(value = "SELECT * FROM texts WHERE language = :language AND type = :type ORDER BY text_id LIMIT :count OFFSET :offset", nativeQuery = true)
+    List<Text> findPageByLanguageAndType(
+            @Param("language") String language,
+            @Param("type") String type,
+            @Param("count") int count,
+            @Param("offset") long offset);
 }

@@ -2,10 +2,13 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
 import TypingViewport from './TypingViewport';
+import { TypingPassageSkeleton } from './TypingSkeleton';
 import { useTypingActivity } from '../../hooks/useTypingActivity';
 import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
+import { beginKeystroke } from '../../utils/performance';
+import { completeTypingJourney } from '../../utils/telemetry';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
 
 const wordCounts: WordCount[] = [10, 25, 50, 100];
@@ -85,6 +88,10 @@ export default function TypingTest() {
     }
   }, [isLoading, next]);
 
+  useEffect(() => {
+    if (passage !== null) completeTypingJourney();
+  }, [passage]);
+
   const isCapsLockOn = useCapsLock();
 
   const { state, handleKeyDown, getResult, reset } = useTypingEngine(
@@ -122,6 +129,9 @@ export default function TypingTest() {
       navigatedRef.current = false;
       containerRef.current?.focus();
       return;
+    }
+    if (e.key.length === 1 || e.key === 'Backspace') {
+      beginKeystroke();
     }
     markActive();
     handleKeyDown(e);
@@ -230,7 +240,7 @@ export default function TypingTest() {
           className="w-full p-6 rounded-xl bg-card border border-line transition-theme focus:outline-none focus:ring-2 focus:ring-accent/30 font-mono text-xl md:text-2xl leading-relaxed cursor-text select-none"
         >
           {!passage ? (
-            <div className="text-center text-text-dim font-sans text-sm transition-theme">Loading passage...</div>
+            <TypingPassageSkeleton />
           ) : !state.isRunning && !state.isFinished ? (
             <div className="text-center text-text-dim font-sans text-sm mb-4 transition-theme">
               Start typing to begin &middot; Press Esc to restart

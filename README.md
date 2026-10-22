@@ -77,6 +77,25 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 3.1 | SQL logging off; Open-Session-In-View disabled; bounded HikariCP pool | Transaction-scoped persistence context + environment-specific config via profiles | [`docs/refactors/03-jpa-osiv-sql-logging.md`](docs/refactors/03-jpa-osiv-sql-logging.md) |
 | 4.1 | Random word/text selection done in the database | Push selection down to the database (set-based random sampling) | [`docs/refactors/05-word-text-random-selection.md`](docs/refactors/05-word-text-random-selection.md) |
 | 4.2 | User-stats update is a single atomic SQL statement | Atomic state transition (single-statement read-modify-write) | [`docs/refactors/06-user-stat-atomic-update.md`](docs/refactors/06-user-stat-atomic-update.md) |
+| 5.1 | Solo route chunk is fetched from landing intent instead of after navigation | Intent-based route prefetching over a memoized dynamic import | [`docs/refactors/32-solo-route-intent-prefetch.md`](docs/refactors/32-solo-route-intent-prefetch.md) |
+| 5.2 | Solo route and passage loading use typing-shaped skeletons | Route-specific Suspense fallback plus content-shaped loading state | [`docs/refactors/33-typing-skeleton-fallback.md`](docs/refactors/33-typing-skeleton-fallback.md) |
+| 5.3 | First passage is deadline-bounded and falls back locally | Deadline-bounded remote read with an immediate local fallback | [`docs/refactors/34-passage-deadline-local-fallback.md`](docs/refactors/34-passage-deadline-local-fallback.md) |
+| 6.1 | Passage batches share a TTL cache and in-flight request map | TTL cache-aside with request coalescing | [`docs/refactors/35-passage-cache-inflight-dedupe.md`](docs/refactors/35-passage-cache-inflight-dedupe.md) |
+| 6.2 | Landing warms the passage cache on idle and start intent | Idle-time cache warming keyed by current preferences | [`docs/refactors/36-landing-idle-passage-prefetch.md`](docs/refactors/36-landing-idle-passage-prefetch.md) |
+| 6.3 | Typing page renders cached passages first and revalidates in the background | Stale-while-revalidate with an append-only queue | [`docs/refactors/37-passage-cache-first-swr.md`](docs/refactors/37-passage-cache-first-swr.md) |
+| 7.1 | Random words/texts use count + indexed offset instead of `ORDER BY random()` | Uniform sampling over an ordered index | [`docs/refactors/38-ordered-random-sampling.md`](docs/refactors/38-ordered-random-sampling.md) |
+| 7.2 | Word pools are cached per language/difficulty and shuffled in memory | Cache-aside for read-mostly data with bounded in-memory pools | [`docs/refactors/39-word-pool-cache.md`](docs/refactors/39-word-pool-cache.md) |
+| 7.3 | Batch content reuses the existing `count` parameters | Batch retrieval over a parameterized read | [`docs/refactors/40-batch-content-reuse.md`](docs/refactors/40-batch-content-reuse.md) |
+| 7.4 | Content endpoints report service time in `Server-Timing` | Per-route response-header instrumentation | [`docs/refactors/41-server-timing-telemetry.md`](docs/refactors/41-server-timing-telemetry.md) |
+| 8.1 | Typing render path reports keystroke and viewport timing | User Timing marks around the keydown-to-commit path | [`docs/refactors/42-performance-instrumentation.md`](docs/refactors/42-performance-instrumentation.md) |
+| 8.2 | Inactive words stop re-rendering on every keystroke | Active-only prop boundary + strict leaf memoization | [`docs/refactors/43-strict-word-memoization.md`](docs/refactors/43-strict-word-memoization.md) |
+| 8.3 | Caret movement no longer triggers layout | Compositor-only transform animation | [`docs/refactors/44-cursor-transform-animation.md`](docs/refactors/44-cursor-transform-animation.md) |
+| 9.1 | Cold starts use bounded database and Redis pools; deployment stays warm | Bounded resource pools with fail-fast timeouts; explicit capacity constraint | [`docs/refactors/45-cold-start-and-connection-pools.md`](docs/refactors/45-cold-start-and-connection-pools.md) |
+| 9.2 | Multi-replica audit confirms race rooms and STOMP remain instance-local | Explicit single-replica capacity constraint | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
+| 9.3 | k6 suite validated against the optimized read endpoints | Scripted arrival-rate load testing with thresholds | [`k6/README.md`](k6/README.md) |
+| 10.1 | Pull requests enforce bundle and Lighthouse performance budgets | Automated performance budgets in CI | [`docs/refactors/46-ci-performance-regression-gates.md`](docs/refactors/46-ci-performance-regression-gates.md) |
+| 10.2 | Backend requests, services, and repositories emit Actuator, Prometheus, and OTLP telemetry | Automatic HTTP instrumentation + declarative observations at service and repository boundaries | [`docs/refactors/47-backend-telemetry.md`](docs/refactors/47-backend-telemetry.md) |
+| 10.3 | Browsers report Core Web Vitals and Start Typing latency to a Micrometer-backed ingress | Beacon-delivered field metrics + bounded-cardinality server summaries | [`docs/refactors/48-frontend-rum.md`](docs/refactors/48-frontend-rum.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -230,6 +249,197 @@ the atomic streak update. `updatedRows == 0` preserves the "not found" behaviour
 
 **Impact:** concurrent result submissions no longer clobber each other's count/average.
 
+### 5.1 - Solo route chunk is fetched from landing intent
+
+**Before:** the lazy `/solo` route downloaded `TypingTest` only after navigation, so the global
+page spinner stood between the click and the typing page.
+
+**After:** `preloadSolo()` memoizes the route import and is called after an 800 ms idle window, on
+start-button pointer/focus/touch intent, and on click. `App.tsx` reuses the same import for the lazy
+route, and the start button exposes a busy state while the transition begins.
+
+**Impact:** the route chunk can download while the user configures the test, removing one serial
+step from the click-to-type path. A slow or missing prefetch still falls back to normal Suspense
+loading.
+
+### 5.2 - Typing-shaped loading skeletons
+
+**Before:** the `/solo` route used the global centered spinner while its chunk loaded, then the
+passage card showed a single "Loading passage..." line before expanding into the typing layout.
+
+**After:** the route has a specific Suspense fallback shaped like the typing page, and the card uses
+a reusable passage skeleton. Both expose a polite status label and keep the final layout stable.
+
+**Impact:** removes the full-screen spinner flash and the layout jump between loading and typing.
+
+### 5.3 - Deadline-bounded passage loading
+
+**Before:** the first `/words` or `/texts` request had no time bound. A slow backend could leave the
+typing page loading indefinitely, and a late response could still write to the queue after a
+preference change or unmount.
+
+**After:** each passage batch is aborted at 1.5 seconds and replaced with a synchronously generated
+local passage. One quick retry is allowed while enough deadline remains, and request ids invalidate
+stale work after preference changes or unmounts. `api.get` now accepts an optional `RequestInit` so
+the queue can pass an `AbortSignal`.
+
+**Impact:** the first passage arrives within 1.5 seconds even when the API is slow or unavailable,
+and stale requests cannot mutate the queue.
+
+### 6.1 - Shared passage cache with request coalescing
+
+**Before:** every queue batch fetched `/words` or `/texts` directly, so the landing screen and the
+typing screen could not share work, and concurrent consumers could duplicate the same request.
+
+**After:** `passageCache.ts` owns word and phrase fetching behind five-minute, preference-keyed
+entries, a synchronous `getCachedPassages` lookup, and a `Map` of in-flight promises. Successful
+batches are cached; failures preserve the previous entry. Queue refills force a new batch but still
+join an in-flight request, preventing duplicate passages from being appended.
+
+**Impact:** identical preference sets can share one network response, and a late response warms the
+cache for the next visit while the current queue keeps its 1.5-second local fallback.
+
+### 6.2 - Landing-page passage prefetch
+
+**Before:** the landing page prefetched the `/solo` route chunk but still left the first `/words` or
+`/texts` request to start after navigation.
+
+**After:** an idle callback prefetches the current preference set, and every preference change
+replaces the pending warm-up with one for the new key. Start-button intent warms both the route and
+the passage cache before the click navigates.
+
+**Impact:** a user who pauses on the landing page can arrive with the route and its first passage
+batch already available, while failures still fall back to the bounded typing-page fetch.
+
+### 6.3 - Cache-first passages with background revalidation
+
+**Before:** the typing page always started with an empty queue, even when the landing page had just
+prefetched the same preferences.
+
+**After:** `usePassageQueue` reads the cache synchronously on mount. A cache hit renders immediately;
+a stale hit is served while a forced batch revalidates in the background. Revalidation only appends
+to the upcoming queue, so the passage already on screen cannot change.
+
+**Impact:** the landing warm-up becomes a real instant start, and stale passages remain available
+without blocking the test.
+
+### 7.1 - Indexed offset sampling for random content
+
+**Before:** random words and texts used `ORDER BY random()` (or function-based random ordering), so
+PostgreSQL sorted the whole matching set on every request; even cached galleries did not help the
+non-cached random paths.
+
+**After:** each request counts the matching rows, picks a random `OFFSET` in
+`[0, total - count]`, and reads one page ordered by the primary key. Dedicated indexes cover the
+language/difficulty and language/type predicates, so the count and page read stay index-only or
+index-range scans.
+
+**Impact:** request cost is proportional to the page size instead of the full content set, and the
+sampled rows are uniformly distributed without a sort.
+
+### 7.2 - Cached word pools
+
+**Before:** every word request ran a count plus a page query, even though seeded words change only
+through admin writes.
+
+**After:** a `wordPools` Caffeine region holds an immutable pool per `language:difficulty`, capped at
+5,000 words. Requests shuffle a copy in memory; oversized requests fall back to the indexed page
+query, and word writes evict the region.
+
+**Impact:** warm requests do no database work while preserving uniform sampling over the current
+5,000-word groups.
+
+### 7.3 - Reuse existing batch endpoints
+
+**Before:** the plan called for a batch content API, but `/words` and `/texts` already accepted
+`count`, and the frontend already requested `wordCount * 5` words or five texts per batch.
+
+**After:** kept the existing endpoints as the batch contract; no duplicate `/batch` route was added.
+Invalid counts and counts above the pool still return a client error.
+
+**Impact:** fewer routes to maintain and no change to the frontend's cache/queue batching.
+
+### 7.4 - Server-Timing telemetry
+
+**Before:** a slow passage request was indistinguishable from security, serialization, or network
+overhead in the browser and in k6 output.
+
+**After:** `/words`, `/texts`, `/texts/{id}`, and `/texts/random` return
+`Server-Timing: <metric>;dur=<ms>`, and CORS exposes the header to the frontend origin.
+
+**Impact:** cache hits, database reads, and sampling cost are visible per request without changing
+the response body; total client latency remains available from the browser or k6.
+
+### 8.1 - Typing render instrumentation
+
+**Before:** slow keystrokes could not be attributed to the engine, React rendering, or caret layout.
+
+**After:** `19wpm:keystroke` measures keydown through the first committed viewport update, and
+`19wpm:viewport` measures render through the final layout effect. Both are exposed through the
+browser's User Timing API and remain enabled in production builds.
+
+**Impact:** the production-preview baseline for a 240-word timed passage was 0.8 ms p50 / 1.2 ms p95
+per keystroke and 0.6 ms p50 / 1.0 ms p95 per viewport render.
+
+### 8.2 - Active-only word memoization
+
+**Before:** `TypedWord` was memoized, but every word received the changing `activeGlobalIdx`, so the
+comparator invalidated every word and React reconciled the whole passage on each keystroke.
+
+**After:** only the active word receives the cursor index; inactive words receive `-1` and skip the
+typed-segment comparison. The leaf is now `Word`, with a stable word ref callback and character refs
+only on the current and last characters.
+
+**Impact:** keystroke timing fell to 0.3 ms p50 / 0.5 ms p95 and viewport timing to 0.2 ms p50 /
+0.3 ms p95, roughly a 60–70% reduction.
+
+### 8.3 - Transform-based caret
+
+**Before:** the caret animated `left` and `top`, forcing layout work on every animation frame.
+
+**After:** the caret is positioned once with `translate3d` and subsequent moves animate
+`translateX`/`translateY`. Invariant geometry moved to `.typing-cursor`, and the conflicting CSS
+transition and unused keyframes were removed.
+
+**Impact:** cursor motion stays on the compositor; typing timings were unchanged because the
+benchmark markers do not include paint or compositing.
+
+### 9.1 - Warm single replica with bounded connection pools
+
+**Before:** Hikari waited up to 30 seconds for a cold PostgreSQL connection, Redis had no connection
+pool, and no deployment manifest prevented scale-to-zero.
+
+**After:** database connections fail within 5 seconds and are validated within 2 seconds; Redis uses
+a Lettuce pool with 2-second command/connect timeouts. `deploy/container-app.yaml` pins
+`minReplicas: 1` and `maxReplicas: 1`, so an idle app stays warm without pretending horizontal
+scaling is safe.
+
+**Impact:** a cold start no longer becomes a 30-second request; connection growth is bounded. The
+limits are reasoned defaults, not load-test results.
+
+### 9.2 - Race-room scale-out re-audit
+
+**Before:** the single-replica requirement was documented, but the scale-out blockers were not
+enumerated in one place.
+
+**After:** the audit records four independent instance-local mechanisms: Caffeine room state, the
+simple STOMP broker, the local countdown scheduler, and the matchmaking lock. All four must change
+before `maxReplicas` can exceed 1.
+
+**Impact:** the deployment constraint is now explicit in both code-adjacent documentation and the
+Container Apps manifest.
+
+### 9.3 - k6 suite validation
+
+**Before:** the load-test suite was committed, but its coverage of the optimized content endpoints
+had not been rechecked after the performance work.
+
+**After:** all six scripts pass `k6 inspect`. The read-heavy workload exercises random texts, text
+batches, cached word pools, text by id, stats, and paginated results at 100 requests per second.
+
+**Impact:** the optimized read paths remain covered by the committed suite; the measured median
+baseline remains the 2026-10-19 run because local services were unavailable for a rerun.
+
 ## Code Review Remediation
 
 Follow-up fixes from a full-codebase review (security, correctness, and cleanliness). Each is an
@@ -257,6 +467,7 @@ isolated commit so it can be reverted on its own. Per-change write-ups live in
 | Fix | `RaceRoomRepository` injects Boot 4's Jackson 3 mapper (CR-2.5 follow-up) | Inject the container-managed bean type | [`docs/refactors/28-raceroom-jackson3-mapper.md`](docs/refactors/28-raceroom-jackson3-mapper.md) |
 | Fix | Race countdown synced to the server clock (was desynced / stuck on `GO!`) | Clock-offset estimation (NTP-style round trip) over STOMP | [`docs/refactors/29-server-clock-offset-sync.md`](docs/refactors/29-server-clock-offset-sync.md) |
 | Fix | Race accuracy counts corrected mistakes, matching practice mode | One accuracy definition (cumulative keystroke stats) across modes | [`docs/refactors/30-race-accuracy-keystroke.md`](docs/refactors/30-race-accuracy-keystroke.md) |
+| Fix | Stale streak no longer shown after a missed day | Read-time derived view over the stored streak state | [`docs/refactors/31-streak-current-read-model.md`](docs/refactors/31-streak-current-read-model.md) |
 
 ### CR-1.1 — Only the current word re-renders per keystroke
 
@@ -504,10 +715,26 @@ recomputing them from `typedContent`, which is removed along with `calculateErro
 **Impact:** a corrected mistake still lowers race accuracy, matching practice mode, and live/final
 race figures agree. Reverting restores the positional (final-string) calculation.
 
+### Fix — Stale streak derived on read
+
+**Before:** `users.streak` was written only when a result or race finished, and every profile/auth/stat
+read returned it raw. After a missed day the dashboard kept showing the old value (e.g. `10 Day
+Streak`) until the user played again, because the write model intentionally leaves the stored streak
+untouched until the next activity resets it.
+
+**After:** `StreakService.currentStreak(User | StreakState)` derives the visible value from
+`lastPlayedDate` in the user's timezone: `0` when the last play is older than yesterday, otherwise
+`max(stored, 1)` (today, yesterday, or a future date after a backwards timezone move). `/auth/me`,
+auth responses, the user list, and user-stat reads now carry this value; the stored columns and write
+path are unchanged.
+
+**Impact:** a broken streak reads as `0` on the next fetch without any extra query or write, and
+consecutive-day increment/reset behaviour is untouched. No schema or response-shape change.
+
 ## Limitations
 
 - Guest results live in localStorage only. Clearing site data removes them permanently.
-- Live race rooms are held in a single backend instance, so the backend must run one replica (or route a room's participants to one instance) until a distributed room store is added.
+- Live race rooms are held in a single backend instance, so the backend must run one replica (or route a room's participants to one instance) until a distributed room store is added. The Container Apps template enforces `maxReplicas: 1` and keeps `minReplicas: 1` to avoid request-triggered cold starts.
 - Mobile works for typing but keyboard shortcuts (Tab, Enter) require a physical keyboard.
 - Word lists and phrase content are seeded at deploy time and cannot be edited through the UI.
 - No offline support. Both frontend and backend must be reachable for authenticated sessions.

@@ -102,3 +102,38 @@ constraint rather than an accidental one.
 
 Revert this commit — folds the interface and implementation back into the original concrete
 `RaceRoomStore` class.
+
+## Phase 5 re-audit (2026-10-22)
+
+The single-replica constraint still holds. Re-checking the live path found four independent
+instance-local mechanisms, not one:
+
+1. **Authoritative room state.** `InMemoryRaceRoomStore` keeps `RaceRoom` objects in a process-local
+   Caffeine cache. Redis is a lifecycle write-through, not the live read path. A room loaded on
+   instance B would not see progress mutations made on instance A.
+2. **STOMP fan-out.** `WebSocketConfig` enables a `SimpleBroker` for `/topic` and `/queue` with no
+   broker relay. A message published on instance A does not reach a subscriber connected to
+   instance B.
+3. **Countdown transition.** `RaceStompController.startRoom` schedules the COUNTDOWN to RACING
+   transition on the local `TaskScheduler`. Running the transition on every instance would race,
+   while running it on only one instance would leave rooms on other instances stuck.
+4. **Matchmaking coordination.** `MatchmakingService.matchQueue` serializes queue pops with a local
+   `ReentrantLock`. Two instances can therefore pop from the same Redis list concurrently and create
+   overlapping matches.
+
+The deployment is pinned to `minReplicas: 1` and `maxReplicas: 1` in
+`deploy/container-app.yaml`. Scale-to-zero is disabled to avoid request-triggered cold starts, not
+because horizontal scaling is safe.
+
+### Conditions for raising `maxReplicas`
+
+All four items must change together:
+
+- Store live rooms in Redis (or another shared store) with an atomic check-and-mutate path.
+- Route STOMP broadcasts through Redis pub/sub or a broker relay.
+- Make the countdown transition idempotent and guarded by a distributed lock.
+- Replace the matchmaking `ReentrantLock` with a Redis lock or an atomic Lua script.
+
+Sticky routing of a room's participants to one instance is a cheaper alternative, but it must cover
+both HTTP and WebSocket traffic and survive revision restarts. Until one of those designs is in
+place, `maxReplicas` must remain `1`.

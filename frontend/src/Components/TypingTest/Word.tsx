@@ -1,51 +1,68 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 
-export interface TypedWordChar {
+const EXTRA_BLOCK_STYLE: CSSProperties = {
+  color: 'var(--error)',
+  backgroundColor: 'var(--error)',
+};
+
+const EXTRA_BLOCK_TEXT_STYLE: CSSProperties = {
+  color: '#fff',
+};
+
+export interface WordChar {
   char: string;
   globalIdx: number;
 }
 
-export interface TypedWordProps {
-  chars: TypedWordChar[];
+export interface WordProps {
+  chars: WordChar[];
   start: number;
   end: number;
   typedChars: string[];
   isPastWord: boolean;
   hasError: boolean;
-  showExtra: boolean;
-  activeGlobalIdx: number;
+  isActive: boolean;
+  activeCharIndex: number;
   lastGlobalIdx: number;
   extraChars: string[];
   extraVariant?: 'plain' | 'block';
-  onWordRef: (el: HTMLSpanElement | null) => void;
+  wordIndex: number;
+  onWordRef: (index: number, el: HTMLSpanElement | null) => void;
   onCurrentCharRef: (el: HTMLSpanElement | null) => void;
   onLastCharRef: (el: HTMLSpanElement | null) => void;
 }
 
-function TypedWord({
+function Word({
   chars,
   typedChars,
   isPastWord,
   hasError,
-  showExtra,
-  activeGlobalIdx,
+  isActive,
+  activeCharIndex,
   lastGlobalIdx,
   extraChars,
   extraVariant = 'plain',
+  wordIndex,
   onWordRef,
   onCurrentCharRef,
   onLastCharRef,
-}: TypedWordProps) {
+}: WordProps) {
+  const setWordRef = useCallback(
+    (el: HTMLSpanElement | null) => onWordRef(wordIndex, el),
+    [onWordRef, wordIndex]
+  );
+
   const wordErrorClass = isPastWord && hasError
     ? 'underline decoration-error decoration-2'
     : '';
 
   return (
-    <span ref={onWordRef} className={`flex ${wordErrorClass}`}>
+    <span ref={setWordRef} className={`flex ${wordErrorClass}`}>
       {chars.map(({ char, globalIdx }) => {
         const typed = typedChars[globalIdx];
         const isLastChar = globalIdx === lastGlobalIdx;
-        const isCurrent = globalIdx === activeGlobalIdx;
+        const isCurrent = globalIdx === activeCharIndex;
         const isSkipped = typed === '';
         const isCorrect = typed !== undefined && typed !== '' && typed === char;
         const isIncorrect = typed !== undefined && (typed !== '' ? typed !== char : true);
@@ -61,24 +78,21 @@ function TypedWord({
         return (
           <span
             key={globalIdx}
-            ref={el => {
-              if (isCurrent) onCurrentCharRef(el);
-              if (isLastChar) onLastCharRef(el);
-            }}
+            ref={isCurrent ? onCurrentCharRef : isLastChar ? onLastCharRef : undefined}
             className={cls}
           >
             {displayChar}
           </span>
         );
       })}
-      {showExtra && extraChars.map((ch, i) => (
+      {isActive && extraChars.map((ch, i) => (
         extraVariant === 'block' ? (
           <span
             key={`ex-${i}`}
             className="char-incorrect"
-            style={{ color: 'var(--error)', backgroundColor: 'var(--error)' }}
+            style={EXTRA_BLOCK_STYLE}
           >
-            <span style={{ color: '#fff' }}>{ch}</span>
+            <span style={EXTRA_BLOCK_TEXT_STYLE}>{ch}</span>
           </span>
         ) : (
           <span key={`ex-${i}`} className="char-incorrect">{ch}</span>
@@ -88,16 +102,18 @@ function TypedWord({
   );
 }
 
-function areEqual(prev: TypedWordProps, next: TypedWordProps): boolean {
+function areEqual(prev: WordProps, next: WordProps): boolean {
   if (prev.chars !== next.chars) return false;
   if (prev.start !== next.start || prev.end !== next.end) return false;
   if (prev.isPastWord !== next.isPastWord) return false;
   if (prev.hasError !== next.hasError) return false;
-  if (prev.showExtra !== next.showExtra) return false;
-  if (prev.activeGlobalIdx !== next.activeGlobalIdx) return false;
+  if (prev.isActive !== next.isActive) return false;
+  if (prev.activeCharIndex !== next.activeCharIndex) return false;
   if (prev.lastGlobalIdx !== next.lastGlobalIdx) return false;
   if (prev.extraChars !== next.extraChars) return false;
   if (prev.extraVariant !== next.extraVariant) return false;
+
+  if (!prev.isActive) return true;
 
   const a = prev.typedChars;
   const b = next.typedChars;
@@ -108,4 +124,4 @@ function areEqual(prev: TypedWordProps, next: TypedWordProps): boolean {
   return true;
 }
 
-export default memo(TypedWord, areEqual);
+export default memo(Word, areEqual);

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
+import { markStartTyping } from '../utils/telemetry';
 
 export default function About() {
   const navigate = useNavigate();
@@ -76,7 +77,10 @@ export default function About() {
 
           <div className="text-center pt-4">
             <button
-              onClick={() => navigate('/solo')}
+              onClick={() => {
+                markStartTyping();
+                navigate('/solo');
+              }}
               className="px-8 py-3 bg-accent text-white rounded-xl font-sans font-semibold text-sm hover:bg-accent-hover transition-colors hover:cursor-pointer"
             >
               Start Typing

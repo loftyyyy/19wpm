@@ -14,6 +14,8 @@ import com.rho.backend.model.User;
 import com.rho.backend.redis.RedisTokenStore;
 import com.rho.backend.repository.RoleRepository;
 import com.rho.backend.repository.UserRepository;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,8 +40,10 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final RoleRepository roleRepository;
     private final UserStatService userStatService;
+    private final StreakService streakService;
+    private final ObservationRegistry observationRegistry;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, RedisTokenStore redisTokenStore, AuthenticationManager authenticationManager, RoleRepository roleRepository, UserStatService userStatService){
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, RedisTokenStore redisTokenStore, AuthenticationManager authenticationManager, RoleRepository roleRepository, UserStatService userStatService, StreakService streakService, ObservationRegistry observationRegistry){
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -47,6 +51,8 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
         this.roleRepository = roleRepository;
         this.userStatService = userStatService;
+        this.streakService = streakService;
+        this.observationRegistry = observationRegistry;
     }
 
     // ── Register ──────────────────────────────────────────────────────────────
@@ -164,18 +170,29 @@ public class AuthService {
      * response body to the POST that presents the code.
      */
     public AuthResponseDTO exchangeOAuthCode(String code) {
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("Missing OAuth exchange code.");
+        Observation observation = Observation.createNotStarted("auth.oauth.exchange", observationRegistry)
+                .lowCardinalityKeyValue("flow", "oauth2-code")
+                .start();
+
+        try (Observation.Scope ignored = observation.openScope()) {
+            if (code == null || code.isBlank()) {
+                throw new IllegalArgumentException("Missing OAuth exchange code.");
+            }
+
+            Long userId = redisTokenStore.consumeOAuthCode(code)
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth exchange code."));
+
+            User user = userRepository.findByIdWithRole(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+
+            logger.info("OAuth exchange code redeemed for userId={}", userId);
+            return issueTokenPair(user);
+        } catch (RuntimeException e) {
+            observation.error(e);
+            throw e;
+        } finally {
+            observation.stop();
         }
-
-        Long userId = redisTokenStore.consumeOAuthCode(code)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth exchange code."));
-
-        User user = userRepository.findByIdWithRole(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
-
-        logger.info("OAuth exchange code redeemed for userId={}", userId);
-        return issueTokenPair(user);
     }
 
     // ── Logout (single device) ────────────────────────────────────────────────
@@ -284,7 +301,7 @@ public class AuthService {
                 "Bearer",
                 accessToken,
                 refreshToken,
-                UserResponseDTO.from(user)
+                UserResponseDTO.from(user, streakService.currentStreak(user))
         );
     }
 }

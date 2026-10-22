@@ -2,6 +2,7 @@ package com.rho.backend.service;
 
 import com.rho.backend.exception.user.ResourceNotFoundException;
 import com.rho.backend.model.StreakState;
+import com.rho.backend.model.User;
 import com.rho.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,28 @@ public class StreakService {
         StreakState fallback = userRepository.findStreakState(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return fallback.streak() == null ? 1 : fallback.streak();
+    }
+
+    public int currentStreak(User user) {
+        return currentStreak(user.getStreak(), user.getLastPlayedDate(), user.getTimezone());
+    }
+
+    public int currentStreak(StreakState state) {
+        return currentStreak(state.streak(), state.lastPlayedDate(), state.timezone());
+    }
+
+    private int currentStreak(Integer storedStreak, LocalDate lastPlayed, String timezone) {
+        if (lastPlayed == null) {
+            return 0;
+        }
+
+        LocalDate today = LocalDate.now(clock.withZone(zoneIdOf(timezone)));
+        if (lastPlayed.isBefore(today.minusDays(1))) {
+            return 0;
+        }
+
+        int stored = storedStreak == null ? 0 : storedStreak;
+        return Math.max(stored, 1);
     }
 
     private ZoneId zoneIdOf(String timezone) {

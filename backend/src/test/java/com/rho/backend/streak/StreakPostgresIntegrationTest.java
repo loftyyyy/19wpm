@@ -151,6 +151,40 @@ class StreakPostgresIntegrationTest {
         assertThat(streak).isEqualTo(5);
     }
 
+    @DisplayName("Reading an alive streak keeps the stored value on real Postgres")
+    @Test
+    void readCurrentStreakKeepsAliveStreak() {
+        LocalDate today = LocalDate.now(UTC);
+        User user = userRepository.save(newUser());
+        user.setStreak(10);
+        user.setLastPlayedDate(today.minusDays(1));
+        userRepository.save(user);
+
+        assertThat(streakService.currentStreak(user)).isEqualTo(10);
+    }
+
+    @DisplayName("Reading a stale streak derives zero without mutating the stored row")
+    @Test
+    void readCurrentStreakDerivesZeroAfterGapWithoutMutation() {
+        LocalDate today = LocalDate.now(UTC);
+        LocalDate lastPlayed = today.minusDays(3);
+        User user = userRepository.save(newUser());
+        user.setStreak(10);
+        user.setLastPlayedDate(lastPlayed);
+        userRepository.save(user);
+        entityManager.flush();
+        entityManager.clear();
+
+        User persisted = userRepository.findById(user.getUserId()).orElseThrow();
+        assertThat(streakService.currentStreak(persisted)).isZero();
+
+        entityManager.flush();
+        entityManager.clear();
+        User unchanged = userRepository.findById(user.getUserId()).orElseThrow();
+        assertThat(unchanged.getStreak()).isEqualTo(10);
+        assertThat(unchanged.getLastPlayedDate()).isEqualTo(lastPlayed);
+    }
+
     @DisplayName("Boundary control: same instant with correctly stored Asia/Manila timezone increments to 6")
     @Test
     void boundaryManilaStoredUserIncrementsOnNewLocalDay() {

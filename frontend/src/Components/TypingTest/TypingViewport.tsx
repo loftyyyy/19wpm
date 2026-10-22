@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { animate } from 'animejs';
-import TypedWord from './TypedWord';
+import Word from './Word';
+import { completeKeystroke, markPerformance, measurePerformance } from '../../utils/performance';
 
 const NO_EXTRA_CHARS: string[] = [];
 
@@ -41,12 +42,18 @@ export default function TypingViewport({
   const isFirstPositionRef = useRef(true);
   const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
+  const renderStartMarkRef = useRef<string | null>(null);
+
+  renderStartMarkRef.current = markPerformance('viewport:start');
 
   const setCurrentCharRef = useCallback((el: HTMLSpanElement | null) => {
     currentCharRef.current = el;
   }, []);
   const setLastCharRef = useCallback((el: HTMLSpanElement | null) => {
     lastCharRef.current = el;
+  }, []);
+  const setWordRef = useCallback((index: number, el: HTMLSpanElement | null) => {
+    wordRefs.current[index] = el;
   }, []);
 
   const passageWords = useMemo(() => {
@@ -177,26 +184,31 @@ export default function TypingViewport({
       left -= 1;
 
       if (isFirstPositionRef.current) {
-        // Teleport on first render — no animation
         isFirstPositionRef.current = false;
-        cursorEl.style.left = `${left}px`;
-        cursorEl.style.top = `${top}px`;
+        cursorEl.style.transform = `translate3d(${left}px, ${top}px, 0)`;
         return;
       }
 
-      // Cancel any in-flight animation
       caretAnimationRef.current?.pause();
 
-      // Animate with Monkeytype's exact easing
       caretAnimationRef.current = animate(cursorEl, {
-        left,
-        top,
+        translateX: left,
+        translateY: top,
         duration: 85,
         ease: 'inOut(1.25)',
       });
     });
     return () => cancelAnimationFrame(rafId);
   }, [currentIndex, charsText]);
+
+  useLayoutEffect(() => {
+    const startMark = renderStartMarkRef.current;
+    if (startMark) {
+      measurePerformance('viewport', startMark);
+      renderStartMarkRef.current = null;
+    }
+    completeKeystroke();
+  });
 
   const passageLength = charsText.length;
   const isAtEnd = currentIndex >= passageLength;
@@ -213,27 +225,15 @@ export default function TypingViewport({
       <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
         <div
           ref={cursorRef}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '2px',
-            height: '1.2em',
-            backgroundColor: 'var(--accent)',
-            borderRadius: '1px',
-            pointerEvents: 'none',
-            zIndex: 10,
-            display: isFinished ? 'none' : 'block',
-          }}
-          className={isTypingActive ? '' : 'animate-blink'}
+          className={`typing-cursor ${isFinished ? 'typing-cursor-hidden' : isTypingActive ? 'typing-cursor-active' : 'animate-blink'}`}
         />
         {passageWords.map((word, wi) => {
           const { chars } = word;
           const start = chars[0].globalIdx;
           const end = start + chars.length;
-          const showExtra = wi === currentWordIndex;
+          const isActive = wi === currentWordIndex;
           return (
-            <TypedWord
+            <Word
               key={wi}
               chars={chars}
               start={start}
@@ -241,12 +241,13 @@ export default function TypingViewport({
               typedChars={typedChars}
               isPastWord={lockedIndex >= end}
               hasError={mistakeWordIndices.has(wi)}
-              showExtra={showExtra}
-              activeGlobalIdx={activeGlobalIdx}
+              isActive={isActive}
+              activeCharIndex={isActive ? activeGlobalIdx : -1}
               lastGlobalIdx={lastGlobalIdx}
-              extraChars={showExtra ? extraChars : NO_EXTRA_CHARS}
+              extraChars={isActive ? extraChars : NO_EXTRA_CHARS}
               extraVariant={extraVariant}
-              onWordRef={el => { wordRefs.current[wi] = el; }}
+              wordIndex={wi}
+              onWordRef={setWordRef}
               onCurrentCharRef={setCurrentCharRef}
               onLastCharRef={setLastCharRef}
             />

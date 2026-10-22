@@ -1,9 +1,11 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import PageFallback from './Components/PageFallback';
+import TypingSkeleton from './Components/TypingTest/TypingSkeleton';
+import { preloadSolo } from './routes/preloadSolo';
 
 const LandingPage = lazy(() => import('./LandingPage/Landing-page'));
-const TypingTest = lazy(() => import('./Components/TypingTest/TypingTest'));
+const TypingTest = lazy(() => preloadSolo());
 const TestResults = lazy(() => import('./Components/TypingTest/TestResults'));
 const LoginContainer = lazy(() => import('./Components/Auth/LoginContainer'));
 const OAuth2Callback = lazy(() => import('./Components/Auth/OAuth2Callback'));
@@ -20,7 +22,7 @@ export default function App() {
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/solo" element={<TypingTest />} />
+          <Route path="/solo" element={<Suspense fallback={<TypingSkeleton />}><TypingTest /></Suspense>} />
           <Route path="/results" element={<TestResults />} />
           <Route path="/login" element={<LoginContainer />} />
           <Route path="/oauth2/callback" element={<OAuth2Callback />} />

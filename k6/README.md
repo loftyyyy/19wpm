@@ -13,6 +13,13 @@ described below; nothing here is estimated.
   `Trend`/`Counter` metrics.
 - Produce a machine-readable and human-readable summary per run.
 
+## Phase 5 validation (2026-10-22)
+
+All six scripts pass `k6 inspect` with k6 v2.2.0. `read-heavy.js` covers the optimized paths:
+random text, text batch, cached words, text by id, stats, and result history. The suite was not
+rerun on this date because local PostgreSQL, Redis, and the backend were not running; the measured
+baseline below remains the three-run median from 2026-10-19.
+
 ## Environment
 
 All results were measured on this exact setup:
