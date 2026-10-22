@@ -90,6 +90,9 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 8.1 | Typing render path reports keystroke and viewport timing | User Timing marks around the keydown-to-commit path | [`docs/refactors/42-performance-instrumentation.md`](docs/refactors/42-performance-instrumentation.md) |
 | 8.2 | Inactive words stop re-rendering on every keystroke | Active-only prop boundary + strict leaf memoization | [`docs/refactors/43-strict-word-memoization.md`](docs/refactors/43-strict-word-memoization.md) |
 | 8.3 | Caret movement no longer triggers layout | Compositor-only transform animation | [`docs/refactors/44-cursor-transform-animation.md`](docs/refactors/44-cursor-transform-animation.md) |
+| 9.1 | Cold starts use bounded database and Redis pools; deployment stays warm | Bounded resource pools with fail-fast timeouts; explicit capacity constraint | [`docs/refactors/45-cold-start-and-connection-pools.md`](docs/refactors/45-cold-start-and-connection-pools.md) |
+| 9.2 | Multi-replica audit confirms race rooms and STOMP remain instance-local | Explicit single-replica capacity constraint | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
+| 9.3 | k6 suite validated against the optimized read endpoints | Scripted arrival-rate load testing with thresholds | [`k6/README.md`](k6/README.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -398,6 +401,42 @@ transition and unused keyframes were removed.
 **Impact:** cursor motion stays on the compositor; typing timings were unchanged because the
 benchmark markers do not include paint or compositing.
 
+### 9.1 - Warm single replica with bounded connection pools
+
+**Before:** Hikari waited up to 30 seconds for a cold PostgreSQL connection, Redis had no connection
+pool, and no deployment manifest prevented scale-to-zero.
+
+**After:** database connections fail within 5 seconds and are validated within 2 seconds; Redis uses
+a Lettuce pool with 2-second command/connect timeouts. `deploy/container-app.yaml` pins
+`minReplicas: 1` and `maxReplicas: 1`, so an idle app stays warm without pretending horizontal
+scaling is safe.
+
+**Impact:** a cold start no longer becomes a 30-second request; connection growth is bounded. The
+limits are reasoned defaults, not load-test results.
+
+### 9.2 - Race-room scale-out re-audit
+
+**Before:** the single-replica requirement was documented, but the scale-out blockers were not
+enumerated in one place.
+
+**After:** the audit records four independent instance-local mechanisms: Caffeine room state, the
+simple STOMP broker, the local countdown scheduler, and the matchmaking lock. All four must change
+before `maxReplicas` can exceed 1.
+
+**Impact:** the deployment constraint is now explicit in both code-adjacent documentation and the
+Container Apps manifest.
+
+### 9.3 - k6 suite validation
+
+**Before:** the load-test suite was committed, but its coverage of the optimized content endpoints
+had not been rechecked after the performance work.
+
+**After:** all six scripts pass `k6 inspect`. The read-heavy workload exercises random texts, text
+batches, cached word pools, text by id, stats, and paginated results at 100 requests per second.
+
+**Impact:** the optimized read paths remain covered by the committed suite; the measured median
+baseline remains the 2026-10-19 run because local services were unavailable for a rerun.
+
 ## Code Review Remediation
 
 Follow-up fixes from a full-codebase review (security, correctness, and cleanliness). Each is an
@@ -692,7 +731,7 @@ consecutive-day increment/reset behaviour is untouched. No schema or response-sh
 ## Limitations
 
 - Guest results live in localStorage only. Clearing site data removes them permanently.
-- Live race rooms are held in a single backend instance, so the backend must run one replica (or route a room's participants to one instance) until a distributed room store is added.
+- Live race rooms are held in a single backend instance, so the backend must run one replica (or route a room's participants to one instance) until a distributed room store is added. The Container Apps template enforces `maxReplicas: 1` and keeps `minReplicas: 1` to avoid request-triggered cold starts.
 - Mobile works for typing but keyboard shortcuts (Tab, Enter) require a physical keyboard.
 - Word lists and phrase content are seeded at deploy time and cannot be edited through the UI.
 - No offline support. Both frontend and backend must be reachable for authenticated sessions.
