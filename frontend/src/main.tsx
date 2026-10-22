@@ -4,6 +4,9 @@ import './index.css'
 import App from './App'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
+import { initWebVitals } from './utils/telemetry'
+
+initWebVitals()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

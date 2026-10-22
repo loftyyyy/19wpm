@@ -95,6 +95,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 9.3 | k6 suite validated against the optimized read endpoints | Scripted arrival-rate load testing with thresholds | [`k6/README.md`](k6/README.md) |
 | 10.1 | Pull requests enforce bundle and Lighthouse performance budgets | Automated performance budgets in CI | [`docs/refactors/46-ci-performance-regression-gates.md`](docs/refactors/46-ci-performance-regression-gates.md) |
 | 10.2 | Backend requests, services, and repositories emit Actuator, Prometheus, and OTLP telemetry | Automatic HTTP instrumentation + declarative observations at service and repository boundaries | [`docs/refactors/47-backend-telemetry.md`](docs/refactors/47-backend-telemetry.md) |
+| 10.3 | Browsers report Core Web Vitals and Start Typing latency to a Micrometer-backed ingress | Beacon-delivered field metrics + bounded-cardinality server summaries | [`docs/refactors/48-frontend-rum.md`](docs/refactors/48-frontend-rum.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 

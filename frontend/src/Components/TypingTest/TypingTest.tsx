@@ -8,6 +8,7 @@ import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
 import { beginKeystroke } from '../../utils/performance';
+import { completeTypingJourney } from '../../utils/telemetry';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
 
 const wordCounts: WordCount[] = [10, 25, 50, 100];
@@ -86,6 +87,10 @@ export default function TypingTest() {
       setPassage(next());
     }
   }, [isLoading, next]);
+
+  useEffect(() => {
+    if (passage !== null) completeTypingJourney();
+  }, [passage]);
 
   const isCapsLockOn = useCapsLock();
 

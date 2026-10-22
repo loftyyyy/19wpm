@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
 import { useAuth } from '../context/AuthContext';
+import { markStartTyping } from '../utils/telemetry';
 import type { Duration } from '../types';
 
 const durations: Duration[] = [15, 30, 60];
@@ -78,7 +79,10 @@ export default function Compete() {
 
         <div className="flex justify-center mb-12">
           <button
-            onClick={() => navigate(`/solo?time=${selectedDuration}`)}
+            onClick={() => {
+              markStartTyping();
+              navigate(`/solo?time=${selectedDuration}`);
+            }}
             className="px-10 py-4 bg-accent text-white rounded-xl font-sans font-semibold text-sm hover:bg-accent-hover transition-colors hover:cursor-pointer shadow-sm"
           >
             {pb ? 'Beat Your Best' : 'Take First Test'}

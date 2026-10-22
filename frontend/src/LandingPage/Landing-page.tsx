@@ -4,6 +4,7 @@ import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
 import { preloadSolo } from '../routes/preloadSolo';
 import { prefetchPassages } from '../services/passageCache';
+import { markStartTyping } from '../utils/telemetry';
 import type { Duration, Mode, WordCount, PhraseLength, TextDifficulty } from '../types';
 import English from '../assets/English.svg';
 import Type from '../assets/TYPEIMAGE.png';
@@ -110,6 +111,7 @@ export default function LandingPage() {
   const handleStart = () => {
     if (isStarting) return;
     setIsStarting(true);
+    markStartTyping();
     handleStartIntent();
     navigate(`/solo?${buildQuery(mode, selectedDuration, wordCount, phraseLength, selectedDifficulty)}`);
   };
