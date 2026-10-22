@@ -4,3 +4,5 @@ node_modules/
 .DS_Store
 *.log
 deploy/container-app.rendered.yaml
+.lighthouseci/
+frontend/.lighthouseci/
