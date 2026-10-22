@@ -345,3 +345,71 @@ Add Docker availability for Testcontainers and publish `backend/target/surefire-
   Redis client but does not open a Redis connection.
 - The full backend test suite was not rerun for this update. The 56/59 baseline and the three known
   failures remain current until a full suite run is performed.
+
+---
+
+## Phase 6 update (2026-10-23)
+
+Phase 6 added CI performance gates, backend Actuator/OpenTelemetry instrumentation, and frontend
+Core Web Vitals RUM with a public Micrometer-backed ingestion endpoint. This update records the
+verification performed for those changes; it does not replace a full backend-suite run.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| Backend compile (`.\mvnw.cmd -q -DskipTests compile`) | Pass |
+| `WebVitalsServiceTest` | 5/5 pass |
+| `TelemetryContextTest` | 3/3 pass |
+| `npm run build` | Pass (868 modules transformed) |
+| `npm run perf:bundle` | Pass (all four gzip budgets) |
+| Repository-wide `npm run lint` | Fails: 12 errors, 8 warnings |
+
+`TelemetryContextTest` now verifies the public telemetry contract in addition to observation
+registration:
+
+- `POST /api/v1/telemetry/web-vitals` without authentication returns `202`.
+- An unsupported metric name returns `400`.
+
+The backend still logs a `RedisConnectionFailureException` from the matchmaking scheduler when Redis
+is absent. The targeted tests pass because the scheduler failure is logged asynchronously; this is an
+environment limitation, not a telemetry test failure.
+
+The Phase 6 frontend bundle remains within budget:
+
+```text
+PASS Total JavaScript (gzip): 266.2 KiB / 312.5 KiB
+PASS Initial JS + CSS (gzip): 87.4 KiB / 117.2 KiB
+PASS Largest JavaScript chunk (gzip): 109.6 KiB / 136.7 KiB
+PASS Total CSS (gzip): 6.4 KiB / 23.4 KiB
+```
+
+The repository-wide lint failures are pre-existing and outside the Phase 6 changed-file set. They
+include React purity/refs findings in `Countdown.tsx`, `TypingViewport.tsx`, and `TypingTest.tsx`,
+fast-refresh export findings in the context providers, unused binding findings in `auth.ts` and
+`passages.ts`, and empty-block findings in `TypingTest.tsx` and `Landing-page.tsx`. Changed telemetry
+files pass targeted ESLint checks.
+
+### Current test inventory
+
+- Previous baseline: 59 tests across 7 files.
+- Added `TelemetryContextTest`: 3 tests.
+- Added `WebVitalsServiceTest`: 5 tests.
+- Expected full-suite total if all classes run: 67 tests.
+
+The three `TextIntegrationTest` failures documented above have not been fixed or re-run. The full
+suite remains unverified and is expected to be red until the cache-isolation issue and the outdated
+public-preset-text expectation are resolved.
+
+### CI and remaining gaps
+
+- `.github/workflows/performance.yml` exists and runs `npm ci`, `npm run build`,
+  `npm run perf:bundle`, and Lighthouse CI on frontend pull requests and pushes to `main`.
+- There is still no backend test workflow, no frontend unit/component test runner, and no full
+  browser E2E suite.
+- RUM ingress is public and has no per-IP rate limiting; edge throttling or bucket-based throttling
+  should be added before high-volume Internet exposure.
+- No Prometheus scraper, OTLP collector, RUM dashboard, or alert rule is provisioned, so telemetry
+  is emitted but not yet centrally stored or alerted on.
+- k6 performance scenarios remain manual and environment-dependent.
+- Docker/Testcontainers, PostgreSQL, and Redis are still required for a complete backend-suite run.
