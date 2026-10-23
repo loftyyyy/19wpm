@@ -27,7 +27,9 @@ Related documents:
   broadcast locally and publishes it on Redis Pub/Sub `race:events`; peers deliver it to
   their own sessions. The originating instance ignores its own echo by instance id.
 - Matchmaking queues are Redis lists keyed by text type, with a per-player presence key,
-  a pending-room key, and a per-text-type distributed lock.
+  a pending-room key, and a per-text-type distributed lock. Two-player queues pair
+  immediately; queues of three to five use a 5-second fallback and larger queues use 20
+  seconds. A persisted `matchNow` flag lets a player request any available opponent.
 - Race results are persisted to PostgreSQL when the room reaches `FINISHED`. Redis rooms
   are ephemeral and expire.
 
@@ -60,7 +62,7 @@ operator change, not part of the application rollout.
 | `race:lock:{code}` | String | 5 s | `RedisLock` via `RedisRaceRoomStore`; mutation mutual exclusion. |
 | `race:countdown` | Sorted set | No key TTL | `RaceCountdownScheduler`; member `roomCode`, score = due time in epoch ms. |
 | `race:events` | Pub/Sub channel | n/a | `RaceEventBus`; cross-replica STOMP fan-out. |
-| `matchmaking:queue:{TYPE}` | List (JSON entries) | No key TTL; entries pruned after 5 min | `MatchmakingService`; oldest-first after the loader reverses the newest-first list. |
+| `matchmaking:queue:{TYPE}` | List (JSON entries) | No key TTL; entries pruned after 5 min | `MatchmakingService`; oldest-first after the loader reverses the newest-first list. Entries may carry `matchNow: true`. |
 | `matchmaking:player:{userId}` | String (`TYPE`) | 5 min | Presence/queue membership; blocks duplicate joins. |
 | `matchmaking:pending:{userId}` | String (`roomCode`) | 2 min | Consumed once by `GET /api/v1/race/matchmaking/pending`. |
 | `matchmaking:lock:{TYPE}` | String | 10 s | `RedisLock` around pairing and dequeue. |
@@ -170,8 +172,10 @@ shared Redis.
    `/topic/room/{code}/progress`; Redis `TTL` on the room key remains positive.
 6. Finish both clients. Confirm the room becomes `FINISHED`, results appear in PostgreSQL,
    and a clean run is `VALID`.
-7. Join matchmaking with two users. Confirm a shared room code, pending codes are readable
-   once, and the matchmaking keys are removed for matched players.
+7. Join matchmaking with two users. Confirm they pair immediately with a shared room code,
+   pending codes are readable once, and the matchmaking keys are removed. With three users,
+   confirm `POST /api/v1/race/matchmaking/now` returns `202` and pairs the requester without
+   waiting for the 5-second sparse-queue deadline; a user who is not queued gets `409`.
 8. With two replicas, repeat steps 2-7 and confirm cross-replica delivery. Check
    `PUBSUB NUMSUB race:events` and the replica logs for Pub/Sub warnings.
 
@@ -228,6 +232,8 @@ and `RedisConnectionFailureException` appears in logs.
    ```
 2. Prefer the application path: `POST /api/v1/race/matchmaking/leave`, then join again.
    `leaveQueue` takes the same distributed lock and removes the user's serialized entries.
+   If players are waiting but not paired, `POST /api/v1/race/matchmaking/now` sets the
+   requester's `matchNow` flag and retries matching under the queue lock.
 3. If the presence key exists but the queue entry does not, call leave and rejoin; a stale
    presence key also expires after 5 minutes.
 4. A pending code is single-use. If the client lost it, the match already exists; both

@@ -52,6 +52,14 @@ public class RaceRestController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/matchmaking/now")
+    public ResponseEntity<?> requestImmediateMatch(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        if (matchmakingService.requestImmediateMatch(customUserDetails.getUserId())) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body("Waiting for any opponent...");
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body("Not queued for matchmaking");
+    }
+
     @GetMapping("/matchmaking/pending")
     public ResponseEntity<?> getPendingMatch(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
         String key = "matchmaking:pending:" + customUserDetails.getUserId();

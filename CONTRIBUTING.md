@@ -209,7 +209,7 @@ review item use `fix: CR-<area>.<n> follow-up - <summary>`. One review item per 
 Every behaviour or architecture change ships with documentation in the **same commit**:
 
 1. **Write-up:** `docs/refactors/<NN>-<kebab-title>.md`, numbered sequentially from the highest
-   existing file (next free number is **50**). Never reuse or skip.
+   existing file (next free number is **51**). Never reuse or skip.
 2. **README table row:** add to the matching table —
    - performance work → `## Backend Performance Refactors`
    - review/fix work → `## Code Review Remediation`

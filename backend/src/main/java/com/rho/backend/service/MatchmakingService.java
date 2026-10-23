@@ -11,6 +11,8 @@ import com.rho.backend.repository.UserStatRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -31,6 +33,16 @@ public class MatchmakingService {
     private static final Duration QUEUE_TTL = Duration.ofMinutes(5);
     private static final Duration LOCK_TTL = Duration.ofSeconds(10);
     private static final Duration LOCK_WAIT = Duration.ofSeconds(2);
+    private static final RedisScript<Long> REPLACE_ENTRY_SCRIPT = new DefaultRedisScript<>(
+            "local values = redis.call('LRANGE', KEYS[1], 0, -1) "
+                    + "for i, value in ipairs(values) do "
+                    + "if value == ARGV[1] then "
+                    + "redis.call('LSET', KEYS[1], i - 1, ARGV[2]) "
+                    + "return 1 "
+                    + "end "
+                    + "end "
+                    + "return 0",
+            Long.class);
 
     private final RaceService raceService;
     private final RaceEventBus raceEventBus;
@@ -100,6 +112,59 @@ public class MatchmakingService {
         }
     }
 
+    public boolean requestImmediateMatch(Long userId) {
+        String playerKey = playerKey(userId);
+        String textTypeName = redisTemplate.opsForValue().get(playerKey);
+        if (textTypeName == null) {
+            return false;
+        }
+
+        TextType textType;
+        try {
+            textType = TextType.valueOf(textTypeName);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Ignoring immediate-match request for user {} with unknown text type {}",
+                    userId, textTypeName);
+            return false;
+        }
+
+        String queueKey = queueKey(textType);
+        try {
+            Boolean accepted = redisLock.withLock(lockKey(textType), LOCK_TTL, LOCK_WAIT, () -> {
+                List<QueuedEntry> queue = loadQueue(queueKey);
+                pruneExpired(queue, queueKey);
+
+                int index = indexOfUser(queue, userId);
+                if (index < 0) {
+                    return false;
+                }
+
+                QueuedEntry queued = queue.get(index);
+                if (!queued.entry().matchNow()) {
+                    MatchmakingEntry updated = queued.entry().withMatchNow(true);
+                    String updatedRaw = serialize(updated);
+                    Long replaced = redisTemplate.execute(
+                            REPLACE_ENTRY_SCRIPT,
+                            List.of(queueKey),
+                            queued.raw(),
+                            updatedRaw);
+                    if (!Long.valueOf(1L).equals(replaced)) {
+                        return false;
+                    }
+                    queue.set(index, new QueuedEntry(updatedRaw, updated));
+                }
+
+                matchQueued(textType, queueKey, queue);
+                return true;
+            });
+            return Boolean.TRUE.equals(accepted);
+        } catch (IllegalStateException e) {
+            logger.warn("Could not acquire matchmaking lock for immediate-match request from {}: {}",
+                    userId, e.getMessage());
+            return false;
+        }
+    }
+
     public void pollQueues() {
         for (TextType textType : TextType.values()) {
             matchQueue(textType);
@@ -118,27 +183,30 @@ public class MatchmakingService {
             redisLock.withLock(lockKey(textType), LOCK_TTL, LOCK_WAIT, () -> {
                 List<QueuedEntry> queue = loadQueue(queueKey);
                 pruneExpired(queue, queueKey);
-
-                long now = System.currentTimeMillis();
-                List<MatchmakingEntry> oldestFirst = queue.stream()
-                        .map(QueuedEntry::entry)
-                        .toList();
-                Optional<SkillMatchmaker.Pair> pair = skillMatchmaker.selectPair(oldestFirst, now);
-                if (pair.isEmpty()) {
-                    return null;
-                }
-
-                QueuedEntry first = queue.get(pair.get().firstIndex());
-                QueuedEntry second = queue.get(pair.get().secondIndex());
-                removeEntry(queueKey, first.raw());
-                removeEntry(queueKey, second.raw());
-
-                createMatchedRoom(textType, List.of(first.entry(), second.entry()));
+                matchQueued(textType, queueKey, queue);
                 return null;
             });
         } catch (IllegalStateException e) {
             logger.warn("Could not acquire matchmaking lock for {}: {}", textType, e.getMessage());
         }
+    }
+
+    private void matchQueued(TextType textType, String queueKey, List<QueuedEntry> queue) {
+        long now = System.currentTimeMillis();
+        List<MatchmakingEntry> oldestFirst = queue.stream()
+                .map(QueuedEntry::entry)
+                .toList();
+        Optional<SkillMatchmaker.Pair> pair = skillMatchmaker.selectPair(oldestFirst, now);
+        if (pair.isEmpty()) {
+            return;
+        }
+
+        QueuedEntry first = queue.get(pair.get().firstIndex());
+        QueuedEntry second = queue.get(pair.get().secondIndex());
+        removeEntry(queueKey, first.raw());
+        removeEntry(queueKey, second.raw());
+
+        createMatchedRoom(textType, List.of(first.entry(), second.entry()));
     }
 
     private void createMatchedRoom(TextType textType, List<MatchmakingEntry> entries) {
@@ -199,6 +267,15 @@ public class MatchmakingService {
         // Redis list is newest-first because joinQueue left-pushes.
         Collections.reverse(queue);
         return queue;
+    }
+
+    private int indexOfUser(List<QueuedEntry> queue, Long userId) {
+        for (int i = 0; i < queue.size(); i++) {
+            if (queue.get(i).entry().userId() == userId) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void removeUserEntries(String queueKey, Long userId) {

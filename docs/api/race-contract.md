@@ -46,6 +46,7 @@ room codes or status strings, not quoted JSON strings.
 | `POST` | `/api/v1/race/rooms/{code}/join` | none | `200`, `RaceRoom` | `400` (room full), `401`, `404` |
 | `GET` | `/api/v1/race/rooms/{code}` | none | `200`, `RaceRoom` | `401`, `404` |
 | `POST` | `/api/v1/race/matchmaking/join` | `{ "textType": "SHORT" }` | `200`, `text/plain` `Searching...` | `400`, `401` |
+| `POST` | `/api/v1/race/matchmaking/now` | none | `202`, `text/plain` `Waiting for any opponent...` | `401`, `409` when not queued |
 | `POST` | `/api/v1/race/matchmaking/leave` | none | `200` empty body | `401` |
 | `GET` | `/api/v1/race/matchmaking/pending` | none | `200`, `text/plain` room code | `204` when no match, `401` |
 
@@ -68,7 +69,15 @@ room codes or status strings, not quoted JSON strings.
 
 Matchmaking is skill-based. The queue payload only carries the text type; the server
 resolves the player's average WPM and accuracy from stored stats, with defaults of 50 WPM
-and 90% for new players. Pairing happens on join, with a 10-second safety-net sweep.
+and 90% for new players. Pairing happens on join, with a 10-second safety-net sweep. Two
+players pair immediately; a queue of three to five players force-pairs after 5 seconds when
+no pair is within the WPM tolerance; larger queues keep the 20-second fallback.
+
+`POST /matchmaking/now` marks the caller's queued entry as willing to match with anyone. The
+server still pairs immediately when possible and honors a lone request when the next player
+joins. The flag does not reset the queue timer and expires with the five-minute queue entry.
+`409` means the caller has no live queue entry, or the queue lock timed out; retry after
+joining.
 
 `GET /matchmaking/pending` is a consuming read: when it returns a code, the pending entry
 is deleted, so a retry can return `204`.
@@ -89,7 +98,7 @@ Status meanings used by race endpoints:
 - `401` - missing or invalid bearer token.
 - `403` - authenticated user is not allowed to perform the action.
 - `404` - room or participant not found.
-- `409` - duplicate resource.
+- `409` - duplicate resource, or an immediate-match request with no live queue entry.
 
 ## `RaceRoom` snapshot
 

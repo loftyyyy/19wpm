@@ -467,3 +467,31 @@ still expected to be red until those are fixed.
 - A hard replica crash can leave a participant marked connected until room TTL because no disconnect
   event is delivered; there is no liveness sweep or admin remediation endpoint.
 - `npm run lint` remains red from the pre-existing errors and warnings listed in the Phase 6 update.
+
+---
+
+## Phase 9 matchmaking follow-up (2026-10-23)
+
+This update covers the sparse-queue and immediate-match backend changes. It does not replace a
+full backend-suite or multi-replica integration run.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| `.\mvnw.cmd -q -Dtest=SkillMatchmakerTest test` | Pass, 11/11 |
+| `.\mvnw.cmd -q -DskipTests test-compile` | Pass |
+
+`SkillMatchmakerTest` now covers immediate two-player pairing, the 5-second sparse-queue
+fallback, the 20-second large-queue fallback, tolerance growth, immediate-match selection, and
+singleton queues. The queue-entry replacement used by immediate match is a Lua script; it is
+covered by code review and the operations runbook, not by an automated Redis integration test.
+
+### Current test inventory
+
+- Phase 9 baseline: 79 tests across 11 files, assuming the full suite runs.
+- `SkillMatchmakerTest` grew from 6 to 11 tests.
+- Expected full-suite total if all classes run: 84 tests.
+
+The full suite remains unrun because PostgreSQL, Redis, and Docker are unavailable locally. The
+three `TextIntegrationTest` failures documented above remain unresolved.

@@ -99,6 +99,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 11.1 | Race rooms move to Redis and STOMP events bridge across replicas | Shared-state store with distributed locks + Pub/Sub event bridge | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
 | 11.2 | Matchmaking pairs players by WPM and accuracy across replicas | Skill-based pairing over sharded queues + distributed lock | [`docs/refactors/11-matchmaking-event-driven.md`](docs/refactors/11-matchmaking-event-driven.md) |
 | 11.3 | Race finishes are validated server-side; suspicious runs are flagged | Server-authoritative scoring + tiered anti-cheat verdicts | [`docs/refactors/49-server-authoritative-anti-cheat.md`](docs/refactors/49-server-authoritative-anti-cheat.md) |
+| 11.4 | Sparse queues pair faster; players can request any opponent | Queue-size-aware fallback deadlines + persisted player preference | [`docs/refactors/50-queue-size-aware-matchmaking.md`](docs/refactors/50-queue-size-aware-matchmaking.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -480,9 +481,9 @@ a distributed lock.
 faster typist.
 
 **After:** queue entries carry WPM and accuracy. `SkillMatchmaker` pairs the closest score within a
-WPM tolerance that widens every 10 seconds and force-pairs after 20 seconds. Queues, presence, and
-pending room codes live in Redis, and pairing runs under a per-text-type lock so two replicas cannot
-match the same player twice.
+WPM tolerance that widens every 10 seconds and a queue-size-aware force-pair deadline (refined in
+11.4). Queues, presence, and pending room codes live in Redis, and pairing runs under a
+per-text-type lock so two replicas cannot match the same player twice.
 
 **Impact:** matches are closer and work across replicas. The trade-off is waiting longer for a
 well-matched opponent; the widening tolerance bounds that wait. See
@@ -502,6 +503,23 @@ persisted on `race_results` by `V12`.
 leave an audit trail. The trade-off is more stored data and a small number of false positives from
 missing telemetry; thresholds are documented in
 [`49-server-authoritative-anti-cheat.md`](docs/refactors/49-server-authoritative-anti-cheat.md).
+
+### 11.4 - Sparse queues pair faster and players can request an immediate match
+
+**Before:** a two-player queue waited for the 20-second fallback whenever the WPM gap exceeded the
+base tolerance, and a third player joining a sparse queue could reset the wait for the only pair.
+
+**After:** two players pair immediately. Queues of three to five players force-pair after 5 seconds
+if no eligible pair exists, while larger queues keep the 20-second window. A player can also call
+`POST /api/v1/race/matchmaking/now`; the request persists `matchNow` on the queue entry, ignores the
+skill tolerance on the next match attempt, and leaves the flag in place if the player is alone.
+The queue entry is replaced atomically with a Lua script so a concurrent `LPUSH` cannot shift the
+target index.
+
+**Impact:** small queues no longer stall behind a match-quality rule they cannot satisfy, and a
+player who values starting over skill proximity can opt out of the wait. The trade-off is a
+deliberately wider skill gap for immediate matches and for sparse queues after 5 seconds. See
+[`50-queue-size-aware-matchmaking.md`](docs/refactors/50-queue-size-aware-matchmaking.md).
 
 ## Code Review Remediation
 
