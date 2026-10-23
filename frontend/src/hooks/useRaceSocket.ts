@@ -24,7 +24,6 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const [connected, setConnected] = useState(false);
   const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
-  const hasJoinedRef = useRef(false);
   const bestRttRef = useRef(Number.POSITIVE_INFINITY);
   const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number } | null>(null);
 
@@ -76,7 +75,6 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   useEffect(() => {
     if (!isTokenReady) return;
 
-    hasJoinedRef.current = false;
     let active = true;
     const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
     const client = new Client({
@@ -144,13 +142,18 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           });
         });
 
-        if (!hasJoinedRef.current) {
-          hasJoinedRef.current = true;
-          client.publish({
-            destination: `/app/room/${roomCode}/join`,
-            body: JSON.stringify({}),
-          });
-        }
+        client.subscribe('/user/queue/race-resume', (message) => {
+          const raceRoom: RaceRoom = JSON.parse(message.body);
+          setRoom(raceRoom);
+        });
+
+        // Reconnecting clients re-join on every connect. The backend treats join as
+        // idempotent and replies with a targeted snapshot on /user/queue/race-resume,
+        // so a player can recover mid-race after a network drop or replica restart.
+        client.publish({
+          destination: `/app/room/${roomCode}/join`,
+          body: JSON.stringify({}),
+        });
 
         if (pendingFinishRef.current !== null) {
           const pendingFinish = pendingFinishRef.current;
@@ -206,7 +209,6 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
 
     return () => {
       active = false;
-      hasJoinedRef.current = false;
       pendingFinishRef.current = null;
       client.deactivate();
       clientRef.current = null;

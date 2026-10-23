@@ -1,16 +1,20 @@
 package com.rho.backend.multiplayer;
 
 import com.rho.backend.enums.RaceState;
+import com.rho.backend.race.RaceEventBus;
 import com.rho.backend.race.RaceParticipant;
+import com.rho.backend.race.RaceRoom;
 import com.rho.backend.race.RaceRoomStore;
 import com.rho.backend.service.RaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
+
+import java.time.Duration;
+import java.time.Instant;
 
 @Component
 public class WebSocketDisconnectHandler {
@@ -19,15 +23,15 @@ public class WebSocketDisconnectHandler {
 
     private final RaceRoomStore raceRoomStore;
     private final RaceService raceService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RaceEventBus raceEventBus;
 
     public WebSocketDisconnectHandler(
             RaceRoomStore raceRoomStore,
             RaceService raceService,
-            SimpMessagingTemplate messagingTemplate) {
+            RaceEventBus raceEventBus) {
         this.raceRoomStore = raceRoomStore;
         this.raceService = raceService;
-        this.messagingTemplate = messagingTemplate;
+        this.raceEventBus = raceEventBus;
     }
 
     @EventListener
@@ -51,34 +55,40 @@ public class WebSocketDisconnectHandler {
         String roomCode = roomCodeObj.toString();
 
         String sessionId = accessor.getSessionId();
+        boolean[] roomFinished = {false};
 
-        raceRoomStore.get(roomCode).ifPresent(room -> {
-            synchronized (room) {
-                RaceParticipant participant = room.findParticipant(userId);
-                if (participant == null) return;
-                if (participant.isDisconnected()) return;
-
-                String currentSessionId = participant.getSessionId();
-                if (currentSessionId != null && !currentSessionId.equals(sessionId)) {
-                    logger.info("Ignoring stale disconnect for userId {} (session {} != current {})", userId, sessionId, currentSessionId);
-                    return;
-                }
-
-                participant.setDisconnected(true);
-                participant.setConnected(false);
-                raceRoomStore.persist(room);
-
-                messagingTemplate.convertAndSend("/topic/room/" + roomCode, room);
-
-                if (room.getState() == RaceState.RACING && room.allActiveFinished()) {
-                    room.setState(RaceState.FINISHED);
-                    raceRoomStore.persist(room);
-                    raceService.persistRacePublic(room);
-                    messagingTemplate.convertAndSend("/topic/room/" + roomCode, room);
-                }
-
-                logger.info("Marked userId {} as disconnected in room {}", userId, roomCode);
+        RaceRoom room = raceRoomStore.mutate(roomCode, currentRoom -> {
+            RaceParticipant participant = currentRoom.findParticipant(userId);
+            if (participant == null || participant.isDisconnected()) {
+                return null;
             }
-        });
+
+            String currentSessionId = participant.getSessionId();
+            if (currentSessionId != null && !currentSessionId.equals(sessionId)) {
+                logger.info("Ignoring stale disconnect for userId {} (session {} != current {})", userId, sessionId, currentSessionId);
+                return null;
+            }
+
+            participant.setDisconnected(true);
+            participant.setConnected(false);
+
+            if (currentRoom.getState() == RaceState.RACING && currentRoom.allActiveFinished()) {
+                currentRoom.setState(RaceState.FINISHED);
+                currentRoom.setDurationSeconds((int) Math.max(0,
+                        Duration.between(currentRoom.getStartTime(), Instant.now()).toSeconds()));
+                roomFinished[0] = true;
+            }
+            return currentRoom;
+        }).orElse(null);
+
+        if (room == null) {
+            return;
+        }
+
+        raceEventBus.broadcast("/topic/room/" + roomCode, room);
+        if (roomFinished[0]) {
+            raceService.persistRacePublic(room);
+        }
+        logger.info("Marked userId {} as disconnected in room {}", userId, roomCode);
     }
 }

@@ -1,21 +1,15 @@
 package com.rho.backend.race;
 
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Abstraction over the live race-room store: the authoritative home of in-flight room state.
  *
- * <p>Two distinct concerns are deliberately separated by this seam. Live room state is held by
- * {@link #get(String)} / {@link #put(RaceRoom)} (fast, mutable, read on every progress tick),
- * whereas {@link #persist(RaceRoom)} is the durable write-through to Redis that is only invoked on
- * room lifecycle transitions (create / join / start / racing / finish / disconnect), never per
- * progress tick.
- *
- * <p>The only implementation today, {@link InMemoryRaceRoomStore}, keeps that authoritative state
- * in a single JVM. The application therefore assumes a <strong>single backend instance</strong>
- * (or sticky routing of a room's participants to one instance). Swapping in a distributed
- * implementation — shared state plus cross-instance broadcast — is the scale-out path; see
- * {@code docs/refactors/17-race-room-store-seam.md}.
+ * <p>Live state is read and written through Redis so every backend replica observes the same
+ * room. Mutations that span more than one field must go through {@link #mutate(String, Function)}
+ * which executes the supplied function under a per-room distributed lock, reloads the latest
+ * room, applies the change, and writes it back atomically.
  */
 public interface RaceRoomStore {
 
@@ -33,4 +27,11 @@ public interface RaceRoomStore {
 
     /** Removes the room from both the live and durable layers. */
     void remove(String roomCode);
+
+    /**
+     * Applies {@code mutation} to the latest room state under a distributed lock and persists the
+     * result. The function must not retain or mutate the room after returning. Returns empty when
+     * the room no longer exists.
+     */
+    <T> Optional<T> mutate(String roomCode, Function<RaceRoom, T> mutation);
 }

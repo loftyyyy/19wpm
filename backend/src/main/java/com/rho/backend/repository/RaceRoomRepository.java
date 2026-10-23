@@ -1,5 +1,7 @@
 package com.rho.backend.repository;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import tools.jackson.databind.ObjectMapper;
 import com.rho.backend.dto.text.response.TextResponseDTO;
 import com.rho.backend.race.PersistedRaceRoom;
@@ -20,11 +22,16 @@ public class RaceRoomRepository {
     private final TextRepository textRepository;
 
     private final ObjectMapper objectMapper;
+    private final Cache<Long, TextResponseDTO> textCache;
 
     public RaceRoomRepository(RedisTemplate<String, String> redisTemplate, TextRepository textRepository, ObjectMapper objectMapper){
         this.redisTemplate = redisTemplate;
         this.textRepository = textRepository;
         this.objectMapper = objectMapper;
+        this.textCache = Caffeine.newBuilder()
+                .expireAfterAccess(Duration.ofMinutes(30))
+                .maximumSize(5_000)
+                .build();
     }
 
     public void save(RaceRoom room){
@@ -46,7 +53,8 @@ public class RaceRoomRepository {
             }
             PersistedRaceRoom persisted = objectMapper.readValue(json, PersistedRaceRoom.class);
             TextResponseDTO text = persisted.textId() == null ? null
-                    : textRepository.findByTextId(persisted.textId()).map(TextResponseDTO::new).orElse(null);
+                    : textCache.get(persisted.textId(), id ->
+                            textRepository.findByTextId(id).map(TextResponseDTO::new).orElse(null));
             return Optional.of(persisted.toRoom(text));
         }catch (Exception e){
             throw new RuntimeException("Failed to read race room: " + roomCode, e);

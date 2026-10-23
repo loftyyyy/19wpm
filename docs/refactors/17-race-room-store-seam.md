@@ -137,3 +137,38 @@ All four items must change together:
 Sticky routing of a room's participants to one instance is a cheaper alternative, but it must cover
 both HTTP and WebSocket traffic and survive revision restarts. Until one of those designs is in
 place, `maxReplicas` must remain `1`.
+
+## Phase 9 — distributed adaptor (2026-10-23)
+
+Live room state now lives in Redis for every replica. `RedisRaceRoomStore` implements the same
+`RaceRoomStore` port, and `InMemoryRaceRoomStore` is deleted. The port gains one method:
+
+```java
+<T> Optional<T> mutate(String roomCode, Function<RaceRoom, T> mutation);
+```
+
+`mutate` holds `race:lock:{roomCode}` (SET NX PX, Lua compare-and-delete release), reloads the
+latest room, applies the function, and writes it back. All multi-field transitions use it:
+join/connect, start, progress, finish, and disconnect.
+
+Cross-replica STOMP fan-out uses `RaceEventBus`: it delivers locally through
+`SimpMessagingTemplate`, publishes `RaceEvent(originId, destination, userId, payload)` on Redis
+`race:events`, and each replica re-delivers events from other origins. The Spring simple broker is
+kept; a STOMP broker relay still requires RabbitMQ/Artemis, which this deployment does not run.
+
+The countdown deadline is a member of the Redis sorted set `race:countdown`. Every replica polls
+with `@Scheduled(fixedDelay = 500)`; the replica that atomically removes a due room performs the
+COUNTDOWN to RACING transition under the room lock, and peers observe a non-COUNTDOWN state and do
+nothing. `transitionToRacing` returns `Optional.empty()` when another replica won.
+
+Reconnect recovery: the client re-joins on every STOMP connect (join is idempotent) and subscribes
+to `/user/queue/race-resume` for a targeted room snapshot. `/topic/room/{code}` remains the
+lifecycle broadcast and `/topic/room/{code}/progress` remains the per-tick delta.
+
+Trade-off: progress ticks now round-trip Redis because the authoritative room is shared. Text
+content is cached in `RaceRoomRepository` (Caffeine, keyed by `textId`) so a mutation does not hit
+PostgreSQL. This is acceptable for race-sized rooms; progress is not persisted to the relational
+database, only the final result is.
+
+Verification: `./mvnw.cmd -q -DskipTests test-compile` and `npm run build` (both green).
+Remaining for horizontal scale: replace `MatchmakingService`'s `ReentrantLock` with the Redis lock.
