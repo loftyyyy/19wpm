@@ -70,8 +70,10 @@ room codes or status strings, not quoted JSON strings.
 Matchmaking is skill-based. The queue payload only carries the text type; the server
 resolves the player's average WPM and accuracy from stored stats, with defaults of 50 WPM
 and 90% for new players. Pairing happens on join, with a 10-second safety-net sweep. Two
-players pair immediately; a queue of three to five players force-pairs after 5 seconds when
-no pair is within the WPM tolerance; larger queues keep the 20-second fallback.
+players pair immediately; a queue of three to five players force-pairs on the first match
+attempt after the 5-second deadline when no pair is within the WPM tolerance; larger queues
+keep the 20-second fallback. Because the sweep is 10 seconds, a sparse queue can pair up to
+roughly one sweep after the deadline.
 
 `POST /matchmaking/now` marks the caller's queued entry as willing to match with anyone. The
 server still pairs immediately when possible and honors a lone request when the next player

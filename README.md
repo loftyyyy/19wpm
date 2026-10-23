@@ -510,8 +510,10 @@ missing telemetry; thresholds are documented in
 **Before:** a two-player queue waited for the 20-second fallback whenever the WPM gap exceeded the
 base tolerance, and a third player joining a sparse queue could reset the wait for the only pair.
 
-**After:** two players pair immediately. Queues of three to five players force-pair after 5 seconds
-if no eligible pair exists, while larger queues keep the 20-second window. A player can also call
+**After:** two players pair immediately. Queues of three to five players force-pair once the
+5-second sparse deadline passes if no eligible pair exists, while larger queues keep the
+20-second window. The deadline is checked on joins, immediate-match requests, and the scheduler's
+10-second sweep, so the observed wait can be up to roughly one sweep longer. A player can also call
 `POST /api/v1/race/matchmaking/now`; the request persists `matchNow` on the queue entry, ignores the
 skill tolerance on the next match attempt, and leaves the flag in place if the player is alone.
 The queue entry is replaced atomically with a Lua script so a concurrent `LPUSH` cannot shift the

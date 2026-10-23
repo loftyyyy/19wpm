@@ -25,11 +25,15 @@ lower-quality match.
 | Queue size | Behavior |
 |---|---|
 | 2 | Pair immediately, regardless of WPM gap. There is no third candidate to wait for. |
-| 3–5 | Prefer an eligible pair, then force-pair the oldest two after 5 seconds. |
+| 3–5 | Prefer an eligible pair, then force-pair the oldest two once the 5-second deadline passes. |
 | 6+ | Keep the existing 20-second fallback so a larger queue can find a closer pair. |
 
 The eligibility pass still runs first. The deadline only applies when no pair is within the
 current WPM tolerance, so increasing queue size never makes a good match wait longer.
+
+The deadline is evaluated when a player joins or requests an immediate match, and by the
+scheduler's 10-second safety-net sweep. A 5-second deadline can therefore be observed up to
+roughly one sweep later; it bounds the minimum wait, not the exact pairing instant.
 
 ## Immediate-match request
 
