@@ -17,6 +17,10 @@ export async function leaveMatchmaking(): Promise<void> {
   await api.post('/race/matchmaking/leave', undefined, 'text');
 }
 
+export async function requestImmediateMatch(): Promise<void> {
+  await api.post('/race/matchmaking/now', undefined, 'text');
+}
+
 export async function getPendingMatch(): Promise<string | null> {
   try {
     const code = await api.get<string | undefined>('/race/matchmaking/pending', 'text');

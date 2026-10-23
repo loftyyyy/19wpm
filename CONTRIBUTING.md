@@ -163,10 +163,12 @@ docs/refactors/ numbered per-change write-ups
   `useRaceSocket`; do not render against raw `Date.now()`.
 - **Text is stored once.** `texts` owns passage content; durable race rooms persist `textId` and
   rehydrate on load.
-- **Live race state is single-instance.** `InMemoryRaceRoomStore` is process-local by design; keep the
-  Container App at one replica (see `README.md` → Limitations).
-- **The server owns final results.** Clients submit progress/counts; the server validates and
-  broadcasts.
+- **Live race state is shared, not process-local.** Rooms live in Redis under `race:room:{code}` and
+  must be mutated through `RaceRoomRepository` under the room lock; never hold mutable room state in
+  a replica-local field. Broadcast through `RaceEventBus` so other replicas receive the event.
+- **The server owns final results.** Clients submit progress/counts; the server computes `serverWpm`,
+  applies anti-cheat, and broadcasts. `finalWpm` is stored for audit only and must not drive ranking,
+  accuracy, or streaks.
 
 ## Database changes
 
@@ -207,7 +209,7 @@ review item use `fix: CR-<area>.<n> follow-up - <summary>`. One review item per 
 Every behaviour or architecture change ships with documentation in the **same commit**:
 
 1. **Write-up:** `docs/refactors/<NN>-<kebab-title>.md`, numbered sequentially from the highest
-   existing file (next free number is **31**). Never reuse or skip.
+   existing file (next free number is **52**). Never reuse or skip.
 2. **README table row:** add to the matching table —
    - performance work → `## Backend Performance Refactors`
    - review/fix work → `## Code Review Remediation`
@@ -297,7 +299,11 @@ There is no frontend test runner configured. Don't add one as a drive-by; raise 
   config (including the git-ignored base `application.properties`) must be present.
 - **Verify after rollout:** the replica reports `ready: true`, `started: true`, `restartCount: 0`, and
   `GET /api/v1/texts/random` plus `/api/v1/texts/preset-texts` return 200.
-- **Keep one replica.** Live race rooms are process-local (see Limitations).
+- **Replicas are opt-in.** The template still runs one replica. Phase 9 makes race rooms and
+  matchmaking multi-replica-safe, but scaling requires shared Redis/PostgreSQL, the same `JWT_SECRET`,
+  Flyway `V12`, and a WebSocket-capable ingress. Follow the
+  [distributed race operations runbook](docs/runbooks/distributed-race-operations.md) before raising
+  `maxReplicas` above 1; rolling back to a pre-Phase-9 image requires scaling back to one replica.
 
 ## License
 

@@ -14,6 +14,9 @@ interface Props {
 
 export default function RaceResults({ participants, currentUserId, onPlayAgain, room, wpmHistory, replayResult }: Props) {
   const sorted = [...participants].sort((a, b) => {
+    const aDisqualified = a.antiCheatStatus === 'DISQUALIFIED';
+    const bDisqualified = b.antiCheatStatus === 'DISQUALIFIED';
+    if (aDisqualified !== bDisqualified) return aDisqualified ? 1 : -1;
     if (a.finishRank > 0 && b.finishRank > 0) return a.finishRank - b.finishRank;
     if (a.finishRank > 0) return -1;
     if (b.finishRank > 0) return 1;
@@ -74,17 +77,20 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
       <div className="space-y-1 mb-4">
         {sorted.map((p) => {
           const isMe = p.userId === currentUserId;
-          const isDnf = !p.finished || p.disconnected;
+          const isDisqualified = p.antiCheatStatus === 'DISQUALIFIED';
+          const isDnf = (!p.finished || p.disconnected) && !isDisqualified;
 
           return (
             <div
               key={p.userId}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-theme ${
                 isMe && !isDnf ? 'bg-muted border-l-4 border-accent' : ''
-              } ${isDnf ? 'opacity-50' : ''}`}
+              } ${isDnf || isDisqualified ? 'opacity-50' : ''}`}
             >
               <span className="w-8 shrink-0 text-center text-sm font-sans font-bold">
-                {isDnf ? (
+                {isDisqualified ? (
+                  <span className="text-error">DQ</span>
+                ) : isDnf ? (
                   <span className="text-error">DNF</span>
                 ) : (
                   <span className={p.finishRank === 1 ? 'text-accent' : 'text-text-dim'}>
@@ -98,7 +104,7 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
                 {isMe && ' (You)'}
               </span>
 
-              {!isDnf && (
+              {!isDnf && !isDisqualified && (
                 <>
                   <span className="text-sm font-sans font-semibold text-accent w-14 text-right">{p.currentWpm}</span>
                   <span className={`text-sm font-sans font-semibold ${accuracyClass(p.accuracy)} w-12 text-right`}>
@@ -106,6 +112,10 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
                   </span>
                   <span className="text-sm font-sans text-text-dim w-10 text-right">{p.errors}</span>
                 </>
+              )}
+
+              {isDisqualified && (
+                <span className="text-xs font-sans text-error w-28 text-right">Cheat detected</span>
               )}
 
               {isDnf && (
@@ -133,7 +143,9 @@ export default function RaceResults({ participants, currentUserId, onPlayAgain, 
               <p className="text-xs font-sans text-text-dim">Accuracy</p>
             </div>
             <div>
-              <p className="text-xl font-display font-bold text-text-main">#{myResult.finishRank || 'DNF'}</p>
+              <p className="text-xl font-display font-bold text-text-main">
+                {myResult.antiCheatStatus === 'DISQUALIFIED' ? 'DQ' : `#${myResult.finishRank || 'DNF'}`}
+              </p>
               <p className="text-xs font-sans text-text-dim">Rank</p>
             </div>
             <div>

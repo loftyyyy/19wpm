@@ -24,9 +24,8 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const [connected, setConnected] = useState(false);
   const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
-  const hasJoinedRef = useRef(false);
   const bestRttRef = useRef(Number.POSITIVE_INFINITY);
-  const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number } | null>(null);
+  const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number; keyIntervalsMs: number[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,7 +75,6 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   useEffect(() => {
     if (!isTokenReady) return;
 
-    hasJoinedRef.current = false;
     let active = true;
     const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
     const client = new Client({
@@ -144,13 +142,18 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           });
         });
 
-        if (!hasJoinedRef.current) {
-          hasJoinedRef.current = true;
-          client.publish({
-            destination: `/app/room/${roomCode}/join`,
-            body: JSON.stringify({}),
-          });
-        }
+        client.subscribe('/user/queue/race-resume', (message) => {
+          const raceRoom: RaceRoom = JSON.parse(message.body);
+          setRoom(raceRoom);
+        });
+
+        // Reconnecting clients re-join on every connect. The backend treats join as
+        // idempotent and replies with a targeted snapshot on /user/queue/race-resume,
+        // so a player can recover mid-race after a network drop or replica restart.
+        client.publish({
+          destination: `/app/room/${roomCode}/join`,
+          body: JSON.stringify({}),
+        });
 
         if (pendingFinishRef.current !== null) {
           const pendingFinish = pendingFinishRef.current;
@@ -158,7 +161,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           try {
             client.publish({
               destination: `/app/room/${roomCode}/finish`,
-              body: JSON.stringify({ finalWpm: pendingFinish.finalWpm, errors: pendingFinish.errors, correctChars: pendingFinish.correctChars }),
+              body: JSON.stringify({ finalWpm: pendingFinish.finalWpm, errors: pendingFinish.errors, correctChars: pendingFinish.correctChars, keyIntervalsMs: pendingFinish.keyIntervalsMs }),
             });
           } catch (err) {
             console.warn('[race-socket] finish redelivery failed; re-queued', err);
@@ -206,7 +209,6 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
 
     return () => {
       active = false;
-      hasJoinedRef.current = false;
       pendingFinishRef.current = null;
       client.deactivate();
       clientRef.current = null;
@@ -221,15 +223,15 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     });
   }, [roomCode]);
 
-  const sendFinish = useCallback((finalWpm: number, errors: number, correctChars: number) => {
+  const sendFinish = useCallback((finalWpm: number, errors: number, correctChars: number, keyIntervalsMs: number[] = []) => {
     if (!roomCode) return;
     if (!clientRef.current?.connected) {
-      pendingFinishRef.current = { finalWpm, errors, correctChars };
+      pendingFinishRef.current = { finalWpm, errors, correctChars, keyIntervalsMs };
       return;
     }
     clientRef.current.publish({
       destination: `/app/room/${roomCode}/finish`,
-      body: JSON.stringify({ finalWpm, errors, correctChars }),
+      body: JSON.stringify({ finalWpm, errors, correctChars, keyIntervalsMs }),
     });
   }, [roomCode]);
 

@@ -1,7 +1,9 @@
 package com.rho.backend.service;
 
+import com.rho.backend.anticheat.AntiCheatService;
 import com.rho.backend.dto.race.RaceProgressDTO;
 import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.enums.AntiCheatStatus;
 import com.rho.backend.enums.RaceState;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.exception.InvalidResourceException;
@@ -24,6 +26,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,19 +42,16 @@ public class RaceService {
     private final RaceSessionRepository raceSessionRepository;
     private final RaceResultRepository raceResultRepository;
     private final StreakService streakService;
+    private final AntiCheatService antiCheatService;
 
-    public RaceService(TextService textService, RaceRoomStore raceRoomStore, UserRepository userRepository, RaceSessionRepository raceSessionRepository, RaceResultRepository raceResultRepository, StreakService streakService) {
+    public RaceService(TextService textService, RaceRoomStore raceRoomStore, UserRepository userRepository, RaceSessionRepository raceSessionRepository, RaceResultRepository raceResultRepository, StreakService streakService, AntiCheatService antiCheatService) {
         this.textService = textService;
         this.raceRoomStore = raceRoomStore;
         this.userRepository = userRepository;
         this.raceSessionRepository = raceSessionRepository;
         this.raceResultRepository = raceResultRepository;
         this.streakService = streakService;
-    }
-
-    private RaceRoom getRoom(String roomCode) {
-        return raceRoomStore.get(roomCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
+        this.antiCheatService = antiCheatService;
     }
 
     public String createRoom(Long hostUserId, TextType textType, boolean isPrivate) {
@@ -69,7 +69,6 @@ public class RaceService {
             TextResponseDTO text = (textType != null) ? textService.getRandomTextByType(textType) : textService.getRandomText();
             raceRoom.setText(text);
             raceRoomStore.put(raceRoom);
-            raceRoomStore.persist(raceRoom);
 
             return roomCode;
 
@@ -79,10 +78,9 @@ public class RaceService {
     }
 
     public RaceRoom joinRoom(String roomCode, Long userId) {
-        RaceRoom raceRoom = getRoom(roomCode);
         User user = userRepository.findByIdWithRole(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        synchronized (raceRoom) {
+        return raceRoomStore.mutate(roomCode, raceRoom -> {
             if (!raceRoom.getState().equals(RaceState.LOBBY)) {
                 return raceRoom; // return current state so late joiner gets broadcast of actual room state
             }
@@ -95,31 +93,23 @@ public class RaceService {
                 throw new InvalidResourceException("Race room is already full");
             }
 
-            RaceParticipant raceParticipant = new RaceParticipant(userId, user.getUsername());
-            raceRoom.getParticipants().add(raceParticipant);
-
-            raceRoomStore.persist(raceRoom);
-
+            raceRoom.getParticipants().add(new RaceParticipant(userId, user.getUsername()));
             return raceRoom;
-        }
+        }).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
     }
 
     public RaceRoom markConnected(String roomCode, Long userId, String sessionId) {
-        RaceRoom raceRoom = getRoom(roomCode);
-
-        synchronized (raceRoom) {
+        return raceRoomStore.mutate(roomCode, raceRoom -> {
             RaceParticipant participant = raceRoom.findParticipant(userId);
             if (participant == null) {
                 return raceRoom;
             }
             participant.setConnected(true);
             participant.setSessionId(sessionId);
-            if (raceRoom.getState() == RaceState.LOBBY) {
-                participant.setDisconnected(false);
-            }
-            raceRoomStore.persist(raceRoom);
+            // A reconnect is valid in every state: a RACING player can drop and resume.
+            participant.setDisconnected(false);
             return raceRoom;
-        }
+        }).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
     }
 
     private long countConnected(RaceRoom raceRoom) {
@@ -129,13 +119,12 @@ public class RaceService {
     }
 
     public RaceRoom startRoom(String roomCode, Long userId) {
-        RaceRoom raceRoom = getRoom(roomCode);
-        boolean isPublicRoom = raceRoom.getHostUserId() == null;
-        if (!isPublicRoom && !raceRoom.isHost(userId)) {
-            throw new UnauthorizedResourceException("Only the room creator can start the race");
-        }
+        return raceRoomStore.mutate(roomCode, raceRoom -> {
+            boolean isPublicRoom = raceRoom.getHostUserId() == null;
+            if (!isPublicRoom && !raceRoom.isHost(userId)) {
+                throw new UnauthorizedResourceException("Only the room creator can start the race");
+            }
 
-        synchronized (raceRoom) {
             if (!raceRoom.getState().equals(RaceState.LOBBY)) {
                 return raceRoom;
             }
@@ -149,35 +138,28 @@ public class RaceService {
             raceRoom.setCountdownDurationMs(COUNTDOWN_DURATION_MS);
             logger.info("Room {} entering COUNTDOWN; countdownStartTime={}, durationMs={}",
                     roomCode, raceRoom.getCountdownStartTime(), raceRoom.getCountdownDurationMs());
-            raceRoomStore.persist(raceRoom);
             return raceRoom;
-        }
+        }).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
     }
 
-    public RaceRoom transitionToRacing(String roomCode) {
-        RaceRoom raceRoom = getRoom(roomCode);
-
-        synchronized (raceRoom) {
+    public Optional<RaceRoom> transitionToRacing(String roomCode) {
+        return raceRoomStore.mutate(roomCode, raceRoom -> {
             if (!raceRoom.getState().equals(RaceState.COUNTDOWN)) {
-                throw new InvalidResourceException("Cannot start race");
+                return null;
             }
 
             raceRoom.setState(RaceState.RACING);
             raceRoom.setStartTime(Instant.now());
-            raceRoomStore.persist(raceRoom);
             return raceRoom;
-        }
+        }).flatMap(Optional::ofNullable);
     }
 
     /**
-     * Applies a progress tick in memory and returns a lightweight delta for broadcasting.
-     * The room is intentionally NOT persisted to Redis here: this runs several times per
-     * second per participant and only the final state matters.
+     * Applies a progress tick and persists the latest room snapshot so another replica can finish
+     * the race correctly. The broadcast remains a lightweight delta.
      */
     public RaceProgressDTO updateProgress(String roomCode, Long userId, double progressPercent, int currentWpm, int errors) {
-        RaceRoom raceRoom = getRoom(roomCode);
-
-        synchronized (raceRoom) {
+        return raceRoomStore.mutate(roomCode, raceRoom -> {
             if (!raceRoom.getState().equals(RaceState.RACING)) {
                 throw new InvalidResourceException("Race is not in progress");
             }
@@ -192,20 +174,16 @@ public class RaceService {
             raceParticipant.setErrors(errors);
 
             return new RaceProgressDTO(userId, progressPercent, currentWpm, errors);
-        }
+        }).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
     }
 
-    public RaceRoom finishRace(String roomCode, Long userId, int finalWpm, int errors, int correctChars) {
-        RaceRoom raceRoom = getRoom(roomCode);
-        RaceParticipant raceParticipant;
-        boolean roomFinished = false;
-
-        synchronized (raceRoom) {
+    public RaceFinishOutcome finishRace(String roomCode, Long userId, int finalWpm, int errors, int correctChars, List<Integer> keyIntervalsMs) {
+        RaceFinishOutcome outcome = raceRoomStore.mutate(roomCode, raceRoom -> {
             if (!raceRoom.getState().equals(RaceState.RACING)) {
                 throw new InvalidResourceException("Can't finish a not started race");
             }
 
-            raceParticipant = raceRoom.findParticipant(userId);
+            RaceParticipant raceParticipant = raceRoom.findParticipant(userId);
             if (raceParticipant == null) {
                 throw new ResourceNotFoundException("Participant not found in room");
             }
@@ -214,30 +192,51 @@ public class RaceService {
                 return null;
             }
 
-            raceParticipant.setFinishRank(raceRoom.getFinishCount() + 1);
-            raceRoom.setFinishCount(raceRoom.getFinishCount() + 1);
+            Instant now = Instant.now();
+            Instant startedAt = raceRoom.getStartTime() != null ? raceRoom.getStartTime() : now;
+            AntiCheatService.Verdict verdict = antiCheatService.assess(
+                    startedAt, now, finalWpm, correctChars, errors, keyIntervalsMs);
+
             raceParticipant.setFinished(true);
-            raceParticipant.setCurrentWpm(finalWpm);
+            raceParticipant.setCurrentWpm(verdict.serverWpm());
+            raceParticipant.setServerWpm(verdict.serverWpm());
+            raceParticipant.setClaimedWpm(finalWpm);
             raceParticipant.setErrors(errors);
             raceParticipant.setCorrectChars(correctChars);
             raceParticipant.setAccuracy(computeAccuracy(correctChars, errors));
+            raceParticipant.setAntiCheatStatus(verdict.status());
+            raceParticipant.setAntiCheatFlags(verdict.flags());
 
-            if (raceRoom.allActiveFinished()) {
-                raceRoom.setState(RaceState.FINISHED);
-                raceRoom.setDurationSeconds((int) Math.max(0, Duration.between(raceRoom.getStartTime(), Instant.now()).toSeconds()));
-                roomFinished = true;
+            if (verdict.status() == AntiCheatStatus.DISQUALIFIED) {
+                raceParticipant.setFinishRank(0);
+                raceParticipant.setProgressPercent(100.0);
+            } else {
+                raceParticipant.setFinishRank(raceRoom.getFinishCount() + 1);
+                raceRoom.setFinishCount(raceRoom.getFinishCount() + 1);
             }
 
-            raceRoomStore.persist(raceRoom);
+            boolean roomFinished = raceRoom.allActiveFinished();
+            if (roomFinished) {
+                raceRoom.setState(RaceState.FINISHED);
+                raceRoom.setDurationSeconds((int) Math.max(0, Duration.between(startedAt, now).toSeconds()));
+            }
+            return new RaceFinishOutcome(raceRoom, roomFinished);
+        }).flatMap(Optional::ofNullable).orElse(null);
+
+        if (outcome == null) {
+            return null;
         }
 
-        raceParticipant.setLatestStreak(streakService.recordActivity(userId));
-
-        if (roomFinished) {
-            persistRacePublic(raceRoom);
+        RaceParticipant participant = outcome.room().findParticipant(userId);
+        if (participant != null && participant.getAntiCheatStatus() == AntiCheatStatus.VALID) {
+            participant.setLatestStreak(streakService.recordActivity(userId));
         }
 
-        return raceRoom;
+        if (outcome.roomFinished()) {
+            persistRacePublic(outcome.room());
+        }
+
+        return outcome;
     }
 
     public void persistRacePublic(RaceRoom raceRoom) {
@@ -261,6 +260,12 @@ public class RaceService {
                             .errorCount(participant.getErrors())
                             .correctChars(participant.getCorrectChars())
                             .accuracy(participant.getAccuracy())
+                            .claimedWpm(participant.getClaimedWpm())
+                            .serverWpm(participant.getServerWpm())
+                            .antiCheatStatus(participant.getAntiCheatStatus())
+                            .antiCheatFlags(participant.getAntiCheatFlags() == null || participant.getAntiCheatFlags().isEmpty()
+                                    ? null
+                                    : String.join(",", participant.getAntiCheatFlags()))
                             .finished(participant.isFinished())
                             .build();
                 }).toList();
@@ -284,6 +289,9 @@ public class RaceService {
                 .map(Object::toString)
                 .collect(Collectors.joining());
 
+    }
+
+    public record RaceFinishOutcome(RaceRoom room, boolean roomFinished) {
     }
 
 }
