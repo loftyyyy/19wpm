@@ -97,3 +97,58 @@ private void matchQueue(TextType textType){
 ## Rollback
 
 Revert this commit — restores the 2 s poll-only scheduler and the original `pollQueues` body.
+
+## Phase 9 — skill and WPM matchmaking across replicas (2026-10-23)
+
+**Status:** Done
+
+### Why
+
+Phase 9 runs the backend on multiple instances behind one load balancer. The old queue stored bare
+user ids, matched in arrival order (pop up to five, take the first two), and serialized with an
+in-JVM `ReentrantLock`. Two players of wildly different skill could be paired, and two replicas
+could process the same queue concurrently.
+
+### What changed
+
+- Queue entries are JSON `MatchmakingEntry(userId, wpm, accuracy, enqueuedAt)`. Legacy bare-id
+  entries are still read as a `50 WPM / 90%` profile, so a rolling deploy does not strand players.
+- `SkillMatchmaker` is a pure policy object (unit tested) that selects a pair by:
+  - WPM tiers `0:<30, 1:30-60, 2:60-90, 3:90-120, 4:>120` and accuracy tiers
+    `0:<85, 1:85-92, 2:92-97, 3:>=97` for a skill distance;
+  - tolerance `15 WPM + 10 WPM per 10 s waited`, capped at `100 WPM`;
+  - lowest score wins (`wpmGap * 10 + tierGap + accuracyGap`), so the closest pair is chosen
+    instead of the oldest pair;
+  - fallback: once the oldest entry has waited `20 s`, the two oldest are paired regardless of gap.
+- WPM comes from `UserStat.averageSpeed` (default `50` when absent); accuracy from
+  `TypingResultRepository.findAverageAccuracyByUserId` (default `90%` when absent).
+- `matchQueue` now takes a distributed `RedisLock` (`matchmaking:lock:{textType}`, TTL 10 s, wait
+  2 s) instead of the in-JVM lock. The lock covers loading, pruning, selecting, removing, room
+  creation and notifications, so a player cannot be popped by two replicas.
+- Pruning removes entries older than five minutes and deletes their `matchmaking:player:` key;
+  pending matches keep their two-minute TTL.
+- Room notifications go through `RaceEventBus`, so a player connected to another replica still
+  receives `/queue/matchmaking` and `/queue/race-resume`.
+
+### Trade-offs
+
+- The queue is still a Redis list, not a sorted set. Selection is O(n²) per text type, which is
+  fine at current queue sizes but would need a skill-indexed structure (or bucketed queues) at
+  thousands of concurrent waiters.
+- Matching runs in the joining request thread and in the 10 s safety-net poll. Both are bounded by
+  the lock wait (2 s); a replica that cannot acquire the lock logs and lets the next poll retry.
+- A failed `joinRoom` after a pair is removed from the queue is logged; the room may keep a single
+  participant until the disconnect/idle path cleans it up.
+
+### Files changed
+
+- `backend/src/main/java/com/rho/backend/matchmaking/MatchmakingEntry.java` (new)
+- `backend/src/main/java/com/rho/backend/matchmaking/SkillMatchmaker.java` (new)
+- `backend/src/main/java/com/rho/backend/service/MatchmakingService.java`
+- `backend/src/main/java/com/rho/backend/repository/TypingResultRepository.java`
+- `backend/src/test/java/com/rho/backend/matchmaking/SkillMatchmakerTest.java` (new)
+
+### Verification
+
+- `.\mvnw.cmd -q -Dtest=SkillMatchmakerTest test` — 6 tests green.
+- `.\mvnw.cmd -q -DskipTests compile` / `test-compile` — green.

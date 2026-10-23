@@ -31,4 +31,7 @@ public interface TypingResultRepository extends JpaRepository<TypingResult, Long
             @Param("wpm") BigDecimal wpm,
             @Param("accuracy") BigDecimal accuracy
     );
+
+    @Query("SELECT AVG(tr.accuracy) FROM TypingResult tr WHERE tr.user.userId = :userId")
+    Double findAverageAccuracyByUserId(@Param("userId") Long userId);
 }
