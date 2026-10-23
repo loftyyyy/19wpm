@@ -1,5 +1,6 @@
 export type RaceState = 'LOBBY' | 'COUNTDOWN' | 'RACING' | 'FINISHED';
 export type TextType = 'SHORT' | 'MEDIUM' | 'LONG' | 'THICC';
+export type AntiCheatStatus = 'VALID' | 'QUARANTINED' | 'DISQUALIFIED';
 
 export interface RaceParticipant {
   userId: number;
@@ -14,6 +15,10 @@ export interface RaceParticipant {
   correctChars: number;
   accuracy: number;
   finishRank: number;
+  serverWpm: number;
+  claimedWpm: number;
+  antiCheatStatus: AntiCheatStatus;
+  antiCheatFlags: string[];
 }
 
 export interface RaceText {

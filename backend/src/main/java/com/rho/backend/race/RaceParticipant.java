@@ -5,8 +5,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.rho.backend.enums.AntiCheatStatus;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 @NoArgsConstructor
 @Getter
@@ -28,6 +31,11 @@ public class RaceParticipant implements Serializable {
     private int correctChars;
     private int accuracy;      // 0-100, computed server-side from correctChars + errors
     private int finishRank;
+
+    private int serverWpm;     // recomputed from correctChars and server-observed duration
+    private int claimedWpm;    // value reported by the client, kept for audit
+    private AntiCheatStatus antiCheatStatus = AntiCheatStatus.VALID;
+    private List<String> antiCheatFlags = new ArrayList<>();
 
     @JsonIgnore
     private Integer latestStreak;

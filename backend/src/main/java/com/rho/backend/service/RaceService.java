@@ -1,7 +1,9 @@
 package com.rho.backend.service;
 
+import com.rho.backend.anticheat.AntiCheatService;
 import com.rho.backend.dto.race.RaceProgressDTO;
 import com.rho.backend.dto.text.response.TextResponseDTO;
+import com.rho.backend.enums.AntiCheatStatus;
 import com.rho.backend.enums.RaceState;
 import com.rho.backend.enums.TextType;
 import com.rho.backend.exception.InvalidResourceException;
@@ -40,14 +42,16 @@ public class RaceService {
     private final RaceSessionRepository raceSessionRepository;
     private final RaceResultRepository raceResultRepository;
     private final StreakService streakService;
+    private final AntiCheatService antiCheatService;
 
-    public RaceService(TextService textService, RaceRoomStore raceRoomStore, UserRepository userRepository, RaceSessionRepository raceSessionRepository, RaceResultRepository raceResultRepository, StreakService streakService) {
+    public RaceService(TextService textService, RaceRoomStore raceRoomStore, UserRepository userRepository, RaceSessionRepository raceSessionRepository, RaceResultRepository raceResultRepository, StreakService streakService, AntiCheatService antiCheatService) {
         this.textService = textService;
         this.raceRoomStore = raceRoomStore;
         this.userRepository = userRepository;
         this.raceSessionRepository = raceSessionRepository;
         this.raceResultRepository = raceResultRepository;
         this.streakService = streakService;
+        this.antiCheatService = antiCheatService;
     }
 
     public String createRoom(Long hostUserId, TextType textType, boolean isPrivate) {
@@ -173,7 +177,7 @@ public class RaceService {
         }).orElseThrow(() -> new ResourceNotFoundException("Room code not found"));
     }
 
-    public RaceFinishOutcome finishRace(String roomCode, Long userId, int finalWpm, int errors, int correctChars) {
+    public RaceFinishOutcome finishRace(String roomCode, Long userId, int finalWpm, int errors, int correctChars, List<Integer> keyIntervalsMs) {
         RaceFinishOutcome outcome = raceRoomStore.mutate(roomCode, raceRoom -> {
             if (!raceRoom.getState().equals(RaceState.RACING)) {
                 throw new InvalidResourceException("Can't finish a not started race");
@@ -188,18 +192,33 @@ public class RaceService {
                 return null;
             }
 
-            raceParticipant.setFinishRank(raceRoom.getFinishCount() + 1);
-            raceRoom.setFinishCount(raceRoom.getFinishCount() + 1);
+            Instant now = Instant.now();
+            Instant startedAt = raceRoom.getStartTime() != null ? raceRoom.getStartTime() : now;
+            AntiCheatService.Verdict verdict = antiCheatService.assess(
+                    startedAt, now, finalWpm, correctChars, errors, keyIntervalsMs);
+
             raceParticipant.setFinished(true);
-            raceParticipant.setCurrentWpm(finalWpm);
+            raceParticipant.setCurrentWpm(verdict.serverWpm());
+            raceParticipant.setServerWpm(verdict.serverWpm());
+            raceParticipant.setClaimedWpm(finalWpm);
             raceParticipant.setErrors(errors);
             raceParticipant.setCorrectChars(correctChars);
             raceParticipant.setAccuracy(computeAccuracy(correctChars, errors));
+            raceParticipant.setAntiCheatStatus(verdict.status());
+            raceParticipant.setAntiCheatFlags(verdict.flags());
+
+            if (verdict.status() == AntiCheatStatus.DISQUALIFIED) {
+                raceParticipant.setFinishRank(0);
+                raceParticipant.setProgressPercent(100.0);
+            } else {
+                raceParticipant.setFinishRank(raceRoom.getFinishCount() + 1);
+                raceRoom.setFinishCount(raceRoom.getFinishCount() + 1);
+            }
 
             boolean roomFinished = raceRoom.allActiveFinished();
             if (roomFinished) {
                 raceRoom.setState(RaceState.FINISHED);
-                raceRoom.setDurationSeconds((int) Math.max(0, Duration.between(raceRoom.getStartTime(), Instant.now()).toSeconds()));
+                raceRoom.setDurationSeconds((int) Math.max(0, Duration.between(startedAt, now).toSeconds()));
             }
             return new RaceFinishOutcome(raceRoom, roomFinished);
         }).flatMap(Optional::ofNullable).orElse(null);
@@ -209,7 +228,7 @@ public class RaceService {
         }
 
         RaceParticipant participant = outcome.room().findParticipant(userId);
-        if (participant != null) {
+        if (participant != null && participant.getAntiCheatStatus() == AntiCheatStatus.VALID) {
             participant.setLatestStreak(streakService.recordActivity(userId));
         }
 
@@ -241,6 +260,12 @@ public class RaceService {
                             .errorCount(participant.getErrors())
                             .correctChars(participant.getCorrectChars())
                             .accuracy(participant.getAccuracy())
+                            .claimedWpm(participant.getClaimedWpm())
+                            .serverWpm(participant.getServerWpm())
+                            .antiCheatStatus(participant.getAntiCheatStatus())
+                            .antiCheatFlags(participant.getAntiCheatFlags() == null || participant.getAntiCheatFlags().isEmpty()
+                                    ? null
+                                    : String.join(",", participant.getAntiCheatFlags()))
                             .finished(participant.isFinished())
                             .build();
                 }).toList();

@@ -78,7 +78,7 @@ public class RaceStompController {
     @MessageMapping("/room/{code}/finish")
     public void finishRace(@DestinationVariable String code, @Payload FinishMessageDTO finishMessageDTO, Principal principal) {
         Long userId = Long.parseLong(principal.getName());
-        RaceService.RaceFinishOutcome outcome = raceService.finishRace(code, userId, finishMessageDTO.finalWpm(), finishMessageDTO.errors(), finishMessageDTO.correctChars());
+        RaceService.RaceFinishOutcome outcome = raceService.finishRace(code, userId, finishMessageDTO.finalWpm(), finishMessageDTO.errors(), finishMessageDTO.correctChars(), finishMessageDTO.keyIntervalsMs());
         if (outcome == null) {
             return;
         }

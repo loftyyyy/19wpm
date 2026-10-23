@@ -357,10 +357,10 @@ export default function Race() {
               <RaceTypingInput
                 passage={socket.room.text.content}
                 onProgress={(p, w, t) => socket.sendProgress(p, w, t)}
-                onFinish={(wpm, errors, correctChars, wpmHistory, result) => {
+                onFinish={(wpm, errors, correctChars, wpmHistory, result, keyIntervalsMs) => {
                   setRaceWpmHistory(wpmHistory);
                   setMyRaceResult(result);
-                  socket.sendFinish(wpm, errors, correctChars);
+                  socket.sendFinish(wpm, errors, correctChars, keyIntervalsMs);
                 }}
                 startTime={socket.room.startTime!}
               />
@@ -439,13 +439,15 @@ export default function Race() {
 interface RaceTypingInputProps {
   passage: string;
   onProgress: (progressPercent: number, currentWpm: number, errors: number) => void;
-  onFinish: (finalWpm: number, errors: number, correctChars: number, wpmHistory: WpmPoint[], result: TestResult) => void;
+  onFinish: (finalWpm: number, errors: number, correctChars: number, wpmHistory: WpmPoint[], result: TestResult, keyIntervalsMs: number[]) => void;
   startTime: string;
 }
 
 function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypingInputProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const finishReportedRef = useRef(false);
+  const keyIntervalsRef = useRef<number[]>([]);
+  const lastKeyAtRef = useRef<number | null>(null);
   const onProgressRef = useRef(onProgress);
   const onFinishRef = useRef(onFinish);
   const { isTypingActive, markActive } = useTypingActivity();
@@ -481,7 +483,7 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       finishReportedRef.current = true;
       const typed = state.typedChars.join('');
       onProgressRef.current(1, calcWpm(typed), state.totalIncorrect);
-      onFinishRef.current(calcWpm(typed), state.totalIncorrect, state.totalCorrect, state.wpmHistory, getResult());
+      onFinishRef.current(calcWpm(typed), state.totalIncorrect, state.totalCorrect, state.wpmHistory, getResult(), keyIntervalsRef.current);
     }
     if (!state.isFinished) {
       finishReportedRef.current = false;
@@ -496,6 +498,17 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
     if (e.key === 'Tab' || e.key === 'Escape') {
       e.preventDefault();
       return;
+    }
+    if (!e.repeat && e.key.length === 1) {
+      const now = performance.now();
+      const previous = lastKeyAtRef.current;
+      if (previous !== null) {
+        const interval = Math.round(now - previous);
+        if (interval >= 0 && keyIntervalsRef.current.length < 2000) {
+          keyIntervalsRef.current.push(interval);
+        }
+      }
+      lastKeyAtRef.current = now;
     }
     markActive();
     handleKeyDown(e);

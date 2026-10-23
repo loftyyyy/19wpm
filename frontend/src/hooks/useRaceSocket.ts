@@ -25,7 +25,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const bestRttRef = useRef(Number.POSITIVE_INFINITY);
-  const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number } | null>(null);
+  const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number; keyIntervalsMs: number[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +161,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
           try {
             client.publish({
               destination: `/app/room/${roomCode}/finish`,
-              body: JSON.stringify({ finalWpm: pendingFinish.finalWpm, errors: pendingFinish.errors, correctChars: pendingFinish.correctChars }),
+              body: JSON.stringify({ finalWpm: pendingFinish.finalWpm, errors: pendingFinish.errors, correctChars: pendingFinish.correctChars, keyIntervalsMs: pendingFinish.keyIntervalsMs }),
             });
           } catch (err) {
             console.warn('[race-socket] finish redelivery failed; re-queued', err);
@@ -223,15 +223,15 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
     });
   }, [roomCode]);
 
-  const sendFinish = useCallback((finalWpm: number, errors: number, correctChars: number) => {
+  const sendFinish = useCallback((finalWpm: number, errors: number, correctChars: number, keyIntervalsMs: number[] = []) => {
     if (!roomCode) return;
     if (!clientRef.current?.connected) {
-      pendingFinishRef.current = { finalWpm, errors, correctChars };
+      pendingFinishRef.current = { finalWpm, errors, correctChars, keyIntervalsMs };
       return;
     }
     clientRef.current.publish({
       destination: `/app/room/${roomCode}/finish`,
-      body: JSON.stringify({ finalWpm, errors, correctChars }),
+      body: JSON.stringify({ finalWpm, errors, correctChars, keyIntervalsMs }),
     });
   }, [roomCode]);
 
