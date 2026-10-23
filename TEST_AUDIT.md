@@ -413,3 +413,57 @@ public-preset-text expectation are resolved.
   is emitted but not yet centrally stored or alerted on.
 - k6 performance scenarios remain manual and environment-dependent.
 - Docker/Testcontainers, PostgreSQL, and Redis are still required for a complete backend-suite run.
+
+---
+
+## Phase 9 update (2026-10-23)
+
+Phase 9 moved live race state to Redis, bridged STOMP events across replicas, added skill-based
+matchmaking, and made race finishes server-authoritative with anti-cheat verdicts. This update records
+the verification performed for steps 1-3; it does not replace a full backend-suite or multi-replica
+integration run.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| `.\mvnw.cmd -q -Dtest=AntiCheatServiceTest test` | Pass, 6/6 |
+| `.\mvnw.cmd -q "-Dtest=AntiCheatServiceTest,SkillMatchmakerTest" test` | Pass, 12/12 |
+| `.\mvnw.cmd -q -DskipTests test-compile` | Pass |
+| `npm run build` | Pass |
+
+`AntiCheatServiceTest` covers each severe and moderate flag, the `VALID` path, server-versus-claimed
+WPM handling, short races, interval analysis, and the 2000-interval cap. `SkillMatchmakerTest` covers
+the initial tolerance, tolerance growth, forced pairing, scoring, accuracy/tier tie-breaks, and the
+empty/singleton cases.
+
+### Current test inventory
+
+- Phase 6 baseline: 67 tests across 9 files, assuming the full suite runs.
+- Added `AntiCheatServiceTest`: 6 tests.
+- Added `SkillMatchmakerTest`: 6 tests.
+- Expected full-suite total if all classes run: 79 tests.
+
+The full suite was not run for this update because PostgreSQL, Redis, and Docker are unavailable
+locally. The three `TextIntegrationTest` failures documented above remain unresolved, so the suite is
+still expected to be red until those are fixed.
+
+### Remaining gaps
+
+- There is still no backend test workflow, no frontend unit/component test runner, and no full browser
+  E2E suite. `.github/workflows/performance.yml` only covers bundle/Lighthouse budgets.
+- The Redis room store, distributed lock, countdown scheduler, and `RaceEventBus` Pub/Sub bridge have
+  no integration test against a real Redis or a two-replica deployment. Their behavior is covered by
+  code review and the operations runbook, not automated tests.
+- The `V12` migration and the new `race_results` columns are not exercised by an integration test.
+- Cross-replica STOMP delivery and reconnect after a replica restart were verified manually during
+  development, not by an automated test.
+- `MatchmakingService.createMatchedRoom` can leave a one-participant room if a join fails after the
+  room is created; there is no test or cleanup path for that partial failure.
+- Anti-cheat UI rendering (DQ ordering and labels) has no frontend test; it is covered by
+  `npm run build` only.
+- The k6 suite was not rerun for Phase 9. Its committed numbers remain the 2026-10-19 run, and the
+  manual rerun guidance in `k6/README.md` still requires local PostgreSQL, Redis, and the backend.
+- A hard replica crash can leave a participant marked connected until room TTL because no disconnect
+  event is delivered; there is no liveness sweep or admin remediation endpoint.
+- `npm run lint` remains red from the pre-existing errors and warnings listed in the Phase 6 update.

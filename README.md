@@ -26,10 +26,10 @@
 | `/oauth2/callback` | OAuth2 redirect handler |
 | `/dashboard` | History, progression chart, stats |
 | `/create` | Content creation |
-| `/compete` | Matchmaking lobby |
+| `/compete` | Compete against your personal best |
 | `/leaderboard` | Leaderboard |
 | `/about` | About |
-| `/race` | Matchmaking lobby |
+| `/race` | Multiplayer race lobby |
 
 ## Tech Stack
 
@@ -37,7 +37,7 @@
 |---|---|
 | React 19 | Spring Boot 4.0.2 (Java 17) |
 | TypeScript | PostgreSQL + Flyway |
-| Tailwind CSS v4 | Redis (token blacklist) |
+| Tailwind CSS v4 | Redis (tokens, live race rooms, matchmaking) |
 | Vite | Bucket4j (rate limiting) |
 | Recharts | STOMP / SockJS (WebSocket) |
 
@@ -96,6 +96,9 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 10.1 | Pull requests enforce bundle and Lighthouse performance budgets | Automated performance budgets in CI | [`docs/refactors/46-ci-performance-regression-gates.md`](docs/refactors/46-ci-performance-regression-gates.md) |
 | 10.2 | Backend requests, services, and repositories emit Actuator, Prometheus, and OTLP telemetry | Automatic HTTP instrumentation + declarative observations at service and repository boundaries | [`docs/refactors/47-backend-telemetry.md`](docs/refactors/47-backend-telemetry.md) |
 | 10.3 | Browsers report Core Web Vitals and Start Typing latency to a Micrometer-backed ingress | Beacon-delivered field metrics + bounded-cardinality server summaries | [`docs/refactors/48-frontend-rum.md`](docs/refactors/48-frontend-rum.md) |
+| 11.1 | Race rooms move to Redis and STOMP events bridge across replicas | Shared-state store with distributed locks + Pub/Sub event bridge | [`docs/refactors/17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md) |
+| 11.2 | Matchmaking pairs players by WPM and accuracy across replicas | Skill-based pairing over sharded queues + distributed lock | [`docs/refactors/11-matchmaking-event-driven.md`](docs/refactors/11-matchmaking-event-driven.md) |
+| 11.3 | Race finishes are validated server-side; suspicious runs are flagged | Server-authoritative scoring + tiered anti-cheat verdicts | [`docs/refactors/49-server-authoritative-anti-cheat.md`](docs/refactors/49-server-authoritative-anti-cheat.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -112,6 +115,8 @@ that the client merges into its last full snapshot.
 **Impact:** removes two Redis round-trips plus full-room serialization per tick per participant,
 fixes the concurrent lost-update bug, and drops the per-tick payload from O(participants) to a
 constant-size delta.
+
+> Superseded in Phase 9: live rooms now live in Redis rather than the in-memory store. See 11.1 below.
 
 ### 1.2 — Race countdown on a shared scheduler
 
@@ -423,11 +428,15 @@ limits are reasoned defaults, not load-test results.
 enumerated in one place.
 
 **After:** the audit records four independent instance-local mechanisms: Caffeine room state, the
-simple STOMP broker, the local countdown scheduler, and the matchmaking lock. All four must change
-before `maxReplicas` can exceed 1.
+simple STOMP broker, the local countdown scheduler, and the matchmaking lock. At the time, all four
+had to change before `maxReplicas` could exceed 1.
 
 **Impact:** the deployment constraint is now explicit in both code-adjacent documentation and the
 Container Apps manifest.
+
+> Superseded in Phase 9: all four blockers were replaced (Redis room state, Pub/Sub event bridge,
+> Redis countdown ZSET, distributed matchmaking lock). See 11.1-11.3. The manifest still runs one
+> replica by choice, not because the code requires it.
 
 ### 9.3 - k6 suite validation
 
@@ -439,6 +448,60 @@ batches, cached word pools, text by id, stats, and paginated results at 100 requ
 
 **Impact:** the optimized read paths remain covered by the committed suite; the measured median
 baseline remains the 2026-10-19 run because local services were unavailable for a rerun.
+
+## Phase 9: Distributed Multiplayer
+
+Phase 9 removes the single-instance assumptions behind races. The deployment template still runs one
+replica by default, but the application is now safe to scale horizontally when Redis is shared. The
+client-facing wire contract and operator procedures are in
+[`docs/api/race-contract.md`](docs/api/race-contract.md) and
+[`docs/runbooks/distributed-race-operations.md`](docs/runbooks/distributed-race-operations.md).
+
+### 11.1 - Race rooms move to Redis and STOMP events bridge across replicas
+
+**Before:** live rooms lived in a process-local Caffeine store, the STOMP broker was process-local,
+and the countdown used a local scheduler. A room's participants had to stay on one instance.
+
+**After:** rooms are persisted as `PersistedRaceRoom` JSON under `race:room:{code}` and mutated under
+a Redis lock (`race:lock:{code}`). The countdown deadline is a `race:countdown` sorted-set member
+polled by every replica, so any replica can settle it. Full-room and targeted STOMP messages are
+delivered locally and republished on the `race:events` Pub/Sub channel; peers deliver them to their
+own sessions and ignore their own echo.
+
+**Impact:** rooms and reconnects are replica-independent, a replica crash no longer strands a
+countdown, and clients do not need sticky sessions. See
+[`17-race-room-store-seam.md`](docs/refactors/17-race-room-store-seam.md). The trade-off is that
+Redis is now on the live race path: a Redis outage ends in-flight rooms, and each progress tick takes
+a distributed lock.
+
+### 11.2 - Matchmaking pairs players by skill across replicas
+
+**Before:** matchmaking matched players by arrival order, so a beginner could be paired with a much
+faster typist.
+
+**After:** queue entries carry WPM and accuracy. `SkillMatchmaker` pairs the closest score within a
+WPM tolerance that widens every 10 seconds and force-pairs after 20 seconds. Queues, presence, and
+pending room codes live in Redis, and pairing runs under a per-text-type lock so two replicas cannot
+match the same player twice.
+
+**Impact:** matches are closer and work across replicas. The trade-off is waiting longer for a
+well-matched opponent; the widening tolerance bounds that wait. See
+[`11-matchmaking-event-driven.md`](docs/refactors/11-matchmaking-event-driven.md).
+
+### 11.3 - Race finishes are validated server-side
+
+**Before:** a client's reported WPM and correctness were trusted for ranking and streaks.
+
+**After:** the server computes WPM from `correctChars` and the server-observed race start time,
+analyzes optional inter-key intervals, and classifies the finish as `VALID`, `QUARANTINED`, or
+`DISQUALIFIED`. Quarantined runs stay ranked but do not credit a streak; disqualified runs are
+unranked and do not increment `finish_count`. The claimed WPM, computed WPM, status, and flags are
+persisted on `race_results` by `V12`.
+
+**Impact:** ranking and streaks no longer trust a single client-reported number, and suspicious runs
+leave an audit trail. The trade-off is more stored data and a small number of false positives from
+missing telemetry; thresholds are documented in
+[`49-server-authoritative-anti-cheat.md`](docs/refactors/49-server-authoritative-anti-cheat.md).
 
 ## Code Review Remediation
 
@@ -734,7 +797,7 @@ consecutive-day increment/reset behaviour is untouched. No schema or response-sh
 ## Limitations
 
 - Guest results live in localStorage only. Clearing site data removes them permanently.
-- Live race rooms are held in a single backend instance, so the backend must run one replica (or route a room's participants to one instance) until a distributed room store is added. The Container Apps template enforces `maxReplicas: 1` and keeps `minReplicas: 1` to avoid request-triggered cold starts.
+- Live race rooms and matchmaking now share Redis state, and STOMP events bridge across replicas, so the application no longer requires a single instance. The Container Apps template still pins `maxReplicas: 1` (and `minReplicas: 1` to avoid cold starts); raising it is an explicit scaling decision that assumes shared Redis/PostgreSQL and the same `JWT_SECRET`. See the [distributed race operations runbook](docs/runbooks/distributed-race-operations.md).
 - Mobile works for typing but keyboard shortcuts (Tab, Enter) require a physical keyboard.
 - Word lists and phrase content are seeded at deploy time and cannot be edited through the UI.
 - No offline support. Both frontend and backend must be reachable for authenticated sessions.
