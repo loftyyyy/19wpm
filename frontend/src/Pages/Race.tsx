@@ -11,7 +11,14 @@ import RaceTrack from '../Components/Race/RaceTrack';
 import RaceResults from '../Components/Race/RaceResults';
 import { useAuth } from '../context/AuthContext';
 import { useRaceSocket } from '../hooks/useRaceSocket';
-import { createRoom, joinRoomByCode, joinMatchmaking, getPendingMatch } from '../services/race';
+import {
+  createRoom,
+  joinRoomByCode,
+  joinMatchmaking,
+  leaveMatchmaking,
+  requestImmediateMatch,
+  getPendingMatch,
+} from '../services/race';
 import type { TextType } from '../types/race';
 import type { Passage, TestResult, WpmPoint } from '../types';
 
@@ -26,6 +33,9 @@ export default function Race() {
   const [selectedTextType, setSelectedTextType] = useState<TextType>('SHORT');
   const [isMatchmaking, setIsMatchmaking] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [isRequestingMatchNow, setIsRequestingMatchNow] = useState(false);
+  const [matchNowRequested, setMatchNowRequested] = useState(false);
+  const [matchNowError, setMatchNowError] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [matchmakingSeconds, setMatchmakingSeconds] = useState(0);
@@ -100,6 +110,8 @@ export default function Race() {
   useEffect(() => {
     if (!isMatchmaking) {
       setMatchmakingSeconds(0);
+      setMatchNowRequested(false);
+      setMatchNowError('');
       return;
     }
     const interval = setInterval(() => {
@@ -121,20 +133,25 @@ export default function Race() {
 
   const handleCancelMatchmaking = useCallback(async () => {
     try {
-      await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/race/matchmaking/leave`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('19wpm-access-token') ?? ''}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      await leaveMatchmaking();
     } catch { /* ignore */ }
     setIsMatchmaking(false);
     setMatchmakingSeconds(0);
   }, []);
+
+  const handleMatchNow = useCallback(async () => {
+    if (isRequestingMatchNow || matchNowRequested) return;
+    setIsRequestingMatchNow(true);
+    setMatchNowError('');
+    try {
+      await requestImmediateMatch();
+      setMatchNowRequested(true);
+    } catch {
+      setMatchNowError('Could not request an immediate match. Try again.');
+    } finally {
+      setIsRequestingMatchNow(false);
+    }
+  }, [isRequestingMatchNow, matchNowRequested]);
 
   const handleCreateRoom = useCallback(async () => {
     if (isRequesting) return;
@@ -194,6 +211,8 @@ export default function Race() {
     setJoinCode('');
     setJoinError('');
     setMatchmakingSeconds(0);
+    setMatchNowRequested(false);
+    setMatchNowError('');
     setAutoStartCountdown(null);
     setRaceWpmHistory([]);
     setMyRaceResult(null);
@@ -201,19 +220,36 @@ export default function Race() {
 
   const renderContent = () => {
     if (isMatchmaking) {
+      const searchTitle = matchNowRequested
+        ? 'Waiting for any racer...'
+        : matchmakingSeconds < 5
+          ? 'Searching for a close match...'
+          : matchmakingSeconds < 20
+            ? 'Expanding the search...'
+            : 'Matching with anyone available...';
+
+      const searchDetail = matchNowRequested
+        ? 'Your immediate-match request is active. Skill range is ignored for the next available opponent.'
+        : matchmakingSeconds < 5
+          ? 'Looking within 15 WPM of your pace.'
+          : matchmakingSeconds < 20
+            ? 'The WPM range grows the longer you wait.'
+            : 'No close match yet, so the next available racer will be paired with you.';
+
       return (
         <div className="bg-card border border-line rounded-2xl shadow-sm p-8 transition-theme max-w-lg mx-auto text-center">
           <div className="mb-6">
             <div className="w-12 h-12 rounded-full border-4 border-accent border-t-transparent animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-display font-semibold text-text-main mb-2">Finding a match...</h2>
+            <h2 className="text-xl font-display font-semibold text-text-main mb-2">{searchTitle}</h2>
             <p className="text-text-dim font-sans text-sm">
-              Searching for {selectedTextType.toLowerCase()} race
+              Searching for a {selectedTextType.toLowerCase()} race
             </p>
+            <p className="text-text-dim font-sans text-xs mt-2">{searchDetail}</p>
           </div>
           <p className="text-text-dim font-sans text-xs mb-6">
             {matchmakingSeconds}s elapsed &middot; waiting for opponents
           </p>
-          {matchmakingSeconds >= 30 && (
+          {matchmakingSeconds >= 30 && !matchNowRequested && (
             <p className="text-text-dim font-sans text-xs mb-4 bg-muted rounded-xl p-3">
               Taking longer than usual. Ask a friend to join at{' '}
               <span className="text-accent font-semibold">
@@ -221,6 +257,22 @@ export default function Race() {
               </span>
             </p>
           )}
+          {matchNowError && (
+            <p role="alert" className="text-red-500 font-sans text-xs mb-4">
+              {matchNowError}
+            </p>
+          )}
+          <button
+            onClick={handleMatchNow}
+            disabled={matchNowRequested || isRequestingMatchNow}
+            className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-accent text-white hover:bg-accent-hover transition-colors hover:cursor-pointer disabled:opacity-40 disabled:cursor-default mb-3"
+          >
+            {matchNowRequested
+              ? 'Waiting for any available racer'
+              : isRequestingMatchNow
+                ? 'Requesting...'
+                : 'Match me with anyone now'}
+          </button>
           <button
             onClick={handleCancelMatchmaking}
             className="px-6 py-2 rounded-xl font-sans font-semibold text-sm bg-muted border border-line text-text-sub hover:text-text-main transition-colors hover:cursor-pointer"

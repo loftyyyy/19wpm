@@ -100,6 +100,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 11.2 | Matchmaking pairs players by WPM and accuracy across replicas | Skill-based pairing over sharded queues + distributed lock | [`docs/refactors/11-matchmaking-event-driven.md`](docs/refactors/11-matchmaking-event-driven.md) |
 | 11.3 | Race finishes are validated server-side; suspicious runs are flagged | Server-authoritative scoring + tiered anti-cheat verdicts | [`docs/refactors/49-server-authoritative-anti-cheat.md`](docs/refactors/49-server-authoritative-anti-cheat.md) |
 | 11.4 | Sparse queues pair faster; players can request any opponent | Queue-size-aware fallback deadlines + persisted player preference | [`docs/refactors/50-queue-size-aware-matchmaking.md`](docs/refactors/50-queue-size-aware-matchmaking.md) |
+| 11.5 | Matchmaking UI explains the widening search and offers an immediate match | Timed search stages + explicit user override | [`docs/refactors/51-expanding-search-matchmaking-ui.md`](docs/refactors/51-expanding-search-matchmaking-ui.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -520,6 +521,24 @@ target index.
 player who values starting over skill proximity can opt out of the wait. The trade-off is a
 deliberately wider skill gap for immediate matches and for sparse queues after 5 seconds. See
 [`50-queue-size-aware-matchmaking.md`](docs/refactors/50-queue-size-aware-matchmaking.md).
+
+### 11.5 - Matchmaking explains the widening search and offers an immediate match
+
+**Before:** the race page showed `Finding a match...` until a room arrived. The only explanation
+of the wait appeared after 30 seconds, and there was no way to ask for a faster match with a
+wider skill range.
+
+**After:** the panel switches between three search stages (`Searching`, `Expanding`, and
+`Matching with anyone`) with a detail line for each. A `Match me with anyone now` button calls
+`POST /api/v1/race/matchmaking/now`; after acceptance it becomes a disabled `Waiting for any
+available racer` state, and failures show a retry message. Cancel now uses the shared
+`leaveMatchmaking()` client, and all request state resets when the player leaves, matches, or
+starts another race.
+
+**Impact:** players can see why the wait is getting longer and can choose a faster, wider match.
+The trade-off is that the stage copy is driven by a client timer, so it can lag the server's
+actual match; the button also cannot force a match while the player is alone. See
+[`51-expanding-search-matchmaking-ui.md`](docs/refactors/51-expanding-search-matchmaking-ui.md).
 
 ## Code Review Remediation
 

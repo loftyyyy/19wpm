@@ -481,11 +481,14 @@ full backend-suite or multi-replica integration run.
 |---|---|
 | `.\mvnw.cmd -q -Dtest=SkillMatchmakerTest test` | Pass, 11/11 |
 | `.\mvnw.cmd -q -DskipTests test-compile` | Pass |
+| `npm run build` | Pass |
 
 `SkillMatchmakerTest` now covers immediate two-player pairing, the 5-second sparse-queue
 fallback, the 20-second large-queue fallback, tolerance growth, immediate-match selection, and
 singleton queues. The queue-entry replacement used by immediate match is a Lua script; it is
 covered by code review and the operations runbook, not by an automated Redis integration test.
+The frontend search stages and immediate-match button have no component test; `npm run build`
+and manual race-flow checks are the current coverage.
 
 ### Current test inventory
 
