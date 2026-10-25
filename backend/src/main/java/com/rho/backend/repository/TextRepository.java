@@ -24,6 +24,8 @@ public interface TextRepository extends JpaRepository<Text, Long> {
 
     long countByIsCustomFalseAndType(TextType type);
 
+    long countByLanguage(String language);
+
     long countByLanguageAndType(String language, TextType type);
 
     @Query(value = "SELECT * FROM texts WHERE is_custom = false ORDER BY text_id LIMIT :count OFFSET :offset", nativeQuery = true)
