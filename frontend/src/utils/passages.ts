@@ -1,7 +1,21 @@
-import type { Passage, WordCount, Mode, PhraseLength } from '../types';
+import type { Passage, WordCount, Mode, PhraseLength, TextType } from '../types';
 import { generateRandomWords } from './words';
 
-export const passages: Passage[] = [
+export function charLengthToType(charLength: number): TextType {
+  if (charLength < 100) return 'SHORT';
+  if (charLength < 300) return 'MEDIUM';
+  if (charLength < 600) return 'LONG';
+  return 'THICC';
+}
+
+const TYPE_BANDS: Record<TextType, [number, number]> = {
+  SHORT: [40, 99],
+  MEDIUM: [100, 299],
+  LONG: [300, 599],
+  THICC: [600, 900],
+};
+
+const rawPassages: Passage[] = [
   {
     title: "The Great Gatsby",
     text: "In my younger and more vulnerable years my father gave me some advice that I have been turning over in my mind ever since. Whenever you feel like criticizing any one, he told me, just remember that all the people in this world have not had the advantages that you have had.",
@@ -64,15 +78,40 @@ export const passages: Passage[] = [
   }
 ];
 
-export function getRandomPassage(): Passage {
-  return passages[Math.floor(Math.random() * passages.length)];
+// Tag each fallback passage with the same length band the backend uses so the local generator
+// can honour a requested phrase length instead of leaking whatever text happens to be available.
+export const passages: Passage[] = rawPassages.map(passage => ({
+  ...passage,
+  type: charLengthToType(passage.text.length)
+}));
+
+export function getRandomPassage(preferredType?: TextType): Passage {
+  const pool = preferredType
+    ? passages.filter(passage => passage.type === preferredType)
+    : passages;
+  const source = pool.length > 0 ? pool : passages;
+  return source[Math.floor(Math.random() * source.length)];
+}
+
+function synthesizePassage(type: TextType): Passage {
+  const [min, max] = TYPE_BANDS[type];
+  const target = Math.round((min + max) / 2);
+  // The local word list averages roughly six characters per rendered word (word + space).
+  const wordTarget = Math.max(8, Math.ceil(target / 6));
+  return {
+    title: '',
+    text: generateRandomWords(wordTarget),
+    author: 'random',
+    source: 'word list',
+    type,
+  };
 }
 
 export function generateTestPassage(
   mode: Mode,
   duration: number,
   wordCount: WordCount,
-  _phraseLength?: PhraseLength,
+  phraseLength?: PhraseLength,
 ): Passage {
   if (mode === 'time' || mode === 'words') {
     const wordLimit = mode === 'words' ? wordCount : Math.max(200, duration * 4);
@@ -82,6 +121,16 @@ export function generateTestPassage(
       author: 'random',
       source: 'word list',
     };
+  }
+
+  if (phraseLength && phraseLength !== 'all') {
+    const requestedType = phraseLength.toUpperCase() as TextType;
+    const match = passages.filter(passage => passage.type === requestedType);
+    // Prefer a real passage of the requested length; otherwise synthesize one so the fallback
+    // never violates the requested type constraint.
+    return match.length > 0
+      ? match[Math.floor(Math.random() * match.length)]
+      : synthesizePassage(requestedType);
   }
 
   return getRandomPassage();

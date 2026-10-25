@@ -34,7 +34,7 @@ const inFlight = new Map<string, Promise<Passage[]>>();
 function charLengthToType(charLength: number): TextType {
   if (charLength < 100) return 'SHORT';
   if (charLength < 300) return 'MEDIUM';
-  if (charLength < 500) return 'LONG';
+  if (charLength < 600) return 'LONG';
   return 'THICC';
 }
 
