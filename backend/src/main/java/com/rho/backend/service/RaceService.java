@@ -105,7 +105,9 @@ public class RaceService {
                 return raceRoom;
             }
             participant.setConnected(true);
-            participant.setSessionId(sessionId);
+            // Track every concurrent session so closing one tab does not disconnect a player
+            // who still has another tab open.
+            participant.addSession(sessionId);
             // A reconnect is valid in every state: a RACING player can drop and resume.
             participant.setDisconnected(false);
             return raceRoom;

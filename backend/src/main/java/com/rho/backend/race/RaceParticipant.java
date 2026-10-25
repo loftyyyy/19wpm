@@ -10,6 +10,8 @@ import com.rho.backend.enums.AntiCheatStatus;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @NoArgsConstructor
 @Getter
@@ -22,8 +24,14 @@ public class RaceParticipant implements Serializable {
     private boolean finished;
     private boolean disconnected;
     private boolean connected;
+    /**
+     * Live WebSocket sessions currently attached to this participant. A single account can open
+     * several tabs, so a participant is only considered gone once every tracked session has
+     * disconnected. {@code @JsonIgnore} keeps the internal session ids out of client broadcasts;
+     * they are persisted separately by {@link PersistedRaceRoom}.
+     */
     @JsonIgnore
-    private String sessionId;
+    private Set<String> sessionIds = ConcurrentHashMap.newKeySet();
 
     private double progressPercent;
     private int currentWpm;
@@ -53,6 +61,22 @@ public class RaceParticipant implements Serializable {
         this.correctChars = 0;
         this.accuracy = 0;
         this.finishRank = 0;
+    }
+
+    public void addSession(String sessionId) {
+        if (sessionId != null && !sessionId.isBlank()) {
+            sessionIds.add(sessionId);
+        }
+    }
+
+    public void removeSession(String sessionId) {
+        if (sessionId != null) {
+            sessionIds.remove(sessionId);
+        }
+    }
+
+    public boolean hasActiveSession() {
+        return !sessionIds.isEmpty();
     }
 
 }
