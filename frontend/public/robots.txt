@@ -1,0 +1,17 @@
+# robots.txt for 19wpm
+# Public marketing/content pages are crawlable; app, auth, and API paths are not.
+
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /leaderboard
+Allow: /solo
+
+Disallow: /api/
+Disallow: /login
+Disallow: /oauth2/
+Disallow: /dashboard
+Disallow: /results
+Disallow: /create
+Disallow: /compete
+Disallow: /race
