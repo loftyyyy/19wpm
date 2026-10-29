@@ -18,7 +18,12 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -152,6 +157,74 @@ public class TextService {
                 .map(TextResponseDTO::new)
                 .toList();
     }
+
+    /**
+     * Samples {@code count} preset-free texts across every available {@link TextType} instead of a
+     * single type. A uniform draw over the whole catalogue is biased by pool size (the longest
+     * texts dominate), so the sample round-robins one indexed probe per type and then shuffles the
+     * result. Every query stays a count/offset index range scan, so the "all" type is as cheap as a
+     * single-type batch.
+     */
+    @Observed(name = "texts.random.batch.all")
+    public List<TextResponseDTO> getRandomTexts(String language, int count) {
+        if(language == null || language.isBlank()){
+            throw new InvalidResourceException("Language cannot be empty");
+        }
+        if(count <= 0){
+            throw new InvalidResourceException("Count must be greater than 0");
+        }
+
+        String normalizedLanguage = language.trim().toLowerCase();
+        long total = textRepository.countByLanguage(normalizedLanguage);
+        if(total == 0){
+            throw new ResourceNotFoundException("No texts found for language: " + language);
+        }
+        if(count > total){
+            throw new InvalidResourceException("Count exceeds available texts");
+        }
+
+        List<TextType> availableTypes = Arrays.stream(TextType.values())
+                .filter(type -> textRepository.countByLanguageAndType(normalizedLanguage, type) > 0)
+                .toList();
+
+        List<Text> selected = new ArrayList<>(count);
+        Set<Long> selectedIds = new HashSet<>();
+        int maxAttempts = count * availableTypes.size() * 4;
+        int attempts = 0;
+        while(selected.size() < count && attempts < maxAttempts){
+            boolean progressed = false;
+            for(TextType type : availableTypes){
+                if(selected.size() >= count){
+                    break;
+                }
+                attempts++;
+                Text candidate = sampleOne(normalizedLanguage, type);
+                if(candidate != null && selectedIds.add(candidate.getTextId())){
+                    selected.add(candidate);
+                    progressed = true;
+                }
+            }
+            if(!progressed){
+                break;
+            }
+        }
+
+        Collections.shuffle(selected);
+        return selected.stream()
+                .map(TextResponseDTO::new)
+                .toList();
+    }
+
+    private Text sampleOne(String language, TextType type){
+        long total = textRepository.countByLanguageAndType(language, type);
+        if(total == 0){
+            return null;
+        }
+        long offset = ThreadLocalRandom.current().nextLong(total);
+        List<Text> texts = textRepository.findPageByLanguageAndType(language, type.name(), 1, offset);
+        return texts.isEmpty() ? null : texts.get(0);
+    }
+
     @Observed(name = "texts.by.id")
     public TextResponseDTO getTextById(Long textId, Long id){
         Text text = textRepository.findById(textId).orElseThrow(() -> new ResourceNotFoundException("Text not found"));

@@ -15,6 +15,7 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
 
 @Component
 public class WebSocketDisconnectHandler {
@@ -55,22 +56,37 @@ public class WebSocketDisconnectHandler {
         String roomCode = roomCodeObj.toString();
 
         String sessionId = accessor.getSessionId();
+        boolean[] participantDropped = {false};
         boolean[] roomFinished = {false};
 
         RaceRoom room = raceRoomStore.mutate(roomCode, currentRoom -> {
             RaceParticipant participant = currentRoom.findParticipant(userId);
-            if (participant == null || participant.isDisconnected()) {
+            if (participant == null) {
                 return null;
             }
 
-            String currentSessionId = participant.getSessionId();
-            if (currentSessionId != null && !currentSessionId.equals(sessionId)) {
-                logger.info("Ignoring stale disconnect for userId {} (session {} != current {})", userId, sessionId, currentSessionId);
+            Set<String> activeSessions = participant.getSessionIds();
+            if (sessionId != null && activeSessions != null && !activeSessions.isEmpty()) {
+                if (!activeSessions.contains(sessionId)) {
+                    logger.info("Ignoring stale disconnect for userId {} (session {} not tracked in room {})",
+                            userId, sessionId, roomCode);
+                    return null;
+                }
+                participant.removeSession(sessionId);
+                // The same account can be open in multiple tabs. Only the last tab to close
+                // should drop the participant; the remaining sessions keep them connected.
+                if (participant.hasActiveSession()) {
+                    logger.info("User {} still has {} active session(s) in room {}; keeping them connected",
+                            userId, participant.getSessionIds().size(), roomCode);
+                    return null;
+                }
+            } else if (participant.isDisconnected()) {
                 return null;
             }
 
             participant.setDisconnected(true);
             participant.setConnected(false);
+            participantDropped[0] = true;
 
             if (currentRoom.getState() == RaceState.RACING && currentRoom.allActiveFinished()) {
                 currentRoom.setState(RaceState.FINISHED);
@@ -81,7 +97,7 @@ public class WebSocketDisconnectHandler {
             return currentRoom;
         }).orElse(null);
 
-        if (room == null) {
+        if (room == null || !participantDropped[0]) {
             return;
         }
 

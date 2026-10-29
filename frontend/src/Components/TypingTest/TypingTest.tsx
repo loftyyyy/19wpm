@@ -106,28 +106,34 @@ export default function TypingTest() {
     containerRef.current?.focus();
   }, [reset]);
 
+  const handleNewText = useCallback(() => {
+    const nextPassage = next();
+    if (nextPassage) setPassage(nextPassage);
+    setResetKey(k => k + 1);
+    reset();
+    navigatedRef.current = false;
+    containerRef.current?.focus();
+  }, [next, reset]);
+
   const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const isModified = e.altKey || e.ctrlKey || e.metaKey;
+
     if (e.key === 'Tab') {
       e.preventDefault();
-      handleRestart();
+      // Only an unmodified Tab starts a new text. Alt/Ctrl/Meta+Tab are OS and browser
+      // window/tab-switching shortcuts and must never restart or advance the test when
+      // focus returns to the page after switching away.
+      if (!isModified) handleNewText();
       return;
     }
-    if (e.key === 'Enter' && !state.isRunning && !state.isFinished) {
+    if (e.key === 'Enter' && !isModified && !state.isRunning && !state.isFinished) {
       e.preventDefault();
-      const nextPassage = next();
-      if (nextPassage) setPassage(nextPassage);
-      setResetKey(k => k + 1);
-      reset();
-      navigatedRef.current = false;
-      containerRef.current?.focus();
+      handleNewText();
       return;
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      setResetKey(k => k + 1);
-      reset();
-      navigatedRef.current = false;
-      containerRef.current?.focus();
+      handleRestart();
       return;
     }
     if (e.key.length === 1 || e.key === 'Backspace') {
@@ -135,7 +141,7 @@ export default function TypingTest() {
     }
     markActive();
     handleKeyDown(e);
-  }, [handleKeyDown, handleRestart, markActive, next, reset, state.isRunning]);
+  }, [handleKeyDown, handleNewText, handleRestart, markActive, state.isRunning]);
 
   useEffect(() => {
     if (state.isFinished && !navigatedRef.current) {
@@ -183,15 +189,15 @@ export default function TypingTest() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">tab</kbd>
-                <span>same test</span>
+                <span>new text</span>
               </div>
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">enter</kbd>
-                <span>next test</span>
+                <span>new text</span>
               </div>
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">esc</kbd>
-                <span>reset</span>
+                <span>restart</span>
               </div>
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">ctrl+&#9003;</kbd>
@@ -273,13 +279,22 @@ export default function TypingTest() {
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleRestart(); } }}
               tabIndex={0}
               className="p-2 rounded-xl text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50"
-              title="Restart (Tab) &middot; New test (Enter)"
+              title="Restart same text (Esc)"
+              aria-label="Restart same text"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10" />
                 <polyline points="1 20 1 14 7 14" />
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
               </svg>
+            </button>
+            <button
+              onClick={handleNewText}
+              tabIndex={0}
+              className="px-4 py-2 rounded-xl text-text-sub hover:text-accent hover:bg-muted border border-line font-sans text-xs font-semibold transition-all hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50"
+              title="New Text (Tab)"
+            >
+              New Text
             </button>
           </div>
         )}

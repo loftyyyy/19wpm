@@ -5,7 +5,9 @@ import com.rho.backend.enums.RaceState;
 import com.rho.backend.enums.TextType;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -28,11 +30,27 @@ public record PersistedRaceRoom(
         int finishCount,
         Instant countdownStartTime,
         long countdownDurationMs,
-        int durationSeconds
+        int durationSeconds,
+        List<ParticipantSessions> sessions
 ) {
+
+    /**
+     * Durable copy of a participant's live WebSocket sessions. The sessions are kept out of
+     * {@link RaceParticipant} JSON (so clients never see them) and carried here so a Redis
+     * round-trip does not lose multi-tab connection tracking.
+     */
+    public record ParticipantSessions(Long userId, List<String> sessionIds) {
+    }
 
     public static PersistedRaceRoom from(RaceRoom room) {
         TextResponseDTO text = room.getText();
+        List<ParticipantSessions> sessions = new ArrayList<>();
+        for (RaceParticipant participant : room.getParticipants()) {
+            Set<String> sessionIds = participant.getSessionIds();
+            if (sessionIds != null && !sessionIds.isEmpty()) {
+                sessions.add(new ParticipantSessions(participant.getUserId(), List.copyOf(sessionIds)));
+            }
+        }
         return new PersistedRaceRoom(
                 room.getRoomCode(),
                 room.getState(),
@@ -45,7 +63,8 @@ public record PersistedRaceRoom(
                 room.getFinishCount(),
                 room.getCountdownStartTime(),
                 room.getCountdownDurationMs(),
-                room.getDurationSeconds());
+                room.getDurationSeconds(),
+                sessions);
     }
 
     public RaceRoom toRoom(TextResponseDTO text) {
@@ -63,6 +82,14 @@ public record PersistedRaceRoom(
         room.setCountdownStartTime(countdownStartTime);
         room.setCountdownDurationMs(countdownDurationMs);
         room.setDurationSeconds(durationSeconds);
+        if (sessions != null) {
+            for (ParticipantSessions entry : sessions) {
+                RaceParticipant participant = room.findParticipant(entry.userId());
+                if (participant != null && entry.sessionIds() != null) {
+                    entry.sessionIds().forEach(participant::addSession);
+                }
+            }
+        }
         return room;
     }
 }

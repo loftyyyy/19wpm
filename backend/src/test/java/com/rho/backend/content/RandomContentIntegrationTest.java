@@ -151,6 +151,53 @@ class RandomContentIntegrationTest {
     }
 
     @Test
+    void samplesAcrossAllTypesWhenTextTypeIsOmitted() {
+        textRepository.saveAll(List.of(
+                presetText("medium-text", TextType.MEDIUM, 150),
+                presetText("long-text", TextType.LONG, 400),
+                presetText("thicc-text", TextType.THICC, 700)));
+
+        List<TextResponseDTO> texts = textService.getRandomTexts("en", 4);
+
+        assertThat(texts).hasSize(4);
+        assertThat(texts).extracting(TextResponseDTO::textId).doesNotHaveDuplicates();
+        // The balanced sampler probes every available type, so all four lengths appear in a
+        // four-text "all" batch regardless of the underlying pool sizes.
+        assertThat(texts)
+                .extracting(text -> charLengthToType(text.charLength()))
+                .contains(TextType.SHORT, TextType.MEDIUM, TextType.LONG, TextType.THICC);
+    }
+
+    @Test
+    void textEndpointAcceptsMissingTextType() throws Exception {
+        mockMvc.perform(get("/api/v1/texts")
+                        .param("language", "en")
+                        .param("count", "2"))
+                .andExpect(status().isOk());
+    }
+
+    private Text presetText(String title, TextType type, int charLength) {
+        return Text.builder()
+                .isCustom(false)
+                .title(title)
+                .author("author")
+                .source("source")
+                .language("en")
+                .content(title)
+                .wordCount(1)
+                .charLength(charLength)
+                .type(type)
+                .build();
+    }
+
+    private TextType charLengthToType(int charLength) {
+        if (charLength < 100) return TextType.SHORT;
+        if (charLength < 300) return TextType.MEDIUM;
+        if (charLength < 600) return TextType.LONG;
+        return TextType.THICC;
+    }
+
+    @Test
     void returnsSingleRandomTextFromPresetCatalogue() {
         TextResponseDTO text = textService.getRandomText();
 

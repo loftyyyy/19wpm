@@ -12,9 +12,15 @@ import {
   isPassageCacheStale,
   prefetchPassages
 } from '../services/passageCache';
-import { generateTestPassage } from '../utils/passages';
+import { charLengthToType, generateTestPassage } from '../utils/passages';
 
 const PASSAGE_DEADLINE_MS = 1500;
+
+function matchesPhraseLength(passage: Passage, phraseLength: PhraseLength): boolean {
+  if (phraseLength === 'all') return true;
+  const type = passage.type ?? charLengthToType(passage.text.length);
+  return type === phraseLength.toUpperCase();
+}
 
 function withDeadline<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -64,10 +70,15 @@ export function usePassageQueue(
         PASSAGE_DEADLINE_MS
       );
       if (requestId !== requestIdRef.current) return;
-      if (passages.length === 0) {
+      // Strictly enforce the requested phrase length so a cache or fallback entry that does
+      // not belong to the selected type can never be served to the typist.
+      const accepted = mode === 'phrases'
+        ? passages.filter(passage => matchesPhraseLength(passage, phraseLength))
+        : passages;
+      if (accepted.length === 0) {
         throw new Error('Empty passage batch received');
       }
-      queueRef.current = [...queueRef.current, ...passages];
+      queueRef.current = [...queueRef.current, ...accepted];
     } catch {
       if (requestId !== requestIdRef.current) return;
       queueRef.current = [
@@ -94,8 +105,10 @@ export function usePassageQueue(
     };
     const cached = getCachedPassages(preferences);
 
-    queueRef.current = cached ?? [];
-    if (cached && cached.length > 0) {
+    queueRef.current = (cached ?? []).filter(passage =>
+      mode === 'phrases' ? matchesPhraseLength(passage, phraseLength) : true
+    );
+    if (queueRef.current.length > 0) {
       setIsLoading(false);
       if (isPassageCacheStale(preferences)) {
         void fetchBatch();

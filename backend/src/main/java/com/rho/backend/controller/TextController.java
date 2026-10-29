@@ -41,11 +41,15 @@ public class TextController {
     @GetMapping
     public ResponseEntity<List<TextResponseDTO>> getTexts(
             @RequestParam String language,
-            @RequestParam TextType textType,
+            @RequestParam(required = false) TextType textType,
             @RequestParam int count)
     {
         long startNanos = System.nanoTime();
-        List<TextResponseDTO> texts = textService.getRandomTexts(language, textType, count);
+        // A missing textType is the "all" selection: sample a balanced mix across every type
+        // instead of failing the required-parameter binding.
+        List<TextResponseDTO> texts = textType == null
+                ? textService.getRandomTexts(language, count)
+                : textService.getRandomTexts(language, textType, count);
         return ResponseEntity.ok()
                 .header(ServerTiming.HEADER, ServerTiming.measure("texts", startNanos))
                 .body(texts);
