@@ -167,7 +167,13 @@ public class MatchmakingService {
 
     public void pollQueues() {
         for (TextType textType : TextType.values()) {
-            matchQueue(textType);
+            try {
+                matchQueue(textType);
+            } catch (RuntimeException e) {
+                // One queue failing (for example a transient Redis error) must not stop the
+                // sweep for the remaining text types.
+                logger.warn("Matchmaking sweep failed for {}: {}", textType, e.getMessage());
+            }
         }
     }
 
@@ -240,7 +246,8 @@ public class MatchmakingService {
     private List<QueuedEntry> loadQueue(String queueKey) {
         List<String> rawEntries = redisTemplate.opsForList().range(queueKey, 0, -1);
         if (rawEntries == null || rawEntries.isEmpty()) {
-            return List.of();
+            // Must be mutable: pruneExpired() calls removeIf() on the result.
+            return new ArrayList<>();
         }
 
         List<QueuedEntry> queue = new ArrayList<>(rawEntries.size());
