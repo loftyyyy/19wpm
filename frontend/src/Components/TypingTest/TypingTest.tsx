@@ -194,7 +194,10 @@ export default function TypingTest() {
             &larr; Exit
           </button>
 
-          {!state.isRunning && !state.isFinished && passage && (
+          {/* Hints stay up during a run: Tab is an instant mid-run reset, so hiding
+              them right when typing starts is the moment they matter most. Keeping
+              the row mounted also stops the timer/wpm block shifting on first key. */}
+          {!state.isFinished && passage && (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">tab</kbd>
