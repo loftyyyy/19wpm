@@ -13,8 +13,6 @@ import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseL
 
 const wordCounts: WordCount[] = [10, 25, 50, 100];
 const PREFERENCES_KEY = 'typing_preferences';
-// How long the "reset this test?" prompt stays up before it dismisses itself.
-const RESET_CONFIRM_TIMEOUT_MS = 2500;
 // Placeholder used until the first passage arrives. It must be a stable module-level
 // reference: `useTypingEngine` resets its reducer whenever the passage identity
 // changes, so a fresh object literal here would reset on every render and spin
@@ -48,8 +46,6 @@ export default function TypingTest() {
   const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
   const [resetKey, setResetKey] = useState(0);
-  const [pendingReset, setPendingReset] = useState(false);
-  const resetConfirmTimerRef = useRef<number | null>(null);
   const { isTypingActive, markActive } = useTypingActivity();
 
   const saved = useMemo(() => loadPreferences(), []);
@@ -115,64 +111,24 @@ export default function TypingTest() {
     duration, testMode, wordCount, contentType
   );
 
-  const clearResetConfirmTimer = useCallback(() => {
-    if (resetConfirmTimerRef.current !== null) {
-      window.clearTimeout(resetConfirmTimerRef.current);
-      resetConfirmTimerRef.current = null;
-    }
-  }, []);
-
-  const cancelPendingReset = useCallback(() => {
-    clearResetConfirmTimer();
-    setPendingReset(false);
-  }, [clearResetConfirmTimer]);
-
   const handleRestart = useCallback(() => {
-    cancelPendingReset();
     setResetKey(k => k + 1);
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
-  }, [reset, cancelPendingReset]);
+  }, [reset]);
 
   const handleNewText = useCallback(() => {
-    cancelPendingReset();
     const nextPassage = next();
     if (nextPassage) setPassage(nextPassage);
     setResetKey(k => k + 1);
     reset();
     navigatedRef.current = false;
     containerRef.current?.focus();
-  }, [next, reset, cancelPendingReset]);
-
-  // Tab resets immediately when idle. Mid-run it would throw away work, so ask first.
-  const requestReset = useCallback(() => {
-    if (!state.isRunning || state.currentIndex === 0) {
-      handleRestart();
-      return;
-    }
-    clearResetConfirmTimer();
-    setPendingReset(true);
-    resetConfirmTimerRef.current = window.setTimeout(() => {
-      resetConfirmTimerRef.current = null;
-      setPendingReset(false);
-    }, RESET_CONFIRM_TIMEOUT_MS);
-  }, [state.isRunning, state.currentIndex, handleRestart, clearResetConfirmTimer]);
-
-  useEffect(() => clearResetConfirmTimer, [clearResetConfirmTimer]);
+  }, [next, reset]);
 
   const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
     const isModified = e.altKey || e.ctrlKey || e.metaKey;
-
-    if (pendingReset) {
-      // A second Tab confirms; every other key cancels and is handled as normal input.
-      if (e.key === 'Tab' && !e.shiftKey && !isModified) {
-        e.preventDefault();
-        handleRestart();
-        return;
-      }
-      cancelPendingReset();
-    }
 
     if (e.key === 'Tab') {
       // Keep Shift+Tab available so keyboard users can move focus out of the typing box.
@@ -181,7 +137,7 @@ export default function TypingTest() {
       // Only an unmodified Tab resets the test. Alt/Ctrl/Meta+Tab are OS and browser
       // window/tab-switching shortcuts and must never reset the test when focus
       // returns to the page after switching away.
-      if (!isModified) requestReset();
+      if (!isModified) handleRestart();
       return;
     }
     if (e.key === 'Enter' && !isModified && !state.isRunning && !state.isFinished) {
@@ -194,7 +150,7 @@ export default function TypingTest() {
     }
     markActive();
     handleKeyDown(e);
-  }, [handleKeyDown, handleNewText, handleRestart, requestReset, cancelPendingReset, markActive, state.isRunning, state.isFinished, pendingReset]);
+  }, [handleKeyDown, handleNewText, handleRestart, markActive, state.isRunning, state.isFinished]);
 
   useEffect(() => {
     if (state.isFinished && !navigatedRef.current) {
@@ -292,26 +248,8 @@ export default function TypingTest() {
           tabIndex={0}
           onKeyDown={handleContainerKeyDown}
           onClick={() => containerRef.current?.focus()}
-          className="relative w-full p-6 rounded-xl bg-card border border-line transition-theme focus:outline-none focus:ring-2 focus:ring-accent/30 font-mono text-xl md:text-2xl leading-relaxed cursor-text select-none"
+          className="w-full p-6 rounded-xl bg-card border border-line transition-theme focus:outline-none focus:ring-2 focus:ring-accent/30 font-mono text-xl md:text-2xl leading-relaxed cursor-text select-none"
         >
-          {pendingReset && (
-            <div
-              role="alertdialog"
-              aria-live="assertive"
-              aria-label="Confirm reset"
-              className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-card/95 backdrop-blur-sm"
-            >
-              <div className="text-center font-sans">
-                <p className="text-sm font-medium text-text-sub">Reset this test?</p>
-                <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-text-dim">
-                  <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">tab</kbd>
-                  <span>again to confirm</span>
-                  <span aria-hidden="true">&middot;</span>
-                  <span>any key to cancel</span>
-                </p>
-              </div>
-            </div>
-          )}
           {!passage ? (
             <TypingPassageSkeleton />
           ) : !state.isRunning && !state.isFinished ? (
