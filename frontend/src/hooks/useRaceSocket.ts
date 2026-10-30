@@ -5,11 +5,18 @@ import { attemptTokenRefresh, getAccessToken, getAccessTokenExpiry } from '../se
 import { getRoomState } from '../services/race';
 import type { RaceRoom } from '../types/race';
 
-interface UseRaceSocketOpts {
-  onMatchmakingRoomCode?: (code: string) => void;
-}
-
-export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts) {
+/**
+ * Connects to the race STOMP endpoint for the duration of a room.
+ *
+ * The optional `onMatchmakingRoomCode` handler is intentionally *not* a dependency
+ * of the connection effect: it is usually an inline arrow function from the caller,
+ * so including it would tear down and re-open the socket on every parent render.
+ * The latest handler is mirrored into a ref and read inside the subscription.
+ */
+export function useRaceSocket(
+  roomCode: string | null,
+  onMatchmakingRoomCode?: (code: string) => void
+) {
   const [room, setRoom] = useState<RaceRoom | null>(null);
   const [raceStreak, setRaceStreak] = useState<number | null>(null);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
@@ -26,6 +33,12 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
   const clientRef = useRef<Client | null>(null);
   const bestRttRef = useRef(Number.POSITIVE_INFINITY);
   const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number; keyIntervalsMs: number[] } | null>(null);
+  // Latest matchmaking handler, kept out of the connection effect's deps (see below).
+  const onMatchmakingRoomCodeRef = useRef(onMatchmakingRoomCode);
+
+  useEffect(() => {
+    onMatchmakingRoomCodeRef.current = onMatchmakingRoomCode;
+  }, [onMatchmakingRoomCode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,12 +188,9 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
         });
       }
 
-      if (opts?.onMatchmakingRoomCode) {
-        client.subscribe('/user/queue/matchmaking', (message) => {
-          const code: string = message.body;
-          opts!.onMatchmakingRoomCode!(code);
-        });
-      }
+      client.subscribe('/user/queue/matchmaking', (message) => {
+        onMatchmakingRoomCodeRef.current?.(message.body);
+      });
 
       client.subscribe('/user/queue/race-finish', (message) => {
         const dto: { streak?: number | null } = JSON.parse(message.body);
@@ -213,7 +223,7 @@ export function useRaceSocket(roomCode: string | null, opts?: UseRaceSocketOpts)
       client.deactivate();
       clientRef.current = null;
     };
-  }, [roomCode, opts?.onMatchmakingRoomCode, isTokenReady]);
+  }, [roomCode, isTokenReady]);
 
   const sendProgress = useCallback((progressPercent: number, currentWpm: number, errors: number) => {
     if (!clientRef.current?.connected || !roomCode) return;

@@ -51,7 +51,7 @@ export default function Race() {
     setIsMatchmaking(false);
   }, []);
 
-  const socket = useRaceSocket(roomCode, { onMatchmakingRoomCode: handleMatchmakingCode });
+  const socket = useRaceSocket(roomCode, handleMatchmakingCode);
 
   useEffect(() => {
     if (socket.raceStreak == null) return;
