@@ -15,6 +15,11 @@ const wordCounts: WordCount[] = [10, 25, 50, 100];
 const PREFERENCES_KEY = 'typing_preferences';
 // How long the "reset this test?" prompt stays up before it dismisses itself.
 const RESET_CONFIRM_TIMEOUT_MS = 2500;
+// Placeholder used until the first passage arrives. It must be a stable module-level
+// reference: `useTypingEngine` resets its reducer whenever the passage identity
+// changes, so a fresh object literal here would reset on every render and spin
+// React into "Maximum update depth exceeded".
+const EMPTY_PASSAGE: Passage = { title: '', text: '', author: '', source: '' };
 
 function loadPreferences() {
   try {
@@ -106,7 +111,7 @@ export default function TypingTest() {
   const isCapsLockOn = useCapsLock();
 
   const { state, handleKeyDown, getResult, reset } = useTypingEngine(
-    passage ?? { title: '', text: '', author: '', source: '' },
+    passage ?? EMPTY_PASSAGE,
     duration, testMode, wordCount, contentType
   );
 
