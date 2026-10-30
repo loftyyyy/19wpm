@@ -73,17 +73,22 @@ export default function Race() {
     if (socket.room.state === 'COUNTDOWN') setPhase('countdown');
   }, [socket.room, phase]);
 
-  useEffect(() => {
-    if (!socket.room) return;
-    if (socket.room.hostUserId !== null) return;
-    if (socket.room.state !== 'LOBBY') return;
+  // Primitive slices of the room, so the auto-start effect below is not keyed on the
+  // room object identity (which changes on every broadcast, including progress ticks).
+  const connectedCount = socket.room?.participants.filter(p => p.connected).length ?? 0;
+  const roomState = socket.room?.state;
+  const hostUserId = socket.room?.hostUserId;
+  const sendStart = socket.sendStart;
 
-    const count = socket.room.participants.filter(p => p.connected).length;
+  useEffect(() => {
+    // No room yet: hostUserId is undefined, which fails the host check below.
+    if (hostUserId !== null) return;
+    if (roomState !== 'LOBBY') return;
 
     if (autoStartTimerRef.current) clearTimeout(autoStartTimerRef.current);
     if (autoStartIntervalRef.current) clearInterval(autoStartIntervalRef.current);
 
-    if (count >= 2) {
+    if (connectedCount >= 2) {
       setAutoStartCountdown(5);
       let remaining = 5;
       autoStartIntervalRef.current = setInterval(() => {
@@ -94,7 +99,7 @@ export default function Race() {
         }
       }, 1000);
       autoStartTimerRef.current = setTimeout(() => {
-        socket.sendStart();
+        sendStart();
         setAutoStartCountdown(null);
       }, 5000);
     } else {
@@ -105,7 +110,7 @@ export default function Race() {
       if (autoStartTimerRef.current) clearTimeout(autoStartTimerRef.current);
       if (autoStartIntervalRef.current) clearInterval(autoStartIntervalRef.current);
     };
-  }, [socket.room?.participants.filter(p => p.connected).length, socket.room?.state, socket.room?.hostUserId]);
+  }, [connectedCount, roomState, hostUserId, sendStart]);
 
   useEffect(() => {
     if (!isMatchmaking) {
