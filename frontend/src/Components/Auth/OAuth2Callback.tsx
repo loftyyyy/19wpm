@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { clearTokens } from '../../services/api';
 import { apiExchangeOAuthCode, apiGetSessionUser } from '../../services/auth';
@@ -8,10 +8,17 @@ export default function OAuth2Callback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { setupFromOAuth } = useAuth();
+  // Primitives, so the effect does not depend on the searchParams object identity.
+  const code = searchParams.get('code');
+  const error = searchParams.get('error');
+  // The authorization code is single-use. Exchanging it twice (StrictMode mounts the
+  // effect twice in dev, and any dependency change would re-run it) fails the second
+  // time and clears the tokens the first exchange just stored.
+  const startedRef = useRef(false);
 
   useEffect(() => {
-    const code = searchParams.get('code');
-    const error = searchParams.get('error');
+    if (startedRef.current) return;
+    startedRef.current = true;
 
     if (error) {
       navigate(`/login?oauth_error=${encodeURIComponent(error)}`, { replace: true });
@@ -45,7 +52,7 @@ export default function OAuth2Callback() {
         clearTokens();
         navigate('/login?oauth_error=Failed+to+complete+authentication.+Please+try+again.', { replace: true });
       });
-  }, []);
+  }, [code, error, navigate, setupFromOAuth]);
 
   return (
     <div className="min-h-screen bg-surface transition-theme flex items-center justify-center">
