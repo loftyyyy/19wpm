@@ -119,11 +119,13 @@ export default function TypingTest() {
     const isModified = e.altKey || e.ctrlKey || e.metaKey;
 
     if (e.key === 'Tab') {
+      // Keep Shift+Tab available so keyboard users can move focus out of the typing box.
+      if (e.shiftKey) return;
       e.preventDefault();
-      // Only an unmodified Tab starts a new text. Alt/Ctrl/Meta+Tab are OS and browser
-      // window/tab-switching shortcuts and must never restart or advance the test when
-      // focus returns to the page after switching away.
-      if (!isModified) handleNewText();
+      // Only an unmodified Tab resets the test. Alt/Ctrl/Meta+Tab are OS and browser
+      // window/tab-switching shortcuts and must never reset the test when focus
+      // returns to the page after switching away.
+      if (!isModified) handleRestart();
       return;
     }
     if (e.key === 'Enter' && !isModified && !state.isRunning && !state.isFinished) {
@@ -131,17 +133,12 @@ export default function TypingTest() {
       handleNewText();
       return;
     }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      handleRestart();
-      return;
-    }
     if (e.key.length === 1 || e.key === 'Backspace') {
       beginKeystroke();
     }
     markActive();
     handleKeyDown(e);
-  }, [handleKeyDown, handleNewText, handleRestart, markActive, state.isRunning]);
+  }, [handleKeyDown, handleNewText, handleRestart, markActive, state.isRunning, state.isFinished]);
 
   useEffect(() => {
     if (state.isFinished && !navigatedRef.current) {
@@ -189,15 +186,11 @@ export default function TypingTest() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">tab</kbd>
-                <span>new text</span>
+                <span>reset</span>
               </div>
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">enter</kbd>
                 <span>new text</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
-                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">esc</kbd>
-                <span>restart</span>
               </div>
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">ctrl+&#9003;</kbd>
@@ -249,7 +242,7 @@ export default function TypingTest() {
             <TypingPassageSkeleton />
           ) : !state.isRunning && !state.isFinished ? (
             <div className="text-center text-text-dim font-sans text-sm mb-4 transition-theme">
-              Start typing to begin &middot; Press Esc to restart
+              Start typing to begin &middot; Tab to reset &middot; Enter for a new text
             </div>
           ) : null}
           {passage && (
@@ -279,8 +272,8 @@ export default function TypingTest() {
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleRestart(); } }}
               tabIndex={0}
               className="p-2 rounded-xl text-text-sub hover:text-accent hover:bg-muted transition-all hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50"
-              title="Restart same text (Esc)"
-              aria-label="Restart same text"
+              title="Reset same text (Tab)"
+              aria-label="Reset same text"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10" />
@@ -292,7 +285,7 @@ export default function TypingTest() {
               onClick={handleNewText}
               tabIndex={0}
               className="px-4 py-2 rounded-xl text-text-sub hover:text-accent hover:bg-muted border border-line font-sans text-xs font-semibold transition-all hover:cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50"
-              title="New Text (Tab)"
+              title="New Text (Enter)"
             >
               New Text
             </button>
