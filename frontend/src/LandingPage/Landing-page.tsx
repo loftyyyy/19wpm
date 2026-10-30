@@ -36,7 +36,9 @@ function loadPreferences() {
       const difficulty: TextDifficulty = p.difficulty === 'EASY' || p.difficulty === 'MEDIUM' || p.difficulty === 'HARD' || p.difficulty === 'EXPERT' ? p.difficulty : DEFAULT_PREFERENCES.difficulty;
       return { mode, duration, wordCount, phraseLength, difficulty };
     }
-  } catch {}
+  } catch {
+    /* ignore malformed preferences and fall back to defaults */
+  }
   return { ...DEFAULT_PREFERENCES };
 }
 

@@ -18,8 +18,12 @@ function stepFor(remaining: number, durationMs: number): string {
 
 export default function Countdown({ startTime, durationMs, offsetMs = 0, onComplete }: Props) {
   const [now, setNow] = useState(() => Date.now());
+  // Fallback origin for races whose startTime is missing or malformed.
+  const [fallbackStartMs] = useState(() => Date.now());
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
   const firedRef = useRef(false);
 
   const duration = durationMs > 0 ? durationMs : DEFAULT_DURATION_MS;
@@ -27,9 +31,9 @@ export default function Countdown({ startTime, durationMs, offsetMs = 0, onCompl
   const deadline = useMemo(() => {
     const startMs = new Date(startTime).getTime();
     return Number.isNaN(startMs)
-      ? Date.now() + offsetMs + duration
+      ? fallbackStartMs + offsetMs + duration
       : startMs + duration;
-  }, [startTime, duration, offsetMs]);
+  }, [startTime, duration, offsetMs, fallbackStartMs]);
 
   const remaining = Math.max(0, deadline - (now + offsetMs));
 

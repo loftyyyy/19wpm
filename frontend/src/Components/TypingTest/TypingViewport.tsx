@@ -44,6 +44,8 @@ export default function TypingViewport({
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
   const renderStartMarkRef = useRef<string | null>(null);
 
+  // Captured before commit so the layout effect can measure render-to-paint cost.
+  // eslint-disable-next-line react-hooks/refs -- perf instrumentation, not render state
   renderStartMarkRef.current = markPerformance('viewport:start');
 
   const setCurrentCharRef = useCallback((el: HTMLSpanElement | null) => {
