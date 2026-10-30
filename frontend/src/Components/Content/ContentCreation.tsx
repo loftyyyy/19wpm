@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import Navbar from '../Navbar';
 import Footer from '../Footer';
@@ -13,22 +13,24 @@ interface CustomPassage {
   source: string;
 }
 
+function readCustomPassages(): CustomPassage[] {
+  try {
+    return JSON.parse(localStorage.getItem('19wpm-custom-passages') || '[]');
+  } catch {
+    return [];
+  }
+}
+
 export default function ContentCreation() {
   const [title, setTitle] = useState('');
   const [passage, setPassage] = useState('');
   const [author, setAuthor] = useState('');
   const [source, setSource] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  // Re-read from localStorage after every write, rather than keying a memo on `message`.
+  const [customPassages, setCustomPassages] = useState<CustomPassage[]>(readCustomPassages);
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-
-  const customPassages = useMemo((): CustomPassage[] => {
-    try {
-      return JSON.parse(localStorage.getItem('19wpm-custom-passages') || '[]');
-    } catch {
-      return [];
-    }
-  }, [message]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -53,6 +55,7 @@ export default function ContentCreation() {
       source: source.trim() || 'Custom Submission',
     });
     localStorage.setItem('19wpm-custom-passages', JSON.stringify(existing));
+    setCustomPassages(existing);
 
     // Also persist to the backend
     const { error } = await apiSaveCustomText({
@@ -76,6 +79,7 @@ export default function ContentCreation() {
     const existing: CustomPassage[] = JSON.parse(localStorage.getItem('19wpm-custom-passages') || '[]');
     const filtered = existing.filter(p => p.id !== id);
     localStorage.setItem('19wpm-custom-passages', JSON.stringify(filtered));
+    setCustomPassages(filtered);
     setMessage({ type: 'success', text: 'Passage deleted.' });
   };
 
