@@ -27,6 +27,42 @@ function wordIndexAt(charIndex: number, boundaries: WordBoundary[]): number {
   return -1;
 }
 
+/** Index of the word that ends exactly at `charIndex` (i.e. the word before a space). */
+function wordEndingAt(charIndex: number, boundaries: WordBoundary[]): number {
+  for (let i = 0; i < boundaries.length; i++) {
+    if (boundaries[i].end === charIndex) return i;
+  }
+  return -1;
+}
+
+/**
+ * Monkeytype evaluates a word when it is submitted, not while it is being typed:
+ * the word is wrong if the letters on screen at that moment differ from the
+ * passage, and correcting a typo before pressing space clears it again. Flagging
+ * live would leave the underline stuck on a word the typist already fixed.
+ */
+function withWordOutcome(
+  mistakes: Set<number>,
+  wordIndex: number,
+  word: WordBoundary | undefined,
+  text: string,
+  typedChars: string[],
+  typedEnd: number
+): Set<number> {
+  if (wordIndex < 0 || !word) return mistakes;
+  let isCorrect = true;
+  for (let i = word.start; i < word.end; i++) {
+    if (i >= typedEnd || typedChars[i] !== text[i]) {
+      isCorrect = false;
+      break;
+    }
+  }
+  const next = new Set(mistakes);
+  if (isCorrect) next.delete(wordIndex);
+  else next.add(wordIndex);
+  return next;
+}
+
 interface TypingState {
   passage: Passage;
   typedChars: string[];
@@ -106,7 +142,6 @@ function reducer(state: TypingState, action: Action): TypingState {
       // Case 1: space pressed but expected char is NOT a space
       // (cursor is mid-word)
       if (action.key === ' ' && expected !== ' ') {
-        console.log('Space mid-word: currentIndex=', state.currentIndex, 'expected=', expected, 'extraChars=', state.extraChars);
         // Do nothing at position 0 — can't skip before typing
         if (state.currentIndex === 0) return state;
         
@@ -124,10 +159,17 @@ function reducer(state: TypingState, action: Action): TypingState {
           skipTo++; // skip the space itself
         }
         
-        // Mark skipped chars as incorrect in mistakeWordIndices
-        const newMistakes = new Set(state.mistakeWordIndices);
+        // A word abandoned mid-way is submitted short, so it is wrong by definition;
+        // evaluating it against what is actually on screen keeps the flag honest.
         const wi = wordIndexAt(state.currentIndex, state.wordBoundaries);
-        if (wi >= 0) newMistakes.add(wi);
+        const newMistakes = withWordOutcome(
+          state.mistakeWordIndices,
+          wi,
+          state.wordBoundaries[wi],
+          text,
+          state.typedChars,
+          state.currentIndex
+        );
         
         // Fill typedChars for skipped positions with empty 
         // string so indices stay aligned — untyped chars 
@@ -161,6 +203,8 @@ function reducer(state: TypingState, action: Action): TypingState {
       // (correct space)
       if (expected === ' ' && action.key === ' ' && state.extraChars.length === 0) {
         const newIndex = state.currentIndex + 1;
+        // Submit the word that just ended: correct letters clear any earlier flag.
+        const finishedWord = wordEndingAt(state.currentIndex, state.wordBoundaries);
         return {
           ...state,
           typedChars: [...state.typedChars, ' '],
@@ -170,6 +214,14 @@ function reducer(state: TypingState, action: Action): TypingState {
           totalKeystrokes: state.totalKeystrokes + 1,
           lockedIndex: newIndex,
           completedWords: state.completedWords + 1,
+          mistakeWordIndices: withWordOutcome(
+            state.mistakeWordIndices,
+            finishedWord,
+            state.wordBoundaries[finishedWord],
+            state.passage.text,
+            state.typedChars,
+            state.currentIndex
+          ),
           extraChars: [],
           accuracy: Math.round(((state.totalCorrect + 1) / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
           isRunning: true,
@@ -181,6 +233,10 @@ function reducer(state: TypingState, action: Action): TypingState {
       // (submit word with errors)
       if (expected === ' ' && action.key === ' ' && state.extraChars.length > 0) {
         const newIndex = state.currentIndex + 1;
+        // Overshot the word: the letters may be right, but the extras make it wrong.
+        const finishedWord = wordEndingAt(state.currentIndex, state.wordBoundaries);
+        const erroredMistakes = new Set(state.mistakeWordIndices);
+        if (finishedWord >= 0) erroredMistakes.add(finishedWord);
         return {
           ...state,
           typedChars: [...state.typedChars, ' '],
@@ -188,6 +244,7 @@ function reducer(state: TypingState, action: Action): TypingState {
           extraChars: [],
           lockedIndex: newIndex,
           completedWords: state.completedWords + 1,
+          mistakeWordIndices: erroredMistakes,
           totalKeystrokes: state.totalKeystrokes + 1,
           isRunning: true,
           startTime: state.startTime ?? Date.now(),
