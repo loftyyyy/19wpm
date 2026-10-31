@@ -99,16 +99,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   opacity: 1;
 }
 
-.typed-correct {
-  color: var(--success);
-}
-
-.typed-incorrect {
-  color: var(--error);
-  text-decoration: underline;
-  text-decoration-color: var(--error);
-}
-
 .char-untyped {
   color: var(--text-dim);
 }
