@@ -132,6 +132,65 @@ function initialState(passage: Passage, duration: Duration, testMode: TestMode, 
   };
 }
 
+/**
+ * Correct characters that count towards the reported WPM. In timed mode the word
+ * being typed is not finished yet, so its progress is discarded until the word is
+ * submitted; once the passage is complete there is no in-progress word to discard.
+ */
+function netCorrectChars(state: TypingState): number {
+  if (state.testMode !== 'timed') return state.correctChars;
+  const currentWord = state.wordBoundaries.find(
+    b => state.currentIndex >= b.start && state.currentIndex < b.end
+  );
+  if (!currentWord) return state.correctChars;
+  let deducted = 0;
+  for (let i = currentWord.start; i < state.currentIndex; i++) {
+    if (state.typedChars[i] === state.passage.text[i]) deducted++;
+  }
+  return state.correctChars - deducted;
+}
+
+function computeWpm(correctChars: number, elapsedSeconds: number): number {
+  const elapsedMinutes = elapsedSeconds / 60;
+  return elapsedMinutes > 0 ? Math.round((correctChars / 5) / elapsedMinutes) : 0;
+}
+
+function computeRawWpm(totalKeystrokes: number, elapsedSeconds: number): number {
+  const elapsedMinutes = elapsedSeconds / 60;
+  return elapsedMinutes > 0 ? Math.round((totalKeystrokes / 5) / elapsedMinutes) : 0;
+}
+
+/**
+ * Seconds of test time at `now`. TICK only samples every 100 ms, so the final
+ * keystroke would otherwise be scored against a value up to 100 ms stale.
+ */
+function elapsedSecondsAt(state: TypingState, now: number): number {
+  if (state.startTime === null) return state.elapsedSeconds;
+  const measured = (now - state.startTime) / 1000;
+  const capped = state.testMode === 'timed' ? Math.min(measured, state.totalTime) : measured;
+  return Math.max(state.elapsedSeconds, capped);
+}
+
+function finishState(state: TypingState, elapsedSeconds: number): TypingState {
+  return {
+    ...state,
+    elapsedSeconds,
+    isRunning: false,
+    isFinished: true,
+    wpm: computeWpm(netCorrectChars(state), elapsedSeconds),
+    rawWpm: computeRawWpm(state.totalKeystrokes, elapsedSeconds),
+  };
+}
+
+/**
+ * Ends the test the moment the passage is exhausted, so the last keystroke lands on
+ * a finished state instead of leaving the timer running until the next tick.
+ */
+function finishIfComplete(state: TypingState, now: number): TypingState {
+  if (state.isFinished || state.currentIndex < state.passage.text.length) return state;
+  return finishState(state, elapsedSecondsAt(state, now));
+}
+
 function reducer(state: TypingState, action: Action): TypingState {
   switch (action.type) {
     case 'KEY_PRESS': {
@@ -185,7 +244,7 @@ function reducer(state: TypingState, action: Action): TypingState {
           newTypedChars.push('');
         }
 
-        return {
+        return finishIfComplete({
           ...state,
           typedChars: newTypedChars,
           currentIndex: skipTo,
@@ -196,7 +255,7 @@ function reducer(state: TypingState, action: Action): TypingState {
           totalKeystrokes: state.totalKeystrokes + 1,
           isRunning: true,
           startTime: state.startTime ?? Date.now(),
-        };
+        }, Date.now());
       }
 
       // Case 2: space pressed at word boundary with no extraChars
@@ -205,7 +264,7 @@ function reducer(state: TypingState, action: Action): TypingState {
         const newIndex = state.currentIndex + 1;
         // Submit the word that just ended: correct letters clear any earlier flag.
         const finishedWord = wordEndingAt(state.currentIndex, state.wordBoundaries);
-        return {
+        return finishIfComplete({
           ...state,
           typedChars: [...state.typedChars, ' '],
           currentIndex: newIndex,
@@ -226,7 +285,7 @@ function reducer(state: TypingState, action: Action): TypingState {
           accuracy: Math.round(((state.totalCorrect + 1) / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
           isRunning: true,
           startTime: state.startTime ?? Date.now(),
-        };
+        }, Date.now());
       }
 
       // Case 3: space pressed at word boundary WITH extraChars
@@ -237,7 +296,7 @@ function reducer(state: TypingState, action: Action): TypingState {
         const finishedWord = wordEndingAt(state.currentIndex, state.wordBoundaries);
         const erroredMistakes = new Set(state.mistakeWordIndices);
         if (finishedWord >= 0) erroredMistakes.add(finishedWord);
-        return {
+        return finishIfComplete({
           ...state,
           typedChars: [...state.typedChars, ' '],
           currentIndex: newIndex,
@@ -248,7 +307,7 @@ function reducer(state: TypingState, action: Action): TypingState {
           totalKeystrokes: state.totalKeystrokes + 1,
           isRunning: true,
           startTime: state.startTime ?? Date.now(),
-        };
+        }, Date.now());
       }
 
       // Case 4: extra chars when cursor is at a space position
@@ -281,7 +340,7 @@ function reducer(state: TypingState, action: Action): TypingState {
         if (wi >= 0) newMistakes.add(wi);
       }
       const newIndex = state.currentIndex + 1;
-      return {
+      return finishIfComplete({
         ...state,
         typedChars: [...state.typedChars, action.key],
         currentIndex: newIndex,
@@ -298,7 +357,7 @@ function reducer(state: TypingState, action: Action): TypingState {
         isRunning: true,
         startTime: state.startTime ?? Date.now(),
         extraChars: [],
-      };
+      }, Date.now());
     }
     case 'BACKSPACE': {
       if (state.extraChars.length > 0) {
@@ -354,49 +413,32 @@ function reducer(state: TypingState, action: Action): TypingState {
     case 'TICK': {
       const newElapsed = state.elapsedSeconds + 0.1;
       const roundedElapsed = Math.round(newElapsed);
-      const elapsedMinutes = newElapsed / 60;
       const newTimeLeft = state.testMode === 'timed'
         ? Math.max(0, Math.round((state.timeLeft - 0.1) * 10) / 10)
         : state.timeLeft;
       const finishedByTime = state.testMode === 'timed' && newTimeLeft <= 0;
       const finishedByPassage = state.currentIndex >= state.passage.text.length;
       const finished = finishedByTime || finishedByPassage;
-      let effectiveCorrect = state.correctChars;
-      if (state.testMode === 'timed') {
-        const boundaries = state.wordBoundaries;
-        const currentWordBoundary = boundaries.find(
-          b => state.currentIndex >= b.start && state.currentIndex < b.end
-        );
-        if (currentWordBoundary) {
-          for (let i = currentWordBoundary.start; i < state.currentIndex; i++) {
-            if (state.typedChars[i] === state.passage.text[i]) {
-              effectiveCorrect--;
-            }
-          }
-        }
-      }
-      const wpm = elapsedMinutes > 0
-        ? Math.round((effectiveCorrect / 5) / elapsedMinutes)
-        : 0;
-      const rawWpm = elapsedMinutes > 0
-        ? Math.round((state.totalKeystrokes / 5) / elapsedMinutes)
-        : 0;
       const lastRecorded = state.wpmHistory.length > 0 ? state.wpmHistory[state.wpmHistory.length - 1].time : -1;
       const shouldRecord = roundedElapsed > lastRecorded;
-      return {
+      const wpm = computeWpm(netCorrectChars(state), newElapsed);
+      const next: TypingState = {
         ...state,
         timeLeft: newTimeLeft,
         elapsedSeconds: newElapsed,
-        wpm,
-        rawWpm,
         wpmHistory: finished
           ? state.wpmHistory
           : shouldRecord
             ? [...state.wpmHistory, { time: roundedElapsed, wpm, errors: state.errorsThisSecond }]
             : state.wpmHistory,
         errorsThisSecond: shouldRecord ? 0 : state.errorsThisSecond,
-        isRunning: !finished,
-        isFinished: finished,
+      };
+      if (finished) return finishState(next, newElapsed);
+      return {
+        ...next,
+        wpm,
+        rawWpm: computeRawWpm(next.totalKeystrokes, newElapsed),
+        isRunning: true,
       };
     }
     case 'RESET':
