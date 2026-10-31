@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
-    "perf:bundle": "node scripts/check-bundle-size.mjs"
+    "perf:bundle": "node scripts/check-bundle-size.mjs",
+    "perf:keystroke": "node scripts/bench.js"
   },
   "dependencies": {
     "@stomp/stompjs": "^7.3.0",
