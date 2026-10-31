@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useCallback, useState } from 'react';
 import { animate } from 'animejs';
 import Word from './Word';
 import { completeKeystroke, markPerformance, measurePerformance } from '../../utils/performance';
@@ -43,6 +43,9 @@ export default function TypingViewport({
   const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
   const renderStartMarkRef = useRef<string | null>(null);
+  // Bumped when the container width changes; the layout effects key off it so a
+  // resize re-measures line positions instead of trusting a stale cache.
+  const [layoutEpoch, setLayoutEpoch] = useState(0);
 
   // Captured before commit so the layout effect can measure render-to-paint cost.
   // eslint-disable-next-line react-hooks/refs -- perf instrumentation, not render state
@@ -99,6 +102,26 @@ export default function TypingViewport({
     isFirstPositionRef.current = true;
   }, [charsText, resetKey]);
 
+  // Line wrapping depends on the content width, so a window resize or a device
+  // rotation invalidates every cached `offsetTop`. Without this the scroll offset
+  // and the three-line window keep pointing at the pre-resize layout.
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content || typeof ResizeObserver === 'undefined') return;
+
+    let lastWidth = content.clientWidth;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry ? entry.contentRect.width : content.clientWidth;
+      if (Math.abs(width - lastWidth) < 1) return;
+      lastWidth = width;
+      lineCacheRef.current = null;
+      isFirstPositionRef.current = true;
+      setLayoutEpoch(epoch => epoch + 1);
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+
   useLayoutEffect(() => {
     const elements = wordRefs.current;
     if (!elements.length || !contentRef.current || !viewportRef.current) return;
@@ -139,7 +162,7 @@ export default function TypingViewport({
       duration: 125,
       ease: 'inOut(2)',
     });
-  }, [currentWordIndex, passageWords.length, measureKey]);
+  }, [currentWordIndex, passageWords.length, measureKey, layoutEpoch]);
 
   useEffect(() => {
     const rafId = requestAnimationFrame(() => {
@@ -201,7 +224,7 @@ export default function TypingViewport({
       });
     });
     return () => cancelAnimationFrame(rafId);
-  }, [currentIndex, charsText]);
+  }, [currentIndex, charsText, layoutEpoch]);
 
   useLayoutEffect(() => {
     const startMark = renderStartMarkRef.current;
