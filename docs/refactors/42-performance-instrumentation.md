@@ -13,17 +13,22 @@ That made the later memoization and animation changes impossible to compare agai
 ## Solution / enhancement (after)
 
 Add `frontend/src/utils/performance.ts` with small wrappers around `performance.mark`,
-`performance.measure`, and `performance.clearMarks`. Two measures are emitted:
+`performance.measure`, and `performance.clearMarks`. Three measures are emitted:
 
 | Measure | Start | End |
 | --- | --- | --- |
 | `19wpm:keystroke` | keydown accepted for typing or Backspace | first viewport commit after the update |
 | `19wpm:viewport` | `TypingViewport` render begins | all viewport layout effects finish |
+| `19wpm:caret` | caret animation frame begins | caret target resolved and animated |
 
 The keystroke mark is started in `TypingTest` before the engine dispatch and completed in
 `TypingViewport`'s final layout effect. The viewport mark is created during render and measured after
 the scroll and caret layout effects run. Replacing an unfinished keystroke mark prevents an ignored
 key from measuring the next unrelated render.
+
+The caret moves in a `requestAnimationFrame` that runs after the keystroke measure has already closed,
+so it gets its own sample. `frontend/scripts/bench.js` reports all three rows; only `keystroke`
+carries a p95 budget.
 
 The measures are available in DevTools with:
 
