@@ -17,8 +17,10 @@ export default function TypingReplay({ result }: { result: TestResult }) {
   const replayCharRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const replayLineHeightRef = useRef(0);
   const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const scrollTargetRef = useRef(0);
   const cursorRef = useRef<HTMLDivElement>(null);
   const caretAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const caretTargetRef = useRef({ x: 0, y: 0 });
   const isFirstCaretPosRef = useRef(true);
 
   const passageWords = useMemo(() => {
@@ -273,12 +275,17 @@ export default function TypingReplay({ result }: { result: TestResult }) {
     const currentMarginTop = parseFloat(replayContentRef.current.style.marginTop || '0');
     if (Math.abs(offset - currentMarginTop) < 1) return;
 
-    // Cancel in-flight scroll animation
-    scrollAnimationRef.current?.pause();
+    // Reuse one animation, retargeted through refresh() + restart(), so a seek
+    // or a line change does not allocate a new animation object.
+    scrollTargetRef.current = offset;
+    if (scrollAnimationRef.current) {
+      scrollAnimationRef.current.refresh().restart();
+      return;
+    }
 
     // Animate marginTop at 125ms like the live typing screen
     scrollAnimationRef.current = animate(replayContentRef.current, {
-      marginTop: offset,
+      marginTop: () => scrollTargetRef.current,
       duration: 125,
       ease: 'inOut(2)',
     });
@@ -339,16 +346,22 @@ export default function TypingReplay({ result }: { result: TestResult }) {
         return;
       }
 
-      // Cancel any in-flight animation
-      caretAnimationRef.current?.pause();
+      // Same reuse as the live typing screen: one animation per caret, moved
+      // by refreshing its target instead of allocating per replayed event.
+      const caretTarget = caretTargetRef.current;
+      caretTarget.x = left;
+      caretTarget.y = top;
 
-      // Animate with the same easing as the live typing screen
-      caretAnimationRef.current = animate(cursorEl, {
-        left,
-        top,
-        duration: 85,
-        ease: 'inOut(1.25)',
-      });
+      if (caretAnimationRef.current) {
+        caretAnimationRef.current.refresh().restart();
+      } else {
+        caretAnimationRef.current = animate(cursorEl, {
+          left: () => caretTarget.x,
+          top: () => caretTarget.y,
+          duration: 85,
+          ease: 'inOut(1.25)',
+        });
+      }
     });
     return () => cancelAnimationFrame(rafId);
   }, [typedChars.length, result.passage, playState]);
