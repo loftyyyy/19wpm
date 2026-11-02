@@ -6,6 +6,9 @@
  * The number reported here is therefore keydown -> committed layout, not paint:
  * it isolates the engine/render cost a change is responsible for.
  *
+ * `19wpm:caret` is sampled separately: the caret moves in its own animation
+ * frame, which starts after the keystroke measure has already closed.
+ *
  * Usage:
  *   npm run build && npm run preview -- --port 4173
  *   node scripts/bench.js
@@ -32,6 +35,7 @@ const JSON_OUTPUT = process.argv.includes('--json');
 
 const KEYSTROKE_MEASURE = '19wpm:keystroke';
 const VIEWPORT_MEASURE = '19wpm:viewport';
+const CARET_MEASURE = '19wpm:caret';
 
 function percentile(sorted, p) {
   if (sorted.length === 0) return 0;
@@ -108,7 +112,7 @@ try {
 
   await page.evaluate(
     (names) => names.forEach((name) => performance.clearMeasures(name)),
-    [KEYSTROKE_MEASURE, VIEWPORT_MEASURE]
+    [KEYSTROKE_MEASURE, VIEWPORT_MEASURE, CARET_MEASURE]
   );
 
   await page.keyboard.type(sample, { delay: KEY_INTERVAL_MS });
@@ -118,26 +122,32 @@ try {
     (names) => {
       const entries = performance.getEntriesByType('measure');
       const collect = (name) => entries.filter((entry) => entry.name === name).map((entry) => entry.duration);
-      return { keystroke: collect(names[0]), viewport: collect(names[1]) };
+      return {
+        keystroke: collect(names[0]),
+        viewport: collect(names[1]),
+        caret: collect(names[2]),
+      };
     },
-    [KEYSTROKE_MEASURE, VIEWPORT_MEASURE]
+    [KEYSTROKE_MEASURE, VIEWPORT_MEASURE, CARET_MEASURE]
   );
 
   const keystroke = summarize(samples.keystroke);
   const viewport = summarize(samples.viewport);
+  const caret = summarize(samples.caret);
 
   if (!keystroke) {
     throw new Error(`No ${KEYSTROKE_MEASURE} measures were recorded; is the solo surface mounted and focused?`);
   }
 
   if (JSON_OUTPUT) {
-    console.log(JSON.stringify({ baseUrl: BASE_URL, keystroke, viewport, runtimeErrors }, null, 2));
+    console.log(JSON.stringify({ baseUrl: BASE_URL, keystroke, viewport, caret, runtimeErrors }, null, 2));
   } else {
     console.log(`\nSolo keystroke latency @ ${BASE_URL}`);
     console.log(`sampled ${sample.length} keys (interval ${KEY_INTERVAL_MS} ms, warmup ${warmup.length})`);
     console.log('\nmetric         n     mean     p50     p95     p99     max   (ms)');
     printRow('keystroke', keystroke);
     printRow('viewport', viewport);
+    printRow('caret', caret);
     console.log('');
   }
 

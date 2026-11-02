@@ -188,6 +188,10 @@ export default function TypingViewport({
 
       if (!targetEl) return;
 
+      // The caret moves in its own frame, after the keystroke measure closes,
+      // so it needs a separate sample to show up in the benchmark.
+      const startMark = markPerformance('caret:start');
+
       // Use offsetLeft/offsetTop relative to contentRef
       // like Monkeytype does, NOT getBoundingClientRect
       let el: HTMLElement | null = targetEl;
@@ -211,6 +215,7 @@ export default function TypingViewport({
       if (isFirstPositionRef.current) {
         isFirstPositionRef.current = false;
         cursorEl.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+        measurePerformance('caret', startMark);
         return;
       }
 
@@ -222,6 +227,7 @@ export default function TypingViewport({
         duration: 85,
         ease: 'inOut(1.25)',
       });
+      measurePerformance('caret', startMark);
     });
     return () => cancelAnimationFrame(rafId);
   }, [currentIndex, charsText, layoutEpoch]);
