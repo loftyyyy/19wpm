@@ -2,6 +2,7 @@ const MARK_PREFIX = '19wpm';
 
 let sequence = 0;
 let pendingKeystrokeMark: string | null = null;
+let pendingTickMark: string | null = null;
 
 function createMark(name: string): string | null {
   if (typeof performance === 'undefined') return null;
@@ -44,4 +45,21 @@ export function completeKeystroke(): void {
   if (!pendingKeystrokeMark) return;
   measurePerformance('keystroke', pendingKeystrokeMark);
   pendingKeystrokeMark = null;
+}
+
+/**
+ * Starts a sample for the background 100 ms timer. Replacing an unfinished tick
+ * mark prevents a dropped render from measuring the next unrelated commit.
+ */
+export function beginTick(): void {
+  if (pendingTickMark && typeof performance !== 'undefined') {
+    performance.clearMarks(pendingTickMark);
+  }
+  pendingTickMark = createMark('tick:start');
+}
+
+export function completeTick(): void {
+  if (!pendingTickMark) return;
+  measurePerformance('tick', pendingTickMark);
+  pendingTickMark = null;
 }

@@ -1,6 +1,7 @@
 import { useReducer, useEffect, useCallback, useRef } from 'react';
 import type { Passage, Duration, TestResult, WpmPoint, MistakeWord, ReplayEvent, TestMode, WordCount, ContentType } from '../types';
 import { v4 } from '../utils/id';
+import { beginTick } from '../utils/performance';
 
 interface WordBoundary {
   start: number;
@@ -490,7 +491,10 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
 
   useEffect(() => {
     if (!state.isRunning || state.isFinished) return;
-    const interval = setInterval(() => dispatch({ type: 'TICK' }), 100);
+    const interval = setInterval(() => {
+      beginTick();
+      dispatch({ type: 'TICK' });
+    }, 100);
     return () => clearInterval(interval);
   }, [state.isRunning, state.isFinished]);
 

@@ -8,6 +8,7 @@
  *
  * `19wpm:caret` is sampled separately: the caret moves in its own animation
  * frame, which starts after the keystroke measure has already closed.
+ * `19wpm:tick` covers the background 100 ms timer from dispatch to commit.
  *
  * Usage:
  *   npm run build && npm run preview -- --port 4173
@@ -36,6 +37,7 @@ const JSON_OUTPUT = process.argv.includes('--json');
 const KEYSTROKE_MEASURE = '19wpm:keystroke';
 const VIEWPORT_MEASURE = '19wpm:viewport';
 const CARET_MEASURE = '19wpm:caret';
+const TICK_MEASURE = '19wpm:tick';
 
 function percentile(sorted, p) {
   if (sorted.length === 0) return 0;
@@ -112,7 +114,7 @@ try {
 
   await page.evaluate(
     (names) => names.forEach((name) => performance.clearMeasures(name)),
-    [KEYSTROKE_MEASURE, VIEWPORT_MEASURE, CARET_MEASURE]
+    [KEYSTROKE_MEASURE, VIEWPORT_MEASURE, CARET_MEASURE, TICK_MEASURE]
   );
 
   await page.keyboard.type(sample, { delay: KEY_INTERVAL_MS });
@@ -126,21 +128,23 @@ try {
         keystroke: collect(names[0]),
         viewport: collect(names[1]),
         caret: collect(names[2]),
+        tick: collect(names[3]),
       };
     },
-    [KEYSTROKE_MEASURE, VIEWPORT_MEASURE, CARET_MEASURE]
+    [KEYSTROKE_MEASURE, VIEWPORT_MEASURE, CARET_MEASURE, TICK_MEASURE]
   );
 
   const keystroke = summarize(samples.keystroke);
   const viewport = summarize(samples.viewport);
   const caret = summarize(samples.caret);
+  const tick = summarize(samples.tick);
 
   if (!keystroke) {
     throw new Error(`No ${KEYSTROKE_MEASURE} measures were recorded; is the solo surface mounted and focused?`);
   }
 
   if (JSON_OUTPUT) {
-    console.log(JSON.stringify({ baseUrl: BASE_URL, keystroke, viewport, caret, runtimeErrors }, null, 2));
+    console.log(JSON.stringify({ baseUrl: BASE_URL, keystroke, viewport, caret, tick, runtimeErrors }, null, 2));
   } else {
     console.log(`\nSolo keystroke latency @ ${BASE_URL}`);
     console.log(`sampled ${sample.length} keys (interval ${KEY_INTERVAL_MS} ms, warmup ${warmup.length})`);
@@ -148,6 +152,7 @@ try {
     printRow('keystroke', keystroke);
     printRow('viewport', viewport);
     printRow('caret', caret);
+    printRow('tick', tick);
     console.log('');
   }
 
