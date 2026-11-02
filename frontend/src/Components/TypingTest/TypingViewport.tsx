@@ -39,8 +39,10 @@ export default function TypingViewport({
   const currentCharRef = useRef<HTMLSpanElement | null>(null);
   const lastCharRef = useRef<HTMLSpanElement | null>(null);
   const caretAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const caretTargetRef = useRef({ x: 0, y: 0 });
   const isFirstPositionRef = useRef(true);
   const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+  const scrollTargetRef = useRef(0);
   const lineCacheRef = useRef<{ sortedTops: number[]; lineHeight: number } | null>(null);
   const renderStartMarkRef = useRef<string | null>(null);
   // Bumped when the container width changes; the layout effects key off it so a
@@ -96,6 +98,10 @@ export default function TypingViewport({
 
   useEffect(() => {
     lineCacheRef.current = null;
+    // A reused animation would keep writing the previous passage's offsets
+    // after the reset, so stop both before the layout is re-measured.
+    caretAnimationRef.current?.pause();
+    scrollAnimationRef.current?.pause();
     if (contentRef.current) {
       contentRef.current.style.marginTop = '0px';
     }
@@ -153,12 +159,18 @@ export default function TypingViewport({
 
     if (Math.abs(newMarginTop - currentMarginTop) < 1) return;
 
-    // Cancel in-flight scroll animation
-    scrollAnimationRef.current?.pause();
+    // One animation per element for the lifetime of the viewport: refresh()
+    // re-reads the in-flight margin, restart() replays from there, so a line
+    // change does not allocate a new animation object.
+    scrollTargetRef.current = newMarginTop;
+    if (scrollAnimationRef.current) {
+      scrollAnimationRef.current.refresh().restart();
+      return;
+    }
 
     // Animate marginTop at 125ms like Monkeytype
     scrollAnimationRef.current = animate(contentRef.current, {
-      marginTop: newMarginTop,
+      marginTop: () => scrollTargetRef.current,
       duration: 125,
       ease: 'inOut(2)',
     });
@@ -219,14 +231,22 @@ export default function TypingViewport({
         return;
       }
 
-      caretAnimationRef.current?.pause();
+      // Same reuse as the scroll animation: one animation per caret, retargeted
+      // through refresh() + restart() instead of allocated per keystroke.
+      const caretTarget = caretTargetRef.current;
+      caretTarget.x = left;
+      caretTarget.y = top;
 
-      caretAnimationRef.current = animate(cursorEl, {
-        translateX: left,
-        translateY: top,
-        duration: 85,
-        ease: 'inOut(1.25)',
-      });
+      if (caretAnimationRef.current) {
+        caretAnimationRef.current.refresh().restart();
+      } else {
+        caretAnimationRef.current = animate(cursorEl, {
+          translateX: () => caretTarget.x,
+          translateY: () => caretTarget.y,
+          duration: 85,
+          ease: 'inOut(1.25)',
+        });
+      }
       measurePerformance('caret', startMark);
     });
     return () => cancelAnimationFrame(rafId);
