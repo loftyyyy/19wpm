@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTypingEngine } from '../hooks/useTypingEngine';
 import { getClockSnapshot } from '../utils/typingClock';
-import TypingViewport from '../Components/TypingTest/TypingViewport';
+import { useTypingValue } from '../utils/typingStore';
+import TypingSelectionViewport from '../Components/TypingTest/TypingSelectionViewport';
 import { markTypingActive } from '../hooks/useTypingActivity';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
@@ -517,7 +518,9 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
   useEffect(() => { onProgressRef.current = onProgress; }, [onProgress]);
   useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
 
-  const { state, handleKeyDown, getResult } = useTypingEngine(passageObj, 60, 'words', 25, 'words');
+  const { store, handleKeyDown, getResult } = useTypingEngine(passageObj, 60, 'words', 25, 'words');
+  const isRunning = useTypingValue(store, snapshot => snapshot.isRunning);
+  const isFinished = useTypingValue(store, snapshot => snapshot.isFinished);
 
   const calcWpm = useCallback((typed: string) => {
     const minutes = (Date.now() - new Date(startTime).getTime()) / 60000;
@@ -526,26 +529,33 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
     return Math.round(words / minutes);
   }, [startTime]);
 
+  // Progress is derived from the store rather than from props, so the race
+  // surface can report every commit without re-rendering the input for each one.
   useEffect(() => {
-    const typed = state.typedChars.join('');
-    onProgressRef.current(
-      Math.min(state.currentIndex / passage.length, 1),
-      calcWpm(typed),
-      state.totalIncorrect
-    );
-  }, [state.typedChars, state.currentIndex, state.totalIncorrect, passage, calcWpm]);
+    const report = () => {
+      const snapshot = store.getSnapshot();
+      onProgressRef.current(
+        Math.min(snapshot.currentIndex / passage.length, 1),
+        calcWpm(snapshot.typedChars.join('')),
+        snapshot.totalIncorrect
+      );
+    };
+    report();
+    return store.subscribe(report);
+  }, [store, passage, calcWpm]);
 
   useEffect(() => {
-    if (state.isFinished && !finishReportedRef.current) {
+    if (isFinished && !finishReportedRef.current) {
       finishReportedRef.current = true;
-      const typed = state.typedChars.join('');
-      onProgressRef.current(1, calcWpm(typed), state.totalIncorrect);
-      onFinishRef.current(calcWpm(typed), state.totalIncorrect, state.totalCorrect, getClockSnapshot().wpmHistory, getResult(), keyIntervalsRef.current);
+      const snapshot = store.getSnapshot();
+      const typed = snapshot.typedChars.join('');
+      onProgressRef.current(1, calcWpm(typed), snapshot.totalIncorrect);
+      onFinishRef.current(calcWpm(typed), snapshot.totalIncorrect, snapshot.totalCorrect, getClockSnapshot().wpmHistory, getResult(), keyIntervalsRef.current);
     }
-    if (!state.isFinished) {
+    if (!isFinished) {
       finishReportedRef.current = false;
     }
-  }, [state.isFinished, state.typedChars, state.totalIncorrect, state.totalCorrect, calcWpm, getResult]);
+  }, [isFinished, store, calcWpm, getResult]);
 
   useEffect(() => {
     containerRef.current?.focus();
@@ -579,19 +589,14 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       onClick={() => containerRef.current?.focus()}
       className="w-full focus:outline-none focus:ring-2 focus:ring-accent/30 font-mono text-xl md:text-2xl leading-relaxed cursor-text select-none"
     >
-      {!state.isRunning && !state.isFinished && (
+      {!isRunning && !isFinished && (
         <div className="text-center text-text-dim font-sans text-sm mb-4 transition-theme">
           Start typing to begin
         </div>
       )}
-      <TypingViewport
+      <TypingSelectionViewport
+        store={store}
         charsText={passage}
-        typedChars={state.typedChars}
-        currentIndex={state.currentIndex}
-        lockedIndex={state.lockedIndex}
-        mistakeWordIndices={state.mistakeWordIndices}
-        extraChars={state.extraChars}
-        isFinished={state.isFinished}
         extraVariant="block"
         measureKey={passage}
       />

@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
 import { useClock, useClockValue } from '../../utils/typingClock';
+import { useTypingValue, type TypingStore } from '../../utils/typingStore';
 import { completeTick } from '../../utils/performance';
 import type { TestMode } from '../../types';
 
@@ -52,14 +53,23 @@ function TimedProgress({ totalTime }: { totalTime: number }) {
 interface TestProgressProps {
   testMode: TestMode;
   totalTime: number;
-  completedWords: number;
   totalWords: number;
-  isFinished: boolean;
+  store: TypingStore;
+}
+
+/**
+ * Word progress is store-driven: the counter only advances when a word is
+ * submitted, so the bar subscribes instead of taking the count as a prop.
+ */
+function WordsProgress({ store, totalWords }: { store: TypingStore; totalWords: number }) {
+  const completedWords = useTypingValue(store, snapshot => snapshot.completedWords);
+  const isFinished = useTypingValue(store, snapshot => snapshot.isFinished);
+  const percent = totalWords > 0 ? ((isFinished ? totalWords : completedWords) / totalWords) * 100 : 0;
+  return <ProgressBar percent={percent} />;
 }
 
 /** Timed runs follow the clock; words runs follow the completed-word count. */
-export function TestProgress({ testMode, totalTime, completedWords, totalWords, isFinished }: TestProgressProps) {
+export function TestProgress({ testMode, totalTime, totalWords, store }: TestProgressProps) {
   if (testMode === 'timed') return <TimedProgress totalTime={totalTime} />;
-  const percent = totalWords > 0 ? ((isFinished ? totalWords : completedWords) / totalWords) * 100 : 0;
-  return <ProgressBar percent={percent} />;
+  return <WordsProgress store={store} totalWords={totalWords} />;
 }

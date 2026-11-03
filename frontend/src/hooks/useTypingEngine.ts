@@ -1,199 +1,27 @@
-import { useReducer, useEffect, useCallback, useRef } from 'react';
-import type { Passage, Duration, TestResult, WpmPoint, MistakeWord, ReplayEvent, TestMode, WordCount, ContentType } from '../types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Passage, Duration, TestResult, WpmPoint, ReplayEvent, TestMode, WordCount, ContentType } from '../types';
 import { v4 } from '../utils/id';
 import { beginTick } from '../utils/performance';
 import { getClockSnapshot, publishClock, resetClock, type ClockSnapshot } from '../utils/typingClock';
-
-interface WordBoundary {
-  start: number;
-  end: number;
-}
-
-function getWordBoundaries(text: string): WordBoundary[] {
-  const words: WordBoundary[] = [];
-  let i = 0;
-  while (i < text.length) {
-    while (i < text.length && text[i] === ' ') i++;
-    if (i >= text.length) break;
-    const start = i;
-    while (i < text.length && text[i] !== ' ') i++;
-    words.push({ start, end: i });
-  }
-  return words;
-}
-
-function wordIndexAt(charIndex: number, boundaries: WordBoundary[]): number {
-  for (let i = 0; i < boundaries.length; i++) {
-    if (charIndex >= boundaries[i].start && charIndex < boundaries[i].end) return i;
-  }
-  return -1;
-}
-
-/** Index of the word that ends exactly at `charIndex` (i.e. the word before a space). */
-function wordEndingAt(charIndex: number, boundaries: WordBoundary[]): number {
-  for (let i = 0; i < boundaries.length; i++) {
-    if (boundaries[i].end === charIndex) return i;
-  }
-  return -1;
-}
+import {
+  computeMistakeWords,
+  computeRawWpm,
+  computeWpm,
+  createTypingStore,
+  elapsedSecondsAt,
+  netCorrectChars,
+  type TypingConfig,
+  type TypingSnapshot,
+  type TypingStore,
+} from '../utils/typingStore';
 
 /**
- * Monkeytype evaluates a word when it is submitted, not while it is being typed:
- * the word is wrong if the letters on screen at that moment differ from the
- * passage, and correcting a typo before pressing space clears it again. Flagging
- * live would leave the underline stuck on a word the typist already fixed.
- */
-function withWordOutcome(
-  mistakes: Set<number>,
-  wordIndex: number,
-  word: WordBoundary | undefined,
-  text: string,
-  typedChars: string[],
-  typedEnd: number
-): Set<number> {
-  if (wordIndex < 0 || !word) return mistakes;
-  let isCorrect = true;
-  for (let i = word.start; i < word.end; i++) {
-    if (i >= typedEnd || typedChars[i] !== text[i]) {
-      isCorrect = false;
-      break;
-    }
-  }
-  const next = new Set(mistakes);
-  if (isCorrect) next.delete(wordIndex);
-  else next.add(wordIndex);
-  return next;
-}
-
-interface TypingState {
-  passage: Passage;
-  typedChars: string[];
-  extraChars: string[];
-  currentIndex: number;
-  totalTime: number;
-  elapsedSeconds: number;
-  isRunning: boolean;
-  isFinished: boolean;
-  wpm: number;
-  rawWpm: number;
-  accuracy: number;
-  correctChars: number;
-  incorrectChars: number;
-  totalCorrect: number;
-  totalIncorrect: number;
-  totalKeystrokes: number;
-  mistakeWordIndices: Set<number>;
-  wordBoundaries: WordBoundary[];
-  startTime: number | null;
-  lockedIndex: number;
-  completedWords: number;
-  testMode: TestMode;
-  wordCount: WordCount;
-  contentType: ContentType;
-}
-
-type Action =
-  | { type: 'KEY_PRESS'; key: string }
-  | { type: 'BACKSPACE' }
-  | { type: 'DELETE_WORD' }
-  | { type: 'FINISH' }
-  | { type: 'RESET'; passage: Passage; duration: Duration; testMode: TestMode; wordCount: WordCount; contentType: ContentType };
-
-function initialState(passage: Passage, duration: Duration, testMode: TestMode, wordCount: WordCount, contentType: ContentType): TypingState {
-  return {
-    passage,
-    typedChars: [],
-    extraChars: [],
-    currentIndex: 0,
-    totalTime: duration,
-    elapsedSeconds: 0,
-    isRunning: false,
-    isFinished: false,
-    wpm: 0,
-    rawWpm: 0,
-    accuracy: 100,
-    correctChars: 0,
-    incorrectChars: 0,
-    totalCorrect: 0,
-    totalIncorrect: 0,
-    totalKeystrokes: 0,
-    mistakeWordIndices: new Set(),
-    wordBoundaries: getWordBoundaries(passage.text),
-    startTime: null,
-    lockedIndex: 0,
-    completedWords: 0,
-    testMode,
-    wordCount,
-    contentType,
-  };
-}
-
-/**
- * Correct characters that count towards the reported WPM. In timed mode the word
- * being typed is not finished yet, so its progress is discarded until the word is
- * submitted; once the passage is complete there is no in-progress word to discard.
- */
-function netCorrectChars(state: TypingState): number {
-  if (state.testMode !== 'timed') return state.correctChars;
-  const currentWord = state.wordBoundaries.find(
-    b => state.currentIndex >= b.start && state.currentIndex < b.end
-  );
-  if (!currentWord) return state.correctChars;
-  let deducted = 0;
-  for (let i = currentWord.start; i < state.currentIndex; i++) {
-    if (state.typedChars[i] === state.passage.text[i]) deducted++;
-  }
-  return state.correctChars - deducted;
-}
-
-function computeWpm(correctChars: number, elapsedSeconds: number): number {
-  const elapsedMinutes = elapsedSeconds / 60;
-  return elapsedMinutes > 0 ? Math.round((correctChars / 5) / elapsedMinutes) : 0;
-}
-
-function computeRawWpm(totalKeystrokes: number, elapsedSeconds: number): number {
-  const elapsedMinutes = elapsedSeconds / 60;
-  return elapsedMinutes > 0 ? Math.round((totalKeystrokes / 5) / elapsedMinutes) : 0;
-}
-
-/**
- * Seconds of test time at `now`. The clock only samples every 100 ms, so the
- * final keystroke would otherwise be scored against a value up to 100 ms stale.
- */
-function elapsedSecondsAt(state: TypingState, now: number): number {
-  if (state.startTime === null) return state.elapsedSeconds;
-  const measured = (now - state.startTime) / 1000;
-  const capped = state.testMode === 'timed' ? Math.min(measured, state.totalTime) : measured;
-  return Math.max(state.elapsedSeconds, capped);
-}
-
-function finishState(state: TypingState, elapsedSeconds: number): TypingState {
-  return {
-    ...state,
-    elapsedSeconds,
-    isRunning: false,
-    isFinished: true,
-    wpm: computeWpm(netCorrectChars(state), elapsedSeconds),
-    rawWpm: computeRawWpm(state.totalKeystrokes, elapsedSeconds),
-  };
-}
-
-/**
- * Ends the test the moment the passage is exhausted, so the last keystroke lands on
- * a finished state instead of leaving the timer running until the next clock sample.
- */
-function finishIfComplete(state: TypingState, now: number): TypingState {
-  if (state.isFinished || state.currentIndex < state.passage.text.length) return state;
-  return finishState(state, elapsedSecondsAt(state, now));
-}
-
-/**
- * Mutable inputs for the external clock. `state` is the last committed engine
- * state; the history counters survive between publications so one point is
+ * Mutable inputs for the external clock. `state` is the last committed store
+ * snapshot; the history counters survive between publications so one point is
  * recorded per whole second, exactly like the old ticker did.
  */
 interface ClockSource {
-  state: TypingState;
+  state: TypingSnapshot;
   history: WpmPoint[];
   lastSecond: number;
   incorrectAtLastSecond: number;
@@ -236,252 +64,6 @@ function sampleClock(source: ClockSource, now: number): ClockSnapshot {
   };
 }
 
-function reducer(state: TypingState, action: Action): TypingState {
-  switch (action.type) {
-    case 'KEY_PRESS': {
-      if (state.isFinished || state.currentIndex >= state.passage.text.length) return state;
-      
-      const expected = state.passage.text[state.currentIndex];
-
-      // Case 1: space pressed but expected char is NOT a space
-      // (cursor is mid-word)
-      if (action.key === ' ' && expected !== ' ') {
-        // Do nothing at position 0 — can't skip before typing
-        if (state.currentIndex === 0) return state;
-        
-        // Find the end of the current word and the space after it
-        const text = state.passage.text;
-        let skipTo = state.currentIndex;
-        
-        // Advance to the end of the current word
-        while (skipTo < text.length && text[skipTo] !== ' ') {
-          skipTo++;
-        }
-        // Now skipTo points to the space character (or end of text)
-        // Advance past the space to the start of the next word
-        if (skipTo < text.length && text[skipTo] === ' ') {
-          skipTo++; // skip the space itself
-        }
-        
-        // A word abandoned mid-way is submitted short, so it is wrong by definition;
-        // evaluating it against what is actually on screen keeps the flag honest.
-        const wi = wordIndexAt(state.currentIndex, state.wordBoundaries);
-        const newMistakes = withWordOutcome(
-          state.mistakeWordIndices,
-          wi,
-          state.wordBoundaries[wi],
-          text,
-          state.typedChars,
-          state.currentIndex
-        );
-        
-        // Fill typedChars for skipped positions with empty 
-        // string so indices stay aligned — untyped chars 
-        // remain undefined, which renders as char-untyped
-        // We don't fill them — just advance currentIndex
-        // The render will show untyped chars as char-untyped
-        // which is the correct Monkeytype behavior
-        
-        // Fill all skipped positions with '' so typedChars
-        // stays aligned with currentIndex
-        const newTypedChars = [...state.typedChars];
-        while (newTypedChars.length < skipTo) {
-          newTypedChars.push('');
-        }
-
-        return finishIfComplete({
-          ...state,
-          typedChars: newTypedChars,
-          currentIndex: skipTo,
-          lockedIndex: skipTo,
-          completedWords: state.completedWords + 1,
-          mistakeWordIndices: newMistakes,
-          extraChars: [],
-          totalKeystrokes: state.totalKeystrokes + 1,
-          isRunning: true,
-          startTime: state.startTime ?? Date.now(),
-        }, Date.now());
-      }
-
-      // Case 2: space pressed at word boundary with no extraChars
-      // (correct space)
-      if (expected === ' ' && action.key === ' ' && state.extraChars.length === 0) {
-        const newIndex = state.currentIndex + 1;
-        // Submit the word that just ended: correct letters clear any earlier flag.
-        const finishedWord = wordEndingAt(state.currentIndex, state.wordBoundaries);
-        return finishIfComplete({
-          ...state,
-          typedChars: [...state.typedChars, ' '],
-          currentIndex: newIndex,
-          correctChars: state.correctChars + 1,
-          totalCorrect: state.totalCorrect + 1,
-          totalKeystrokes: state.totalKeystrokes + 1,
-          lockedIndex: newIndex,
-          completedWords: state.completedWords + 1,
-          mistakeWordIndices: withWordOutcome(
-            state.mistakeWordIndices,
-            finishedWord,
-            state.wordBoundaries[finishedWord],
-            state.passage.text,
-            state.typedChars,
-            state.currentIndex
-          ),
-          extraChars: [],
-          accuracy: Math.round(((state.totalCorrect + 1) / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
-          isRunning: true,
-          startTime: state.startTime ?? Date.now(),
-        }, Date.now());
-      }
-
-      // Case 3: space pressed at word boundary WITH extraChars
-      // (submit word with errors)
-      if (expected === ' ' && action.key === ' ' && state.extraChars.length > 0) {
-        const newIndex = state.currentIndex + 1;
-        // Overshot the word: the letters may be right, but the extras make it wrong.
-        const finishedWord = wordEndingAt(state.currentIndex, state.wordBoundaries);
-        const erroredMistakes = new Set(state.mistakeWordIndices);
-        if (finishedWord >= 0) erroredMistakes.add(finishedWord);
-        return finishIfComplete({
-          ...state,
-          typedChars: [...state.typedChars, ' '],
-          currentIndex: newIndex,
-          extraChars: [],
-          lockedIndex: newIndex,
-          completedWords: state.completedWords + 1,
-          mistakeWordIndices: erroredMistakes,
-          totalKeystrokes: state.totalKeystrokes + 1,
-          isRunning: true,
-          startTime: state.startTime ?? Date.now(),
-        }, Date.now());
-      }
-
-      // Case 4: extra chars when cursor is at a space position
-      // (typing non-space when expected is space)
-      if (expected === ' ' && action.key !== ' ') {
-        if (state.extraChars.length >= 20) return state;
-        return {
-          ...state,
-          extraChars: [...state.extraChars, action.key],
-          totalIncorrect: state.totalIncorrect + 1,
-          incorrectChars: state.incorrectChars + 1,
-          totalKeystrokes: state.totalKeystrokes + 1,
-          accuracy: Math.round((state.totalCorrect / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
-          isRunning: true,
-          startTime: state.startTime ?? Date.now(),
-        };
-      }
-
-      // Case 5: normal character (not space, not at space position)
-      const isCorrect = action.key === expected;
-      const newCorrect = state.correctChars + (isCorrect ? 1 : 0);
-      const newIncorrect = state.incorrectChars + (isCorrect ? 0 : 1);
-      const newTotalCorrect = state.totalCorrect + (isCorrect ? 1 : 0);
-      const newTotalIncorrect = state.totalIncorrect + (isCorrect ? 0 : 1);
-      const totalAttempted = newTotalCorrect + newTotalIncorrect;
-      const newMistakes = new Set(state.mistakeWordIndices);
-      if (!isCorrect) {
-        const wi = wordIndexAt(state.currentIndex, state.wordBoundaries);
-        if (wi >= 0) newMistakes.add(wi);
-      }
-      const newIndex = state.currentIndex + 1;
-      return finishIfComplete({
-        ...state,
-        typedChars: [...state.typedChars, action.key],
-        currentIndex: newIndex,
-        correctChars: newCorrect,
-        incorrectChars: newIncorrect,
-        totalCorrect: newTotalCorrect,
-        totalIncorrect: newTotalIncorrect,
-        accuracy: totalAttempted > 0 
-          ? Math.round((newTotalCorrect / totalAttempted) * 100) 
-          : 100,
-        mistakeWordIndices: newMistakes,
-        totalKeystrokes: state.totalKeystrokes + 1,
-        isRunning: true,
-        startTime: state.startTime ?? Date.now(),
-        extraChars: [],
-      }, Date.now());
-    }
-    case 'BACKSPACE': {
-      if (state.extraChars.length > 0) {
-        return {
-          ...state,
-          extraChars: state.extraChars.slice(0, -1),
-          totalIncorrect: state.totalIncorrect - 1,
-          incorrectChars: state.incorrectChars - 1,
-        };
-      }
-      if (state.currentIndex <= state.lockedIndex) return state;
-      const removed = state.typedChars[state.currentIndex - 1];
-      const wasCorrect = removed === state.passage.text[state.currentIndex - 1];
-      return {
-        ...state,
-        typedChars: state.typedChars.slice(0, -1),
-        currentIndex: state.currentIndex - 1,
-        correctChars: state.correctChars - (wasCorrect ? 1 : 0),
-        incorrectChars: state.incorrectChars - (wasCorrect ? 0 : 1),
-      };
-    }
-    case 'DELETE_WORD': {
-      if (state.currentIndex <= state.lockedIndex && state.extraChars.length === 0) return state;
-      if (state.extraChars.length > 0) {
-        return {
-          ...state,
-          extraChars: [],
-          totalIncorrect: state.totalIncorrect - state.extraChars.length,
-          incorrectChars: state.incorrectChars - state.extraChars.length,
-        };
-      }
-      let start = state.currentIndex - 1;
-      while (start >= 0 && state.passage.text[start] === ' ') start--;
-      while (start >= 0 && state.passage.text[start] !== ' ') start--;
-      start++;
-      if (start < state.lockedIndex) start = state.lockedIndex;
-      let correctDeduction = 0;
-      let incorrectDeduction = 0;
-      for (let i = start; i < state.currentIndex; i++) {
-        const typed = state.typedChars[i];
-        if (typed === undefined) continue;
-        if (typed === state.passage.text[i]) correctDeduction++;
-        else incorrectDeduction++;
-      }
-      return {
-        ...state,
-        typedChars: state.typedChars.slice(0, start),
-        currentIndex: start,
-        correctChars: state.correctChars - correctDeduction,
-        incorrectChars: state.incorrectChars - incorrectDeduction,
-      };
-    }
-    case 'FINISH': {
-      if (state.isFinished) return state;
-      return finishState(state, elapsedSecondsAt(state, Date.now()));
-    }
-    case 'RESET':
-      return initialState(action.passage, action.duration, action.testMode, action.wordCount, action.contentType);
-  }
-}
-
-function computeMistakeWords(
-  passage: Passage,
-  typedChars: string[],
-  mistakeIndices: Set<number>,
-  boundaries: WordBoundary[]
-): MistakeWord[] {
-  const result: MistakeWord[] = [];
-  const sorted = [...mistakeIndices].sort((a, b) => a - b);
-  for (const wi of sorted) {
-    const { start, end } = boundaries[wi];
-    const expected = passage.text.slice(start, end);
-    let typed = '';
-    for (let i = start; i < end; i++) {
-      typed += typedChars[i] !== undefined ? typedChars[i] : '';
-    }
-    result.push({ expected, typed: typed || '(skipped)' });
-  }
-  return result;
-}
-
 function computeConsistency(wpmHistory: WpmPoint[]): number {
   if (wpmHistory.length < 2) return 100;
   const wpms = wpmHistory.map(p => p.wpm);
@@ -495,69 +77,114 @@ function computeConsistency(wpmHistory: WpmPoint[]): number {
   return Math.min(100, consistency);
 }
 
-export function useTypingEngine(passage: Passage, duration: Duration, testMode: TestMode = 'timed', wordCount: WordCount = 25, contentType: ContentType = 'phrases') {
-  const [state, dispatch] = useReducer(reducer, { passage, duration, testMode, wordCount, contentType }, (cfg) => initialState(cfg.passage, cfg.duration, cfg.testMode, cfg.wordCount, cfg.contentType));
+export interface TypingEngine {
+  /** External store owning the per-keystroke state. */
+  store: TypingStore;
+  handleKeyDown(e: React.KeyboardEvent): void;
+  getResult(): TestResult;
+  reset(): void;
+}
+
+/**
+ * Wires the typing store to the keyboard, the clock and the result payload.
+ *
+ * The keystroke path never calls `setState`: `handleKeyDown` dispatches into the
+ * store, and only the leaves subscribed to the changed fields re-render. This
+ * hook keeps no React state of its own, so it never re-renders its caller; the
+ * clock, the interval and the clock history live in refs beside the store.
+ */
+export function useTypingEngine(
+  passage: Passage,
+  duration: Duration,
+  testMode: TestMode = 'timed',
+  wordCount: WordCount = 25,
+  contentType: ContentType = 'phrases'
+): TypingEngine {
+  // The store belongs to the mounted engine: created once, then reset by the
+  // config effect below. It is intentionally not rebuilt per passage, so reset is
+  // an action on the same subscription graph.
+  const [store] = useState(() =>
+    createTypingStore({ passage, duration, testMode, wordCount, contentType })
+  );
+
   const replayEventsRef = useRef<ReplayEvent[]>([]);
   const clockSourceRef = useRef<ClockSource>({
-    state,
+    state: store.getSnapshot(),
     history: [],
     lastSecond: -1,
     incorrectAtLastSecond: 0,
   });
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Subscribe to every store commit: refresh the clock readouts and keep the
+  // 100 ms interval alive only while a run is in progress. The interval itself
+  // still publishes on its own beat between keystrokes.
+  useEffect(() => {
+    const source = clockSourceRef.current;
+
+    const sync = () => {
+      const next = store.getSnapshot();
+      source.state = next;
+      if (next.startTime === null) {
+        source.history = [];
+        source.lastSecond = -1;
+        source.incorrectAtLastSecond = 0;
+      }
+      publishClock(sampleClock(source, Date.now()));
+
+      const shouldTick = next.isRunning && !next.isFinished;
+      if (shouldTick && intervalRef.current === null) {
+        intervalRef.current = setInterval(() => {
+          const current = source.state;
+          if (!current.isRunning || current.isFinished) return;
+          beginTick();
+          const now = Date.now();
+          publishClock(sampleClock(source, now));
+          if (current.testMode === 'timed' && elapsedSecondsAt(current, now) >= current.totalTime) {
+            store.dispatch({ type: 'FINISH' });
+          }
+        }, 100);
+      } else if (!shouldTick && intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+
+    const unsubscribe = store.subscribe(sync);
+    sync();
+
+    return () => {
+      unsubscribe();
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [store]);
+
+  // A new passage or config resets the store and the clock. Low-frequency, so it
+  // is a render effect rather than part of the keystroke path.
   useEffect(() => {
     replayEventsRef.current = [];
     resetClock(duration);
-    dispatch({ type: 'RESET', passage, duration, testMode, wordCount, contentType });
-  }, [passage, duration, testMode, wordCount, contentType]);
-
-  // Mirror committed state into the clock source and publish the derived
-  // readouts. Keystrokes refresh a stale timer here; the 100 ms interval below
-  // only needs to keep it moving between them.
-  useEffect(() => {
-    const source = clockSourceRef.current;
-    source.state = state;
-    if (state.startTime === null) {
-      source.history = [];
-      source.lastSecond = -1;
-      source.incorrectAtLastSecond = 0;
-    }
-    publishClock(sampleClock(source, Date.now()));
-  }, [state]);
-
-  // The timer never touches reducer state: it publishes an external snapshot,
-  // so only the small clock readouts re-render every 100 ms instead of the whole
-  // character tree. Timed runs still need one dispatch, to end the test.
-  useEffect(() => {
-    if (!state.isRunning || state.isFinished) return;
-    const interval = setInterval(() => {
-      const source = clockSourceRef.current;
-      const current = source.state;
-      if (!current.isRunning || current.isFinished) return;
-      beginTick();
-      const now = Date.now();
-      publishClock(sampleClock(source, now));
-      if (current.testMode === 'timed' && elapsedSecondsAt(current, now) >= current.totalTime) {
-        dispatch({ type: 'FINISH' });
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [state.isRunning, state.isFinished]);
+    const config: TypingConfig = { passage, duration, testMode, wordCount, contentType };
+    store.reset(config);
+  }, [store, passage, duration, testMode, wordCount, contentType]);
 
   const reset = useCallback(() => {
     replayEventsRef.current = [];
-    dispatch({ type: 'RESET', passage, duration, testMode, wordCount, contentType });
-  }, [passage, duration, testMode, wordCount, contentType]);
+    store.reset();
+  }, [store]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const now = Date.now();
 
-    if (state.isFinished) return;
+    if (store.getSnapshot().isFinished) return;
 
     if (e.key === 'Backspace' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       replayEventsRef.current.push({ type: 'deleteWord', timestamp: now });
-      dispatch({ type: 'DELETE_WORD' });
+      store.dispatch({ type: 'DELETE_WORD' });
       return;
     }
 
@@ -566,18 +193,19 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
     if (e.key === 'Backspace') {
       e.preventDefault();
       replayEventsRef.current.push({ type: 'backspace', timestamp: now });
-      dispatch({ type: 'BACKSPACE' });
+      store.dispatch({ type: 'BACKSPACE' });
       return;
     }
 
     if (e.key.length === 1 && e.key >= ' ') {
       e.preventDefault();
       replayEventsRef.current.push({ type: 'key', key: e.key, timestamp: now });
-      dispatch({ type: 'KEY_PRESS', key: e.key });
+      store.dispatch({ type: 'KEY_PRESS', key: e.key });
     }
-  }, [state.isFinished]);
+  }, [store]);
 
   const getResult = useCallback((): TestResult => {
+    const state = store.getSnapshot();
     const clock = getClockSnapshot();
     const elapsed = state.elapsedSeconds > 0 ? state.elapsedSeconds : clock.elapsedSeconds;
     const startTime = state.startTime ?? (replayEventsRef.current.length > 0 ? replayEventsRef.current[0].timestamp : Date.now());
@@ -609,7 +237,7 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
       contentType: state.contentType,
       date: new Date().toISOString(),
     };
-  }, [state]);
+  }, [store]);
 
-  return { state, dispatch, handleKeyDown, getResult, reset };
+  return { store, handleKeyDown, getResult, reset };
 }

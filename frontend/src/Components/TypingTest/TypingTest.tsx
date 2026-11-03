@@ -1,13 +1,15 @@
 ﻿import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
-import TypingViewport from './TypingViewport';
+import TypingSelectionViewport from './TypingSelectionViewport';
 import { LiveWpm, TestProgress, TestTimer } from './TypingClockReadouts';
+import { AccuracyReadout, WordsReadout } from './TypingStateReadouts';
 import { TypingPassageSkeleton } from './TypingSkeleton';
 import { markTypingActive } from '../../hooks/useTypingActivity';
 import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
+import { countWords, useTypingValue } from '../../utils/typingStore';
 import { beginKeystroke } from '../../utils/performance';
 import { completeTypingJourney } from '../../utils/telemetry';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
@@ -15,7 +17,7 @@ import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseL
 const wordCounts: WordCount[] = [10, 25, 50, 100];
 const PREFERENCES_KEY = 'typing_preferences';
 // Placeholder used until the first passage arrives. It must be a stable module-level
-// reference: `useTypingEngine` resets its reducer whenever the passage identity
+// reference: `useTypingEngine` resets its store whenever the passage identity
 // changes, so a fresh object literal here would reset on every render and spin
 // React into "Maximum update depth exceeded".
 const EMPTY_PASSAGE: Passage = { title: '', text: '', author: '', source: '' };
@@ -122,10 +124,17 @@ export default function TypingTest() {
     if (passage !== null) completeTypingJourney();
   }, [passage]);
 
-  const { state, handleKeyDown, getResult, reset } = useTypingEngine(
+  const { store, handleKeyDown, getResult, reset } = useTypingEngine(
     passage ?? EMPTY_PASSAGE,
     duration, testMode, wordCount, contentType
   );
+
+  // The container only cares about two edges: the run starting and the run
+  // ending. Everything that changes per keystroke is owned by the store and
+  // rendered by the leaves that subscribe to it.
+  const isRunning = useTypingValue(store, snapshot => snapshot.isRunning);
+  const isFinished = useTypingValue(store, snapshot => snapshot.isFinished);
+  const totalWords = useMemo(() => (passage ? countWords(passage.text) : 0), [passage]);
 
   const handleRestart = useCallback(() => {
     setResetKey(k => k + 1);
@@ -156,7 +165,7 @@ export default function TypingTest() {
       if (!isModified) handleRestart();
       return;
     }
-    if (e.key === 'Enter' && !isModified && !state.isRunning && !state.isFinished) {
+    if (e.key === 'Enter' && !isModified && !isRunning && !isFinished) {
       e.preventDefault();
       handleNewText();
       return;
@@ -166,27 +175,24 @@ export default function TypingTest() {
     }
     markTypingActive();
     handleKeyDown(e);
-  }, [handleKeyDown, handleNewText, handleRestart, state.isRunning, state.isFinished]);
+  }, [handleKeyDown, handleNewText, handleRestart, isRunning, isFinished]);
 
   useEffect(() => {
-    if (state.isFinished && !navigatedRef.current) {
+    if (isFinished && !navigatedRef.current) {
       navigatedRef.current = true;
       const result = getResult();
       sessionStorage.setItem('19wpm-last-result', JSON.stringify(result));
       addResult(result);
       navigate('/results', { state: { result } });
     }
-    if (!state.isFinished) {
+    if (!isFinished) {
       navigatedRef.current = false;
     }
-  }, [state.isFinished, addResult, getResult, navigate]);
+  }, [isFinished, addResult, getResult, navigate]);
 
   useEffect(() => {
     containerRef.current?.focus();
   }, []);
-
-  const totalWords = state.wordBoundaries.length;
-  const displayCompleted = state.isFinished ? totalWords : state.completedWords;
 
   return (
     <div className="min-h-screen bg-surface transition-theme flex flex-col">
@@ -202,7 +208,7 @@ export default function TypingTest() {
           {/* Hints stay up during a run: Tab is an instant mid-run reset, so hiding
               them right when typing starts is the moment they matter most. Keeping
               the row mounted also stops the timer/wpm block shifting on first key. */}
-          {!state.isFinished && passage && (
+          {!isFinished && passage && (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-text-dim font-sans text-xs">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border border-line text-text-sub font-mono text-[10px]">tab</kbd>
@@ -220,27 +226,24 @@ export default function TypingTest() {
           )}
 
           <div className="flex items-center gap-6">
-            {state.testMode === 'timed' ? (
+            {testMode === 'timed' ? (
               <TestTimer />
             ) : (
-              <div className="text-base font-mono text-accent transition-theme">
-                {displayCompleted} / {totalWords}
-              </div>
+              <WordsReadout store={store} totalWords={totalWords} />
             )}
             <div className="flex items-center gap-4 text-text-sub font-sans text-sm">
               <LiveWpm />
               <span className="w-px h-4 bg-line" />
-              <span><span className={state.accuracy >= 95 ? 'text-success' : state.accuracy >= 80 ? 'text-accent' : 'text-error'}>{state.accuracy}%</span> acc</span>
+              <AccuracyReadout store={store} />
             </div>
           </div>
         </div>
 
         <TestProgress
-          testMode={state.testMode}
-          totalTime={state.totalTime}
-          completedWords={state.completedWords}
+          testMode={testMode}
+          totalTime={duration}
           totalWords={totalWords}
-          isFinished={state.isFinished}
+          store={store}
         />
 
         <CapsLockNotice />
@@ -254,20 +257,15 @@ export default function TypingTest() {
         >
           {!passage ? (
             <TypingPassageSkeleton />
-          ) : !state.isRunning && !state.isFinished ? (
+          ) : !isRunning && !isFinished ? (
             <div className="text-center text-text-dim font-sans text-sm mb-4 transition-theme">
               Start typing to begin &middot; Tab to reset &middot; Enter for a new text
             </div>
           ) : null}
           {passage && (
-            <TypingViewport
+            <TypingSelectionViewport
+              store={store}
               charsText={passage.text}
-              typedChars={state.typedChars}
-              currentIndex={state.currentIndex}
-              lockedIndex={state.lockedIndex}
-              mistakeWordIndices={state.mistakeWordIndices}
-              extraChars={state.extraChars}
-              isFinished={state.isFinished}
               resetKey={resetKey}
               measureKey={mode}
             />
