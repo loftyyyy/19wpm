@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTypingEngine } from '../hooks/useTypingEngine';
+import { getClockSnapshot } from '../utils/typingClock';
 import TypingViewport from '../Components/TypingTest/TypingViewport';
 import { useTypingActivity } from '../hooks/useTypingActivity';
 import Navbar from '../Components/Navbar';
@@ -540,12 +541,12 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       finishReportedRef.current = true;
       const typed = state.typedChars.join('');
       onProgressRef.current(1, calcWpm(typed), state.totalIncorrect);
-      onFinishRef.current(calcWpm(typed), state.totalIncorrect, state.totalCorrect, state.wpmHistory, getResult(), keyIntervalsRef.current);
+      onFinishRef.current(calcWpm(typed), state.totalIncorrect, state.totalCorrect, getClockSnapshot().wpmHistory, getResult(), keyIntervalsRef.current);
     }
     if (!state.isFinished) {
       finishReportedRef.current = false;
     }
-  }, [state.isFinished, state.typedChars, state.wpmHistory, state.totalIncorrect, state.totalCorrect, calcWpm, getResult]);
+  }, [state.isFinished, state.typedChars, state.totalIncorrect, state.totalCorrect, calcWpm, getResult]);
 
   useEffect(() => {
     containerRef.current?.focus();

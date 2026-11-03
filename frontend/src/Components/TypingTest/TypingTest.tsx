@@ -2,6 +2,7 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTypingEngine } from '../../hooks/useTypingEngine';
 import TypingViewport from './TypingViewport';
+import { LiveWpm, TestProgress, TestTimer } from './TypingClockReadouts';
 import { TypingPassageSkeleton } from './TypingSkeleton';
 import { useTypingActivity } from '../../hooks/useTypingActivity';
 import { useCapsLock } from '../../hooks/useCapsLock';
@@ -172,17 +173,6 @@ export default function TypingTest() {
   const totalWords = state.wordBoundaries.length;
   const displayCompleted = state.isFinished ? totalWords : state.completedWords;
 
-  const progressPct = useMemo(() => {
-    if (state.testMode === 'timed') {
-      return state.totalTime > 0 ? ((state.totalTime - state.timeLeft) / state.totalTime) * 100 : 0;
-    }
-    return totalWords > 0 ? (displayCompleted / totalWords) * 100 : 0;
-  }, [state.testMode, state.totalTime, state.timeLeft, displayCompleted, totalWords]);
-
-  const timerDisplay = state.timeLeft >= 60
-    ? `${Math.floor(state.timeLeft / 60)}:${String(Math.floor(state.timeLeft % 60)).padStart(2, '0')}`
-    : `${Math.floor(state.timeLeft)}`;
-
   return (
     <div className="min-h-screen bg-surface transition-theme flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-4 max-w-4xl mx-auto w-full">
@@ -216,25 +206,27 @@ export default function TypingTest() {
 
           <div className="flex items-center gap-6">
             {state.testMode === 'timed' ? (
-              <div className="text-3xl font-mono font-bold text-accent transition-theme">
-                {timerDisplay}
-              </div>
+              <TestTimer />
             ) : (
               <div className="text-base font-mono text-accent transition-theme">
                 {displayCompleted} / {totalWords}
               </div>
             )}
             <div className="flex items-center gap-4 text-text-sub font-sans text-sm">
-              <span><span className="text-accent font-semibold">{state.wpm}</span> wpm</span>
+              <LiveWpm />
               <span className="w-px h-4 bg-line" />
               <span><span className={state.accuracy >= 95 ? 'text-success' : state.accuracy >= 80 ? 'text-accent' : 'text-error'}>{state.accuracy}%</span> acc</span>
             </div>
           </div>
         </div>
 
-        <div className="w-full h-1.5 bg-muted rounded-full mb-8 transition-theme">
-          <div className="h-full bg-accent rounded-full transition-all duration-100" style={{ width: `${progressPct}%` }} />
-        </div>
+        <TestProgress
+          testMode={state.testMode}
+          totalTime={state.totalTime}
+          completedWords={state.completedWords}
+          totalWords={totalWords}
+          isFinished={state.isFinished}
+        />
 
         {isCapsLockOn && (
           <div className="flex items-center justify-center gap-2 mb-4 text-sm transition-theme" aria-live="polite">

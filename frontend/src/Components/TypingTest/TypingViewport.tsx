@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useCallback, useState } from 'react';
 import { animate } from 'animejs';
 import Word from './Word';
-import { completeKeystroke, completeTick, markPerformance, measurePerformance } from '../../utils/performance';
+import { completeKeystroke, markPerformance, measurePerformance } from '../../utils/performance';
 
 const NO_EXTRA_CHARS: string[] = [];
 
@@ -259,7 +259,6 @@ export default function TypingViewport({
       renderStartMarkRef.current = null;
     }
     completeKeystroke();
-    completeTick();
   });
 
   const passageLength = charsText.length;

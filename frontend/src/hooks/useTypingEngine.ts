@@ -2,6 +2,7 @@ import { useReducer, useEffect, useCallback, useRef } from 'react';
 import type { Passage, Duration, TestResult, WpmPoint, MistakeWord, ReplayEvent, TestMode, WordCount, ContentType } from '../types';
 import { v4 } from '../utils/id';
 import { beginTick } from '../utils/performance';
+import { getClockSnapshot, publishClock, resetClock, type ClockSnapshot } from '../utils/typingClock';
 
 interface WordBoundary {
   start: number;
@@ -69,7 +70,6 @@ interface TypingState {
   typedChars: string[];
   extraChars: string[];
   currentIndex: number;
-  timeLeft: number;
   totalTime: number;
   elapsedSeconds: number;
   isRunning: boolean;
@@ -77,13 +77,11 @@ interface TypingState {
   wpm: number;
   rawWpm: number;
   accuracy: number;
-  wpmHistory: WpmPoint[];
   correctChars: number;
   incorrectChars: number;
   totalCorrect: number;
   totalIncorrect: number;
   totalKeystrokes: number;
-  errorsThisSecond: number;
   mistakeWordIndices: Set<number>;
   wordBoundaries: WordBoundary[];
   startTime: number | null;
@@ -98,7 +96,7 @@ type Action =
   | { type: 'KEY_PRESS'; key: string }
   | { type: 'BACKSPACE' }
   | { type: 'DELETE_WORD' }
-  | { type: 'TICK' }
+  | { type: 'FINISH' }
   | { type: 'RESET'; passage: Passage; duration: Duration; testMode: TestMode; wordCount: WordCount; contentType: ContentType };
 
 function initialState(passage: Passage, duration: Duration, testMode: TestMode, wordCount: WordCount, contentType: ContentType): TypingState {
@@ -107,7 +105,6 @@ function initialState(passage: Passage, duration: Duration, testMode: TestMode, 
     typedChars: [],
     extraChars: [],
     currentIndex: 0,
-    timeLeft: duration,
     totalTime: duration,
     elapsedSeconds: 0,
     isRunning: false,
@@ -115,13 +112,11 @@ function initialState(passage: Passage, duration: Duration, testMode: TestMode, 
     wpm: 0,
     rawWpm: 0,
     accuracy: 100,
-    wpmHistory: [],
     correctChars: 0,
     incorrectChars: 0,
     totalCorrect: 0,
     totalIncorrect: 0,
     totalKeystrokes: 0,
-    errorsThisSecond: 0,
     mistakeWordIndices: new Set(),
     wordBoundaries: getWordBoundaries(passage.text),
     startTime: null,
@@ -162,8 +157,8 @@ function computeRawWpm(totalKeystrokes: number, elapsedSeconds: number): number 
 }
 
 /**
- * Seconds of test time at `now`. TICK only samples every 100 ms, so the final
- * keystroke would otherwise be scored against a value up to 100 ms stale.
+ * Seconds of test time at `now`. The clock only samples every 100 ms, so the
+ * final keystroke would otherwise be scored against a value up to 100 ms stale.
  */
 function elapsedSecondsAt(state: TypingState, now: number): number {
   if (state.startTime === null) return state.elapsedSeconds;
@@ -185,11 +180,60 @@ function finishState(state: TypingState, elapsedSeconds: number): TypingState {
 
 /**
  * Ends the test the moment the passage is exhausted, so the last keystroke lands on
- * a finished state instead of leaving the timer running until the next tick.
+ * a finished state instead of leaving the timer running until the next clock sample.
  */
 function finishIfComplete(state: TypingState, now: number): TypingState {
   if (state.isFinished || state.currentIndex < state.passage.text.length) return state;
   return finishState(state, elapsedSecondsAt(state, now));
+}
+
+/**
+ * Mutable inputs for the external clock. `state` is the last committed engine
+ * state; the history counters survive between publications so one point is
+ * recorded per whole second, exactly like the old ticker did.
+ */
+interface ClockSource {
+  state: TypingState;
+  history: WpmPoint[];
+  lastSecond: number;
+  incorrectAtLastSecond: number;
+}
+
+function sampleClock(source: ClockSource, now: number): ClockSnapshot {
+  const state = source.state;
+  if (state.startTime === null) {
+    return {
+      elapsedSeconds: 0,
+      timeLeft: state.totalTime,
+      wpm: 0,
+      rawWpm: 0,
+      wpmHistory: source.history,
+    };
+  }
+
+  const elapsed = elapsedSecondsAt(state, now);
+  const timeLeft = state.testMode === 'timed'
+    ? Math.max(0, Math.round((state.totalTime - elapsed) * 10) / 10)
+    : state.totalTime;
+  const wpm = computeWpm(netCorrectChars(state), elapsed);
+  const second = Math.round(elapsed);
+
+  if (state.isRunning && second > source.lastSecond) {
+    source.history = [
+      ...source.history,
+      { time: second, wpm, errors: Math.max(0, state.totalIncorrect - source.incorrectAtLastSecond) },
+    ];
+    source.lastSecond = second;
+    source.incorrectAtLastSecond = state.totalIncorrect;
+  }
+
+  return {
+    elapsedSeconds: elapsed,
+    timeLeft,
+    wpm,
+    rawWpm: computeRawWpm(state.totalKeystrokes, elapsed),
+    wpmHistory: source.history,
+  };
 }
 
 function reducer(state: TypingState, action: Action): TypingState {
@@ -320,7 +364,6 @@ function reducer(state: TypingState, action: Action): TypingState {
           extraChars: [...state.extraChars, action.key],
           totalIncorrect: state.totalIncorrect + 1,
           incorrectChars: state.incorrectChars + 1,
-          errorsThisSecond: state.errorsThisSecond + 1,
           totalKeystrokes: state.totalKeystrokes + 1,
           accuracy: Math.round((state.totalCorrect / (state.totalCorrect + state.totalIncorrect + 1)) * 100),
           isRunning: true,
@@ -349,7 +392,6 @@ function reducer(state: TypingState, action: Action): TypingState {
         incorrectChars: newIncorrect,
         totalCorrect: newTotalCorrect,
         totalIncorrect: newTotalIncorrect,
-        errorsThisSecond: state.errorsThisSecond + (isCorrect ? 0 : 1),
         accuracy: totalAttempted > 0 
           ? Math.round((newTotalCorrect / totalAttempted) * 100) 
           : 100,
@@ -411,36 +453,9 @@ function reducer(state: TypingState, action: Action): TypingState {
         incorrectChars: state.incorrectChars - incorrectDeduction,
       };
     }
-    case 'TICK': {
-      const newElapsed = state.elapsedSeconds + 0.1;
-      const roundedElapsed = Math.round(newElapsed);
-      const newTimeLeft = state.testMode === 'timed'
-        ? Math.max(0, Math.round((state.timeLeft - 0.1) * 10) / 10)
-        : state.timeLeft;
-      const finishedByTime = state.testMode === 'timed' && newTimeLeft <= 0;
-      const finishedByPassage = state.currentIndex >= state.passage.text.length;
-      const finished = finishedByTime || finishedByPassage;
-      const lastRecorded = state.wpmHistory.length > 0 ? state.wpmHistory[state.wpmHistory.length - 1].time : -1;
-      const shouldRecord = roundedElapsed > lastRecorded;
-      const wpm = computeWpm(netCorrectChars(state), newElapsed);
-      const next: TypingState = {
-        ...state,
-        timeLeft: newTimeLeft,
-        elapsedSeconds: newElapsed,
-        wpmHistory: finished
-          ? state.wpmHistory
-          : shouldRecord
-            ? [...state.wpmHistory, { time: roundedElapsed, wpm, errors: state.errorsThisSecond }]
-            : state.wpmHistory,
-        errorsThisSecond: shouldRecord ? 0 : state.errorsThisSecond,
-      };
-      if (finished) return finishState(next, newElapsed);
-      return {
-        ...next,
-        wpm,
-        rawWpm: computeRawWpm(next.totalKeystrokes, newElapsed),
-        isRunning: true,
-      };
+    case 'FINISH': {
+      if (state.isFinished) return state;
+      return finishState(state, elapsedSecondsAt(state, Date.now()));
     }
     case 'RESET':
       return initialState(action.passage, action.duration, action.testMode, action.wordCount, action.contentType);
@@ -483,17 +498,48 @@ function computeConsistency(wpmHistory: WpmPoint[]): number {
 export function useTypingEngine(passage: Passage, duration: Duration, testMode: TestMode = 'timed', wordCount: WordCount = 25, contentType: ContentType = 'phrases') {
   const [state, dispatch] = useReducer(reducer, { passage, duration, testMode, wordCount, contentType }, (cfg) => initialState(cfg.passage, cfg.duration, cfg.testMode, cfg.wordCount, cfg.contentType));
   const replayEventsRef = useRef<ReplayEvent[]>([]);
+  const clockSourceRef = useRef<ClockSource>({
+    state,
+    history: [],
+    lastSecond: -1,
+    incorrectAtLastSecond: 0,
+  });
 
   useEffect(() => {
     replayEventsRef.current = [];
+    resetClock(duration);
     dispatch({ type: 'RESET', passage, duration, testMode, wordCount, contentType });
   }, [passage, duration, testMode, wordCount, contentType]);
 
+  // Mirror committed state into the clock source and publish the derived
+  // readouts. Keystrokes refresh a stale timer here; the 100 ms interval below
+  // only needs to keep it moving between them.
+  useEffect(() => {
+    const source = clockSourceRef.current;
+    source.state = state;
+    if (state.startTime === null) {
+      source.history = [];
+      source.lastSecond = -1;
+      source.incorrectAtLastSecond = 0;
+    }
+    publishClock(sampleClock(source, Date.now()));
+  }, [state]);
+
+  // The timer never touches reducer state: it publishes an external snapshot,
+  // so only the small clock readouts re-render every 100 ms instead of the whole
+  // character tree. Timed runs still need one dispatch, to end the test.
   useEffect(() => {
     if (!state.isRunning || state.isFinished) return;
     const interval = setInterval(() => {
+      const source = clockSourceRef.current;
+      const current = source.state;
+      if (!current.isRunning || current.isFinished) return;
       beginTick();
-      dispatch({ type: 'TICK' });
+      const now = Date.now();
+      publishClock(sampleClock(source, now));
+      if (current.testMode === 'timed' && elapsedSecondsAt(current, now) >= current.totalTime) {
+        dispatch({ type: 'FINISH' });
+      }
     }, 100);
     return () => clearInterval(interval);
   }, [state.isRunning, state.isFinished]);
@@ -532,7 +578,8 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
   }, [state.isFinished]);
 
   const getResult = useCallback((): TestResult => {
-    const elapsed = state.testMode === 'timed' ? state.totalTime - state.timeLeft : Math.round(state.elapsedSeconds);
+    const clock = getClockSnapshot();
+    const elapsed = state.elapsedSeconds > 0 ? state.elapsedSeconds : clock.elapsedSeconds;
     const startTime = state.startTime ?? (replayEventsRef.current.length > 0 ? replayEventsRef.current[0].timestamp : Date.now());
     const normalizedEvents = replayEventsRef.current.map(e => ({
       ...e,
@@ -545,16 +592,16 @@ export function useTypingEngine(passage: Passage, duration: Duration, testMode: 
       passage: state.passage.text,
       author: state.passage.author,
       source: state.passage.source,
-      wpm: state.wpm,
-      rawWpm: state.rawWpm,
+      wpm: state.wpm || clock.wpm,
+      rawWpm: state.rawWpm || clock.rawWpm,
       accuracy: state.accuracy,
-      consistency: computeConsistency(state.wpmHistory),
-      duration: Math.max(1, elapsed),
+      consistency: computeConsistency(clock.wpmHistory),
+      duration: Math.max(1, Math.round(elapsed)),
       correctChars: state.correctChars,
       incorrectChars: state.incorrectChars,
       totalCorrect: state.totalCorrect,
       totalIncorrect: state.totalIncorrect,
-      wpmHistory: state.wpmHistory,
+      wpmHistory: clock.wpmHistory,
       mistakeWords: computeMistakeWords(state.passage, state.typedChars, state.mistakeWordIndices, state.wordBoundaries),
       replayEvents: normalizedEvents,
       testMode: state.testMode,

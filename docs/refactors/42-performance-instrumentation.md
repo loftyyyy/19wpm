@@ -13,13 +13,14 @@ That made the later memoization and animation changes impossible to compare agai
 ## Solution / enhancement (after)
 
 Add `frontend/src/utils/performance.ts` with small wrappers around `performance.mark`,
-`performance.measure`, and `performance.clearMarks`. Three measures are emitted:
+`performance.measure`, and `performance.clearMarks`. Four measures are emitted:
 
 | Measure | Start | End |
 | --- | --- | --- |
 | `19wpm:keystroke` | keydown accepted for typing or Backspace | first viewport commit after the update |
 | `19wpm:viewport` | `TypingViewport` render begins | all viewport layout effects finish |
 | `19wpm:caret` | caret animation frame begins | caret target resolved and animated |
+| `19wpm:tick` | background 100 ms clock sample begins | first clock readout commit |
 
 The keystroke mark is started in `TypingTest` before the engine dispatch and completed in
 `TypingViewport`'s final layout effect. The viewport mark is created during render and measured after
@@ -27,7 +28,9 @@ the scroll and caret layout effects run. Replacing an unfinished keystroke mark 
 key from measuring the next unrelated render.
 
 The caret moves in a `requestAnimationFrame` that runs after the keystroke measure has already closed,
-so it gets its own sample. `frontend/scripts/bench.js` reports all three rows; only `keystroke`
+so it gets its own sample. The tick originally closed in the viewport layout effect; after
+[refactor 52](./52-typing-clock-store.md) the timer no longer renders the viewport, so it closes in
+the `LiveWpm` readout instead. `frontend/scripts/bench.js` reports all four rows; only `keystroke`
 carries a p95 budget.
 
 The measures are available in DevTools with:
@@ -51,9 +54,9 @@ Three runs produced a representative baseline:
 | `keystroke` | 1,216 | 0.8 ms | 1.2 ms | 3.3 ms | 0.791 ms |
 | `viewport` | 1,404 | 0.6 ms | 1.0 ms | 3.1 ms | 0.582 ms |
 
-The viewport sample count is higher than the keystroke count because the 100 ms timer also renders
-the viewport while the test is running. These numbers are the pre-optimization baseline for the next
-two refactors.
+The viewport sample count is higher than the keystroke count because the 100 ms timer also rendered
+the viewport while the test was running. These numbers are the pre-optimization baseline for the next
+two refactors; after [refactor 52](./52-typing-clock-store.md) the two counts match.
 
 ## Notes / trade-offs
 
