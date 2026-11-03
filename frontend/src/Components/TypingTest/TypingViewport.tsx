@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useCallback, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useCallback, useState } from 'react';
+import type { RefObject } from 'react';
 import { animate } from 'animejs';
 import Word from './Word';
 import { completeKeystroke, markPerformance, measurePerformance } from '../../utils/performance';
+import { useTypingActivity } from '../../hooks/useTypingActivity';
 
 const NO_EXTRA_CHARS: string[] = [];
 
@@ -13,13 +15,32 @@ interface TypingViewportProps {
   mistakeWordIndices: Set<number>;
   extraChars: string[];
   isFinished: boolean;
-  isTypingActive: boolean;
   extraVariant?: 'plain' | 'block';
   resetKey?: number;
   measureKey?: unknown;
 }
 
-export default function TypingViewport({
+interface TypingCaretProps {
+  cursorRef: RefObject<HTMLDivElement | null>;
+  hidden: boolean;
+}
+
+/**
+ * The blinking caret is the only consumer of the activity flag. Keeping it in
+ * its own memoized component means a typing burst's idle timeout re-renders one
+ * empty div instead of the passage behind it.
+ */
+const TypingCaret = memo(function TypingCaret({ cursorRef, hidden }: TypingCaretProps) {
+  const isTypingActive = useTypingActivity();
+  return (
+    <div
+      ref={cursorRef}
+      className={`typing-cursor ${hidden ? 'typing-cursor-hidden' : isTypingActive ? 'typing-cursor-active' : 'animate-blink'}`}
+    />
+  );
+});
+
+function TypingViewport({
   charsText,
   typedChars,
   currentIndex,
@@ -27,7 +48,6 @@ export default function TypingViewport({
   mistakeWordIndices,
   extraChars,
   isFinished,
-  isTypingActive,
   extraVariant,
   resetKey,
   measureKey,
@@ -274,10 +294,7 @@ export default function TypingViewport({
   return (
     <div ref={viewportRef} className="overflow-hidden">
       <div ref={contentRef} className="flex flex-wrap gap-x-2 gap-y-1 relative">
-        <div
-          ref={cursorRef}
-          className={`typing-cursor ${isFinished ? 'typing-cursor-hidden' : isTypingActive ? 'typing-cursor-active' : 'animate-blink'}`}
-        />
+        <TypingCaret cursorRef={cursorRef} hidden={isFinished} />
         {passageWords.map((word, wi) => {
           const { chars } = word;
           const start = chars[0].globalIdx;
@@ -308,3 +325,31 @@ export default function TypingViewport({
     </div>
   );
 }
+
+/**
+ * Only props that can change what the passage looks like are compared. Activity
+ * flags, idle timers and focus state are deliberately absent: the caret
+ * subscribes to them itself, so a parent re-render for one of those must not
+ * reach this tree. `typedChars`, `extraChars` and `mistakeWordIndices` are
+ * compared by reference because the reducer only allocates new ones when their
+ * content changes.
+ */
+function arePropsEqual(
+  prev: TypingViewportProps,
+  next: TypingViewportProps
+): boolean {
+  return (
+    prev.charsText === next.charsText &&
+    prev.typedChars === next.typedChars &&
+    prev.currentIndex === next.currentIndex &&
+    prev.lockedIndex === next.lockedIndex &&
+    prev.mistakeWordIndices === next.mistakeWordIndices &&
+    prev.extraChars === next.extraChars &&
+    prev.isFinished === next.isFinished &&
+    prev.extraVariant === next.extraVariant &&
+    prev.resetKey === next.resetKey &&
+    prev.measureKey === next.measureKey
+  );
+}
+
+export default memo(TypingViewport, arePropsEqual);

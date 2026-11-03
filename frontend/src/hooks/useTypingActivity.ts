@@ -1,23 +1,45 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 /**
- * Tracks whether the user is actively typing, used to pause the blinking caret
- * while keys are being pressed. `markActive` resets a short idle timer on each
- * keystroke; the timer is cleared on unmount.
+ * Whether the user typed within the last 500 ms, used to keep the caret solid
+ * while keys are pressed and to let it blink when idle.
+ *
+ * The flag lives outside React state because it flips on every typing burst, not
+ * on every passage change. Subscribing the test component would re-render the
+ * whole typing surface once per burst for a decorative class, so only the caret
+ * subscribes; every other caller just pokes `markTypingActive`.
  */
-export function useTypingActivity() {
-  const [isTypingActive, setIsTypingActive] = useState(false);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const IDLE_MS = 500;
 
-  const markActive = useCallback(() => {
-    setIsTypingActive(true);
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => setIsTypingActive(false), 500);
-  }, []);
+let isTypingActive = false;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+const listeners = new Set<() => void>();
 
-  useEffect(() => () => {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-  }, []);
+function publish(next: boolean): void {
+  if (next === isTypingActive) return;
+  isTypingActive = next;
+  for (const listener of listeners) listener();
+}
 
-  return { isTypingActive, markActive };
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getSnapshot(): boolean {
+  return isTypingActive;
+}
+
+/** Starts or extends the active window. Safe to call from an event handler. */
+export function markTypingActive(): void {
+  publish(true);
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => publish(false), IDLE_MS);
+}
+
+/** Subscribes the calling component to the flag. */
+export function useTypingActivity(): boolean {
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

@@ -4,7 +4,7 @@ import { useTypingEngine } from '../../hooks/useTypingEngine';
 import TypingViewport from './TypingViewport';
 import { LiveWpm, TestProgress, TestTimer } from './TypingClockReadouts';
 import { TypingPassageSkeleton } from './TypingSkeleton';
-import { useTypingActivity } from '../../hooks/useTypingActivity';
+import { markTypingActive } from '../../hooks/useTypingActivity';
 import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
@@ -39,6 +39,24 @@ function loadPreferences() {
   return { mode: 'time' as Mode, duration: 30 as Duration, wordCount: 25 as WordCount, phraseLength: 'medium' as PhraseLength, difficulty: 'EASY' as TextDifficulty };
 }
 
+/**
+ * Caps-lock listening is local to this leaf. Toggling the key used to update
+ * state in `TypingTest`, which re-rendered the passage for a banner above it.
+ */
+function CapsLockNotice() {
+  const isCapsLockOn = useCapsLock();
+  if (!isCapsLockOn) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 mb-4 text-sm transition-theme" aria-live="polite">
+      <svg className="w-4 h-4 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+      <span className="text-yellow-600 font-sans font-medium">Caps Lock is on</span>
+    </div>
+  );
+}
+
 export default function TypingTest() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -47,7 +65,6 @@ export default function TypingTest() {
   const restartBtnRef = useRef<HTMLButtonElement>(null);
   const navigatedRef = useRef(false);
   const [resetKey, setResetKey] = useState(0);
-  const { isTypingActive, markActive } = useTypingActivity();
 
   const saved = useMemo(() => loadPreferences(), []);
 
@@ -105,8 +122,6 @@ export default function TypingTest() {
     if (passage !== null) completeTypingJourney();
   }, [passage]);
 
-  const isCapsLockOn = useCapsLock();
-
   const { state, handleKeyDown, getResult, reset } = useTypingEngine(
     passage ?? EMPTY_PASSAGE,
     duration, testMode, wordCount, contentType
@@ -149,9 +164,9 @@ export default function TypingTest() {
     if (e.key.length === 1 || e.key === 'Backspace') {
       beginKeystroke();
     }
-    markActive();
+    markTypingActive();
     handleKeyDown(e);
-  }, [handleKeyDown, handleNewText, handleRestart, markActive, state.isRunning, state.isFinished]);
+  }, [handleKeyDown, handleNewText, handleRestart, state.isRunning, state.isFinished]);
 
   useEffect(() => {
     if (state.isFinished && !navigatedRef.current) {
@@ -228,15 +243,7 @@ export default function TypingTest() {
           isFinished={state.isFinished}
         />
 
-        {isCapsLockOn && (
-          <div className="flex items-center justify-center gap-2 mb-4 text-sm transition-theme" aria-live="polite">
-            <svg className="w-4 h-4 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <span className="text-yellow-600 font-sans font-medium">Caps Lock is on</span>
-          </div>
-        )}
+        <CapsLockNotice />
 
         <div
           ref={containerRef}
@@ -261,7 +268,6 @@ export default function TypingTest() {
               mistakeWordIndices={state.mistakeWordIndices}
               extraChars={state.extraChars}
               isFinished={state.isFinished}
-              isTypingActive={isTypingActive}
               resetKey={resetKey}
               measureKey={mode}
             />

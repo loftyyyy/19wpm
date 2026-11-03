@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTypingEngine } from '../hooks/useTypingEngine';
 import { getClockSnapshot } from '../utils/typingClock';
 import TypingViewport from '../Components/TypingTest/TypingViewport';
-import { useTypingActivity } from '../hooks/useTypingActivity';
+import { markTypingActive } from '../hooks/useTypingActivity';
 import Navbar from '../Components/Navbar';
 import Footer from '../Components/Footer';
 import Lobby from '../Components/Race/Lobby';
@@ -508,7 +508,6 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
   const lastKeyAtRef = useRef<number | null>(null);
   const onProgressRef = useRef(onProgress);
   const onFinishRef = useRef(onFinish);
-  const { isTypingActive, markActive } = useTypingActivity();
 
   const passageObj = useMemo<Passage>(
     () => ({ title: '', text: passage, author: '', source: '' }),
@@ -568,9 +567,9 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       }
       lastKeyAtRef.current = now;
     }
-    markActive();
+    markTypingActive();
     handleKeyDown(e);
-  }, [handleKeyDown, markActive]);
+  }, [handleKeyDown]);
 
   return (
     <div
@@ -593,7 +592,6 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
         mistakeWordIndices={state.mistakeWordIndices}
         extraChars={state.extraChars}
         isFinished={state.isFinished}
-        isTypingActive={isTypingActive}
         extraVariant="block"
         measureKey={passage}
       />
