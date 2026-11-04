@@ -3,7 +3,23 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { attemptTokenRefresh, getAccessToken, getAccessTokenExpiry } from '../services/api';
 import { getRoomState } from '../services/race';
+import { createProgressPublisher, type ProgressPublisher } from '../utils/progressThrottle';
+import { createRaceRoomStore, type RaceRoomStore } from '../utils/raceRoomStore';
 import type { RaceRoom } from '../types/race';
+
+/** One outgoing progress message per 100 ms, with a trailing flush on finish. */
+const PROGRESS_INTERVAL_MS = 100;
+
+export interface RaceSocket {
+  /** External room store; the page subscribes to narrow slices of it. */
+  roomStore: RaceRoomStore;
+  connected: boolean;
+  raceStreak: number | null;
+  serverOffsetMs: number;
+  sendProgress: (progressPercent: number, currentWpm: number, errors: number) => void;
+  sendFinish: (finalWpm: number, errors: number, correctChars: number, keyIntervalsMs?: number[]) => void;
+  sendStart: () => void;
+}
 
 /**
  * Connects to the race STOMP endpoint for the duration of a room.
@@ -16,29 +32,62 @@ import type { RaceRoom } from '../types/race';
 export function useRaceSocket(
   roomCode: string | null,
   onMatchmakingRoomCode?: (code: string) => void
-) {
-  const [room, setRoom] = useState<RaceRoom | null>(null);
+): RaceSocket {
+  const [roomStore] = useState<RaceRoomStore>(() => createRaceRoomStore());
   const [raceStreak, setRaceStreak] = useState<number | null>(null);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
-  const [prevRoomCode, setPrevRoomCode] = useState(roomCode);
-  if (prevRoomCode !== roomCode) {
-    setPrevRoomCode(roomCode);
-    if (roomCode === null) {
-      setRoom(null);
-      setRaceStreak(null);
-    }
-  }
   const [connected, setConnected] = useState(false);
   const [isTokenReady, setIsTokenReady] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const bestRttRef = useRef(Number.POSITIVE_INFINITY);
   const pendingFinishRef = useRef<{ finalWpm: number; errors: number; correctChars: number; keyIntervalsMs: number[] } | null>(null);
+  const progressPublisherRef = useRef<ProgressPublisher | null>(null);
   // Latest matchmaking handler, kept out of the connection effect's deps (see below).
   const onMatchmakingRoomCodeRef = useRef(onMatchmakingRoomCode);
 
   useEffect(() => {
     onMatchmakingRoomCodeRef.current = onMatchmakingRoomCode;
   }, [onMatchmakingRoomCode]);
+
+  // Clearing the streak is a render-phase adjustment keyed on the room code, the
+  // same guarded pattern the old room `useState` used. The store clear itself is
+  // an effect: notifying its subscribers during render is unsafe.
+  const [prevRoomCode, setPrevRoomCode] = useState(roomCode);
+  if (prevRoomCode !== roomCode) {
+    setPrevRoomCode(roomCode);
+    if (roomCode === null) setRaceStreak(null);
+  }
+
+  useEffect(() => {
+    if (roomCode !== null) return;
+    roomStore.set(null);
+  }, [roomCode, roomStore]);
+
+  // The publisher belongs to one room. Disposing on change drops a queued tick
+  // that would otherwise be published to the room the user just left.
+  useEffect(() => {
+    if (!roomCode) return;
+
+    const publisher = createProgressPublisher({
+      intervalMs: PROGRESS_INTERVAL_MS,
+      send: ({ progressPercent, currentWpm, errors }) => {
+        const client = clientRef.current;
+        if (!client?.connected) return;
+        client.publish({
+          destination: `/app/room/${roomCode}/progress`,
+          body: JSON.stringify({ progressPercent, currentWpm, errors }),
+        });
+      },
+    });
+    progressPublisherRef.current = publisher;
+
+    return () => {
+      publisher.dispose();
+      if (progressPublisherRef.current === publisher) {
+        progressPublisherRef.current = null;
+      }
+    };
+  }, [roomCode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,29 +184,24 @@ export function useRaceSocket(
 
       if (roomCode) {
         client.subscribe(`/topic/room/${roomCode}`, (message) => {
+          if (!active) return;
           const raceRoom: RaceRoom = JSON.parse(message.body);
-          setRoom(raceRoom);
+          roomStore.set(raceRoom);
         });
 
         // High-frequency progress deltas are broadcast separately from full room state
         // so the server only sends the changed participant fields per tick.
         client.subscribe(`/topic/room/${roomCode}/progress`, (message) => {
+          if (!active) return;
           const delta: { userId: number; progressPercent: number; currentWpm: number; errors: number } =
             JSON.parse(message.body);
-          setRoom((prev) => {
-            if (!prev) return prev;
-            const participants = prev.participants.map((p) =>
-              p.userId === delta.userId
-                ? { ...p, progressPercent: delta.progressPercent, currentWpm: delta.currentWpm, errors: delta.errors }
-                : p
-            );
-            return { ...prev, participants };
-          });
+          roomStore.applyProgress(delta);
         });
 
         client.subscribe('/user/queue/race-resume', (message) => {
+          if (!active) return;
           const raceRoom: RaceRoom = JSON.parse(message.body);
-          setRoom(raceRoom);
+          roomStore.set(raceRoom);
         });
 
         // Reconnecting clients re-join on every connect. The backend treats join as
@@ -184,7 +228,7 @@ export function useRaceSocket(
 
         // Fetch current room state immediately after subscribing in case we missed a broadcast
         getRoomState(roomCode).then(room => {
-          if (room) setRoom(room);
+          if (active && room) roomStore.set(room);
         });
       }
 
@@ -223,17 +267,16 @@ export function useRaceSocket(
       client.deactivate();
       clientRef.current = null;
     };
-  }, [roomCode, isTokenReady]);
+  }, [roomCode, isTokenReady, roomStore]);
 
   const sendProgress = useCallback((progressPercent: number, currentWpm: number, errors: number) => {
-    if (!clientRef.current?.connected || !roomCode) return;
-    clientRef.current.publish({
-      destination: `/app/room/${roomCode}/progress`,
-      body: JSON.stringify({ progressPercent, currentWpm, errors }),
-    });
-  }, [roomCode]);
+    progressPublisherRef.current?.push({ progressPercent, currentWpm, errors });
+  }, []);
 
   const sendFinish = useCallback((finalWpm: number, errors: number, correctChars: number, keyIntervalsMs: number[] = []) => {
+    // Deliver the newest progress before the finish message so the server sees
+    // the completed run, not the last 100 ms sample plus a jump.
+    progressPublisherRef.current?.flush();
     if (!roomCode) return;
     if (!clientRef.current?.connected) {
       pendingFinishRef.current = { finalWpm, errors, correctChars, keyIntervalsMs };
@@ -253,5 +296,5 @@ export function useRaceSocket(
     });
   }, [roomCode]);
 
-  return { room, connected, raceStreak, serverOffsetMs, sendProgress, sendFinish, sendStart };
+  return { roomStore, connected, raceStreak, serverOffsetMs, sendProgress, sendFinish, sendStart };
 }

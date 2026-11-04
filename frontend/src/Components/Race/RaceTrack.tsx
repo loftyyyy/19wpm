@@ -1,11 +1,20 @@
-import type { RaceParticipant } from '../../types/race';
+import type { RaceParticipant, RaceRoom } from '../../types/race';
+import { useRaceRoomValue, type RaceRoomStore } from '../../utils/raceRoomStore';
 
 interface Props {
-  participants: RaceParticipant[];
+  /** Room store, not the participant array: this component owns the subscription. */
+  store: RaceRoomStore;
   currentUserId: number;
 }
 
-export default function RaceTrack({ participants, currentUserId }: Props) {
+const EMPTY_PARTICIPANTS: RaceParticipant[] = [];
+
+const selectParticipants = (room: RaceRoom | null): RaceParticipant[] =>
+  room?.participants ?? EMPTY_PARTICIPANTS;
+
+export default function RaceTrack({ store, currentUserId }: Props) {
+  const participants = useRaceRoomValue(store, selectParticipants);
+
   const sorted = [...participants].sort((a, b) => {
     if (a.finishRank > 0 && b.finishRank > 0) return a.finishRank - b.finishRank;
     if (a.finishRank > 0) return -1;

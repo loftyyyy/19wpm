@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTypingEngine } from '../hooks/useTypingEngine';
 import { getClockSnapshot } from '../utils/typingClock';
 import { useTypingValue } from '../utils/typingStore';
+import { useRaceRoom, useRaceRoomValue, type RaceRoomStore } from '../utils/raceRoomStore';
 import TypingSelectionViewport from '../Components/TypingTest/TypingSelectionViewport';
 import { markTypingActive } from '../hooks/useTypingActivity';
 import Navbar from '../Components/Navbar';
@@ -21,10 +22,28 @@ import {
   requestImmediateMatch,
   getPendingMatch,
 } from '../services/race';
-import type { TextType } from '../types/race';
+import type { RaceText, RaceRoom, TextType } from '../types/race';
 import type { Passage, TestResult, WpmPoint } from '../types';
 
 const TEXT_TYPES: TextType[] = ['SHORT', 'MEDIUM', 'LONG', 'THICC'];
+
+// Selectors live at module scope so the subscription functions are stable and
+// each stage reads only the primitive (or stable reference) it renders from.
+const selectRoomState = (room: RaceRoom | null) => room?.state;
+const selectHostUserId = (room: RaceRoom | null) => room?.hostUserId;
+const selectConnectedCount = (room: RaceRoom | null) => {
+  if (!room) return 0;
+  let count = 0;
+  for (const participant of room.participants) {
+    if (participant.connected) count++;
+  }
+  return count;
+};
+const selectHasRoom = (room: RaceRoom | null) => room !== null;
+const selectRoomText = (room: RaceRoom | null): RaceText | null => room?.text ?? null;
+const selectStartTime = (room: RaceRoom | null) => room?.startTime ?? null;
+const selectCountdownStart = (room: RaceRoom | null) => room?.countdownStartTime ?? null;
+const selectCountdownDuration = (room: RaceRoom | null) => room?.countdownDurationMs ?? 3500;
 
 export default function Race() {
   const navigate = useNavigate();
@@ -54,6 +73,14 @@ export default function Race() {
   }, []);
 
   const socket = useRaceSocket(roomCode, handleMatchmakingCode);
+  const { roomStore } = socket;
+
+  // Primitive slices of the room. A progress delta replaces one participant's
+  // numbers, so none of these values change and this page does not re-render;
+  // `RaceTrack` owns the participant subscription instead.
+  const roomState = useRaceRoomValue(roomStore, selectRoomState);
+  const hostUserId = useRaceRoomValue(roomStore, selectHostUserId);
+  const connectedCount = useRaceRoomValue(roomStore, selectConnectedCount);
 
   useEffect(() => {
     if (socket.raceStreak == null) return;
@@ -61,25 +88,20 @@ export default function Race() {
   }, [socket.raceStreak, updateUser]);
 
   useEffect(() => {
-    if (!socket.room || phase === 'finished') return;
-    if (socket.room.state === 'FINISHED') setPhase('finished');
-  }, [socket.room, phase]);
+    if (roomState === undefined || phase === 'finished') return;
+    if (roomState === 'FINISHED') setPhase('finished');
+  }, [roomState, phase]);
 
   useEffect(() => {
-    if (!socket.room || phase === 'racing' || phase === 'finished') return;
-    if (socket.room.state === 'RACING') setPhase('racing');
-  }, [socket.room, phase]);
+    if (roomState === undefined || phase === 'racing' || phase === 'finished') return;
+    if (roomState === 'RACING') setPhase('racing');
+  }, [roomState, phase]);
 
   useEffect(() => {
-    if (!socket.room || phase !== 'lobby') return;
-    if (socket.room.state === 'COUNTDOWN') setPhase('countdown');
-  }, [socket.room, phase]);
+    if (roomState === undefined || phase !== 'lobby') return;
+    if (roomState === 'COUNTDOWN') setPhase('countdown');
+  }, [roomState, phase]);
 
-  // Primitive slices of the room, so the auto-start effect below is not keyed on the
-  // room object identity (which changes on every broadcast, including progress ticks).
-  const connectedCount = socket.room?.participants.filter(p => p.connected).length ?? 0;
-  const roomState = socket.room?.state;
-  const hostUserId = socket.room?.hostUserId;
   const sendStart = socket.sendStart;
 
   useEffect(() => {
@@ -203,13 +225,13 @@ export default function Race() {
   }, [joinCode, isRequesting]);
 
   const handleStart = useCallback(() => {
-    socket.sendStart();
-  }, [socket]);
+    sendStart();
+  }, [sendStart]);
 
   const handleCountdownComplete = useCallback(() => {
-    if (socket.room?.state === 'RACING') setPhase('racing');
-    else if (socket.room?.state === 'FINISHED') setPhase('finished');
-  }, [socket.room?.state]);
+    if (roomState === 'RACING') setPhase('racing');
+    else if (roomState === 'FINISHED') setPhase('finished');
+  }, [roomState]);
 
   const handlePlayAgain = useCallback(() => {
     setRoomCode(null);
@@ -371,18 +393,9 @@ export default function Race() {
     }
 
     if (phase === 'lobby') {
-      if (!socket.room) {
-        return (
-          <div className="flex items-center justify-center min-h-40">
-            <p className="text-text-dim font-sans text-sm">
-              Connecting to room...
-            </p>
-          </div>
-        );
-      }
       return (
-        <Lobby
-          room={socket.room}
+        <LobbyStage
+          roomStore={roomStore}
           currentUserId={Number(user?.id ?? 0)}
           onStart={handleStart}
           autoStartCountdown={autoStartCountdown}
@@ -392,50 +405,33 @@ export default function Race() {
 
     if (phase === 'countdown') {
       return (
-        <Countdown
-          startTime={socket.room?.countdownStartTime ?? new Date().toISOString()}
-          durationMs={socket.room?.countdownDurationMs ?? 3500}
+        <CountdownStage
+          roomStore={roomStore}
           offsetMs={socket.serverOffsetMs}
           onComplete={handleCountdownComplete}
         />
       );
     }
 
-    if (phase === 'racing' && socket.room) {
+    if (phase === 'racing') {
       return (
-        <div className="space-y-4 max-w-2xl mx-auto">
-          <RaceTrack
-            participants={socket.room.participants}
-            currentUserId={Number(user?.id ?? 0)}
-          />
-          {socket.room.text && (
-            <div className="bg-card border border-line rounded-2xl shadow-sm p-4 transition-theme">
-              <p className="text-xs font-sans text-text-dim mb-3">
-                {socket.room.text.title} · {socket.room.text.author}
-              </p>
-              <RaceTypingInput
-                passage={socket.room.text.content}
-                onProgress={(p, w, t) => socket.sendProgress(p, w, t)}
-                onFinish={(wpm, errors, correctChars, wpmHistory, result, keyIntervalsMs) => {
-                  setRaceWpmHistory(wpmHistory);
-                  setMyRaceResult(result);
-                  socket.sendFinish(wpm, errors, correctChars, keyIntervalsMs);
-                }}
-                startTime={socket.room.startTime!}
-              />
-            </div>
-          )}
-        </div>
+        <RacingStage
+          roomStore={roomStore}
+          currentUserId={Number(user?.id ?? 0)}
+          sendProgress={socket.sendProgress}
+          sendFinish={socket.sendFinish}
+          onHistory={setRaceWpmHistory}
+          onResult={setMyRaceResult}
+        />
       );
     }
 
-    if (phase === 'finished' && socket.room) {
+    if (phase === 'finished') {
       return (
-        <RaceResults
-          participants={socket.room.participants}
+        <FinishedStage
+          roomStore={roomStore}
           currentUserId={Number(user?.id ?? 0)}
           onPlayAgain={handlePlayAgain}
-          room={socket.room}
           wpmHistory={raceWpmHistory}
           replayResult={myRaceResult}
         />
@@ -495,14 +491,168 @@ export default function Race() {
   );
 }
 
+interface LobbyStageProps {
+  roomStore: RaceRoomStore;
+  currentUserId: number;
+  onStart: () => void;
+  autoStartCountdown: number | null;
+}
+
+/**
+ * Lobby is allowed a broad subscription: it only exists before the run, and it
+ * genuinely renders the participant list. It is a separate component so the
+ * racing page's own subscriptions stay narrow.
+ */
+function LobbyStage({ roomStore, currentUserId, onStart, autoStartCountdown }: LobbyStageProps) {
+  const room = useRaceRoom(roomStore);
+  if (!room) {
+    return (
+      <div className="flex items-center justify-center min-h-40">
+        <p className="text-text-dim font-sans text-sm">
+          Connecting to room...
+        </p>
+      </div>
+    );
+  }
+  return (
+    <Lobby
+      room={room}
+      currentUserId={currentUserId}
+      onStart={onStart}
+      autoStartCountdown={autoStartCountdown}
+    />
+  );
+}
+
+interface CountdownStageProps {
+  roomStore: RaceRoomStore;
+  offsetMs: number;
+  onComplete: () => void;
+}
+
+function CountdownStage({ roomStore, offsetMs, onComplete }: CountdownStageProps) {
+  const startTime = useRaceRoomValue(roomStore, selectCountdownStart);
+  const durationMs = useRaceRoomValue(roomStore, selectCountdownDuration);
+  return (
+    <Countdown
+      startTime={startTime ?? new Date().toISOString()}
+      durationMs={durationMs}
+      offsetMs={offsetMs}
+      onComplete={onComplete}
+    />
+  );
+}
+
+type RaceProgressHandler = (progressPercent: number, currentWpm: number, errors: number) => void;
+type RaceFinishHandler = (
+  finalWpm: number,
+  errors: number,
+  correctChars: number,
+  wpmHistory: WpmPoint[],
+  result: TestResult,
+  keyIntervalsMs: number[]
+) => void;
+
+interface RacingStageProps {
+  roomStore: RaceRoomStore;
+  currentUserId: number;
+  sendProgress: RaceProgressHandler;
+  sendFinish: (finalWpm: number, errors: number, correctChars: number, keyIntervalsMs: number[]) => void;
+  onHistory: (history: WpmPoint[]) => void;
+  onResult: (result: TestResult) => void;
+}
+
+/**
+ * The typing surface. It reads the passage and start time — both change at most
+ * once per race — while `RaceTrack` owns the participant subscription. Progress
+ * deltas therefore re-render the track alone, and the memoized input keeps its
+ * focus, its engine store and its DOM.
+ */
+function RacingStage({
+  roomStore,
+  currentUserId,
+  sendProgress,
+  sendFinish,
+  onHistory,
+  onResult,
+}: RacingStageProps) {
+  const hasRoom = useRaceRoomValue(roomStore, selectHasRoom);
+  const text = useRaceRoomValue(roomStore, selectRoomText);
+  const startTime = useRaceRoomValue(roomStore, selectStartTime);
+
+  const handleFinish = useCallback<RaceFinishHandler>(
+    (wpm, errors, correctChars, wpmHistory, result, keyIntervalsMs) => {
+      onHistory(wpmHistory);
+      onResult(result);
+      sendFinish(wpm, errors, correctChars, keyIntervalsMs);
+    },
+    [onHistory, onResult, sendFinish]
+  );
+
+  if (!hasRoom) return null;
+
+  return (
+    <div className="space-y-4 max-w-2xl mx-auto">
+      <RaceTrack store={roomStore} currentUserId={currentUserId} />
+      {text && (
+        <div className="bg-card border border-line rounded-2xl shadow-sm p-4 transition-theme">
+          <p className="text-xs font-sans text-text-dim mb-3">
+            {text.title} · {text.author}
+          </p>
+          <RaceTypingInput
+            passage={text.content}
+            onProgress={sendProgress}
+            onFinish={handleFinish}
+            startTime={startTime ?? new Date().toISOString()}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface FinishedStageProps {
+  roomStore: RaceRoomStore;
+  currentUserId: number;
+  onPlayAgain: () => void;
+  wpmHistory: WpmPoint[];
+  replayResult: TestResult | null;
+}
+
+function FinishedStage({
+  roomStore,
+  currentUserId,
+  onPlayAgain,
+  wpmHistory,
+  replayResult,
+}: FinishedStageProps) {
+  const room = useRaceRoom(roomStore);
+  if (!room) return null;
+  return (
+    <RaceResults
+      participants={room.participants}
+      currentUserId={currentUserId}
+      onPlayAgain={onPlayAgain}
+      room={room}
+      wpmHistory={wpmHistory}
+      replayResult={replayResult}
+    />
+  );
+}
+
 interface RaceTypingInputProps {
   passage: string;
-  onProgress: (progressPercent: number, currentWpm: number, errors: number) => void;
-  onFinish: (finalWpm: number, errors: number, correctChars: number, wpmHistory: WpmPoint[], result: TestResult, keyIntervalsMs: number[]) => void;
+  onProgress: RaceProgressHandler;
+  onFinish: RaceFinishHandler;
   startTime: string;
 }
 
-function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypingInputProps) {
+/**
+ * Memoized because the racing stage re-renders on full-room broadcasts: the
+ * passage, start time and both handlers stay referentially stable between
+ * progress ticks, so the input keeps its subscription graph untouched.
+ */
+const RaceTypingInput = memo(function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypingInputProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const finishReportedRef = useRef(false);
   const keyIntervalsRef = useRef<number[]>([]);
@@ -602,4 +752,4 @@ function RaceTypingInput({ passage, onProgress, onFinish, startTime }: RaceTypin
       />
     </div>
   );
-}
+});
