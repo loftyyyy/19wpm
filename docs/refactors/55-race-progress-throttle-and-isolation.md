@@ -91,6 +91,24 @@ Bundle (gzip) 269.0 → **269.7 KiB** total JavaScript (budget 312.5 KiB); initi
 + CSS unchanged at 87.5 KiB. The race chunk grew 97.94 → 100.22 kB raw because it now
 carries the store, the publisher and the stage split.
 
+## Verification gate (`npm run verify:typing`)
+
+The solo verification suite is now a committed script, `scripts/verify-typing.mjs`.
+It starts its own `vite preview` on a strict port unless `BASE_URL` is supplied, runs
+headless Chrome, and stops the server in `finally`.
+
+`TypingTest` records a permanent `19wpm:render:typing-test` mark on each render
+(`markTypingTestRender` in `utils/performance.ts`), so the gate measures the real
+container instead of a patched build. Checks:
+
+| Check | Assertion |
+| --- | --- |
+| words mode, 60-key burst | ≤ 3 container renders (measured 1), characters committed |
+| Tab reset | ≤ 4 container renders (measured 2), passage cleared, idle prompt back |
+| words finish | `/results`, stored result matches the passage, accuracy 100, replay events present |
+| replay | play reaches “Replay Complete” and marks characters correct |
+| timed 15 s | finishes by itself, duration 14–16 s, ≥ 15 history points (measured 16) |
+
 ## Notes / trade-offs
 
 - `RaceTrack` still re-renders on every progress delta, which is the point: it is the
@@ -115,12 +133,18 @@ carries the store, the publisher and the stage split.
 - `frontend/src/Pages/Race.tsx` — primitive subscriptions, stage components, memoized
   race input.
 - `frontend/src/Components/Race/RaceTrack.tsx` — subscribes to participants itself.
+- `frontend/src/utils/performance.ts` — permanent container render mark.
+- `frontend/src/Components/TypingTest/TypingTest.tsx` — emits the render mark.
+- `frontend/scripts/verify-typing.mjs` — new: self-contained headless gate.
+- `frontend/package.json` — `verify:typing` alias.
 
 ## Verification
 
 - `npx tsc -b` — green.
 - `npm run lint` — 0 errors, 0 warnings.
 - `npm run build` — green.
+- `npm run verify:typing` — all four checks pass; 1 container render for 60 keys,
+  2 for Tab reset, 15 s run with 16 history points.
 - `npm run perf:bundle` — all budgets pass.
 - `node scripts/smoke.mjs` — all routes pass, including the `/race` chunk.
 

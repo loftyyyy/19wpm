@@ -10,7 +10,7 @@ import { useCapsLock } from '../../hooks/useCapsLock';
 import { usePassageQueue } from '../../hooks/usePassageQueue';
 import { useAuth } from '../../context/AuthContext';
 import { countWords, useTypingValue } from '../../utils/typingStore';
-import { beginKeystroke } from '../../utils/performance';
+import { beginKeystroke, markTypingTestRender } from '../../utils/performance';
 import { completeTypingJourney } from '../../utils/telemetry';
 import type { Duration, Passage, TestMode, WordCount, ContentType, Mode, PhraseLength, TextDifficulty } from '../../types';
 
@@ -60,6 +60,7 @@ function CapsLockNotice() {
 }
 
 export default function TypingTest() {
+  markTypingTestRender();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addResult } = useAuth();

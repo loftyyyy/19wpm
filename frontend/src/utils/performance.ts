@@ -63,3 +63,16 @@ export function completeTick(): void {
   measurePerformance('tick', pendingTickMark);
   pendingTickMark = null;
 }
+
+/**
+ * One mark per render of the solo page container, counted by `verify:typing`.
+ * It is intentionally permanent: the suite asserts that a typing burst does not
+ * re-render the container, and a temporary patch would let the gate drift from
+ * the code it is supposed to guard.
+ */
+export const TYPING_TEST_RENDER_MARK = '19wpm:render:typing-test';
+
+export function markTypingTestRender(): void {
+  if (typeof performance === 'undefined') return;
+  performance.mark(TYPING_TEST_RENDER_MARK);
+}
