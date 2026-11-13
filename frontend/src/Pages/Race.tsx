@@ -258,12 +258,12 @@ export default function Race() {
             : 'Matching with anyone available...';
 
       const searchDetail = matchNowRequested
-        ? 'Your immediate-match request is active. Skill range is ignored for the next available opponent.'
+        ? 'Your immediate-match request is active. Skill range is ignored for the next available racers.'
         : matchmakingSeconds < 5
-          ? 'Looking within 15 WPM of your pace.'
+          ? 'Gathering a group within 15 WPM of your pace.'
           : matchmakingSeconds < 20
             ? 'The WPM range grows the longer you wait.'
-            : 'No close match yet, so the next available racer will be paired with you.';
+            : 'No close match yet, so you will join the next available group of racers.';
 
       return (
         <div className="bg-card border border-line rounded-2xl shadow-sm p-8 transition-theme max-w-lg mx-auto text-center">
@@ -297,7 +297,7 @@ export default function Race() {
             className="w-full py-3 rounded-xl font-sans font-semibold text-sm bg-accent text-white hover:bg-accent-hover transition-colors hover:cursor-pointer disabled:opacity-40 disabled:cursor-default mb-3"
           >
             {matchNowRequested
-              ? 'Waiting for any available racer'
+              ? 'Waiting for any available racers'
               : isRequestingMatchNow
                 ? 'Requesting...'
                 : 'Match me with anyone now'}

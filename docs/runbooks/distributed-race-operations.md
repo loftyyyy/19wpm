@@ -27,9 +27,11 @@ Related documents:
   broadcast locally and publishes it on Redis Pub/Sub `race:events`; peers deliver it to
   their own sessions. The originating instance ignores its own echo by instance id.
 - Matchmaking queues are Redis lists keyed by text type, with a per-player presence key,
-  a pending-room key, and a per-text-type distributed lock. Two-player queues pair
-  immediately; queues of three to five use a 5-second fallback and larger queues use 20
-  seconds. A persisted `matchNow` flag lets a player request any available opponent.
+  a pending-room key, and a per-text-type distributed lock. Matches contain two to five
+  players. A partial queue waits 3.5 seconds for near-simultaneous joins, a full queue
+  matches immediately, and larger queues pick the five closest by WPM. After 20 seconds the
+  oldest player is forced into a group. A persisted `matchNow` flag groups the requester with
+  the closest available racers.
 - Race results are persisted to PostgreSQL when the room reaches `FINISHED`. Redis rooms
   are ephemeral and expire.
 
@@ -172,10 +174,11 @@ shared Redis.
    `/topic/room/{code}/progress`; Redis `TTL` on the room key remains positive.
 6. Finish both clients. Confirm the room becomes `FINISHED`, results appear in PostgreSQL,
    and a clean run is `VALID`.
-7. Join matchmaking with two users. Confirm they pair immediately with a shared room code,
-   pending codes are readable once, and the matchmaking keys are removed. With three users,
-   confirm `POST /api/v1/race/matchmaking/now` returns `202` and pairs the requester without
-   waiting for the 5-second sparse-queue deadline; a user who is not queued gets `409`.
+7. Join matchmaking with four users. Confirm all four receive the same room code after the
+   3.5-second gather window, pending codes are readable once, and the matchmaking keys are
+   removed. Repeat with five users and confirm the room forms immediately. With two users,
+   confirm `POST /api/v1/race/matchmaking/now` returns `202` and groups the requester without
+   waiting for the gather window; a user who is not queued gets `409`.
 8. With two replicas, repeat steps 2-7 and confirm cross-replica delivery. Check
    `PUBSUB NUMSUB race:events` and the replica logs for Pub/Sub warnings.
 

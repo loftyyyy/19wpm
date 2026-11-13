@@ -67,19 +67,20 @@ room codes or status strings, not quoted JSON strings.
   for matchmaking-created rooms. The distinction matters for who may start the race.
 - Room codes are six uppercase alphanumeric characters.
 
-Matchmaking is skill-based. The queue payload only carries the text type; the server
-resolves the player's average WPM and accuracy from stored stats, with defaults of 50 WPM
-and 90% for new players. Pairing happens on join, with a 10-second safety-net sweep. Two
-players pair immediately; a queue of three to five players force-pairs on the first match
-attempt after the 5-second deadline when no pair is within the WPM tolerance; larger queues
-keep the 20-second fallback. Because the sweep is 10 seconds, a sparse queue can pair up to
-roughly one sweep after the deadline.
+Matchmaking is skill-based and forms rooms of two to five players. The queue payload only
+carries the text type; the server resolves the player's average WPM and accuracy from stored
+stats, with defaults of 50 WPM and 90% for new players. Matching is attempted on join, with a
+1-second safety-net sweep. A queue below the five-player maximum waits up to 3.5 seconds for
+more players so that players who search together land in the same room; after that window it
+matches everyone waiting. A queue of exactly five matches immediately. A larger queue matches
+the five closest players by WPM; when no group is within the widened tolerance, the 20-second
+fallback forces the oldest player into a group with the four closest.
 
 `POST /matchmaking/now` marks the caller's queued entry as willing to match with anyone. The
-server still pairs immediately when possible and honors a lone request when the next player
-joins. The flag does not reset the queue timer and expires with the five-minute queue entry.
-`409` means the caller has no live queue entry, or the queue lock timed out; retry after
-joining.
+server groups the caller immediately with the closest available racers, up to the five-player
+maximum, and honors a lone request when the next player joins. The flag does not reset the
+queue timer and expires with the five-minute queue entry. `409` means the caller has no live
+queue entry, or the queue lock timed out; retry after joining.
 
 `GET /matchmaking/pending` is a consuming read: when it returns a code, the pending entry
 is deleted, so a retry can return `204`.

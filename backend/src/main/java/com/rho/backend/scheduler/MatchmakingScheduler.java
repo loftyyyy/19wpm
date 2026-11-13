@@ -16,11 +16,12 @@ public class MatchmakingScheduler {
     }
 
     /**
-     * Safety net only. Matching now happens immediately when a player joins the queue
-     * (see {@code MatchmakingService.joinQueue}); this periodic sweep just catches any
-     * players that were left unmatched. Hence the low frequency.
+     * Safety net only. Matching is attempted immediately when a player joins the queue
+     * (see {@code MatchmakingService.joinQueue}); this sweep forms a partial group once the
+     * short gather window has elapsed. It runs every second so that wait stays close to the
+     * policy's deadline instead of rounding up to a long poll interval.
      */
-    @Scheduled(fixedRate = 10000)
+    @Scheduled(fixedDelay = 1000)
     public void poll() {
         matchmakingService.pollQueues();
     }

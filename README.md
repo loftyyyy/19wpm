@@ -103,6 +103,7 @@ Per-change write-ups live in [`docs/refactors/`](docs/refactors/).
 | 11.3 | Race finishes are validated server-side; suspicious runs are flagged | Server-authoritative scoring + tiered anti-cheat verdicts | [`docs/refactors/49-server-authoritative-anti-cheat.md`](docs/refactors/49-server-authoritative-anti-cheat.md) |
 | 11.4 | Sparse queues pair faster; players can request any opponent | Queue-size-aware fallback deadlines + persisted player preference | [`docs/refactors/50-queue-size-aware-matchmaking.md`](docs/refactors/50-queue-size-aware-matchmaking.md) |
 | 11.5 | Matchmaking UI explains the widening search and offers an immediate match | Timed search stages + explicit user override | [`docs/refactors/51-expanding-search-matchmaking-ui.md`](docs/refactors/51-expanding-search-matchmaking-ui.md) |
+| 11.6 | Public matchmaking forms groups of up to five instead of always pairing two players | Gather-window batch matching over a skill-clustered queue | [`docs/refactors/56-group-matchmaking.md`](docs/refactors/56-group-matchmaking.md) |
 
 ### 1.1 — Race room live-state store + delta progress broadcasts
 
@@ -543,6 +544,24 @@ starts another race.
 The trade-off is that the stage copy is driven by a client timer, so it can lag the server's
 actual match; the button also cannot force a match while the player is alone. See
 [`51-expanding-search-matchmaking-ui.md`](docs/refactors/51-expanding-search-matchmaking-ui.md).
+
+### 11.6 - Public matchmaking forms groups of up to five
+
+**Before:** matching only ever returned one pair. Joining triggered a match attempt immediately,
+so the first two players in a queue were paired off before the rest of a group arrived. Four
+friends searching together were split into two separate 1v1 rooms.
+
+**After:** `SkillMatchmaker` selects a group of two to five players. A partial queue waits 3.5
+seconds for near-simultaneous joins, so a group searching together stays together, then matches
+everyone waiting. A full five-player queue matches immediately, and a larger queue picks the
+five closest by WPM. After 20 seconds the oldest player is forced into a group with the four
+closest, so a stream of new arrivals cannot starve them. The `matchNow` request groups the
+requester immediately with the closest available racers. The scheduler sweep is now 1 second so
+the gather window is observed promptly.
+
+**Impact:** friends can race in one room, and public races feel populated. Two-player queues
+trade up to 3.5 seconds of extra wait for that grouping. See
+[`56-group-matchmaking.md`](docs/refactors/56-group-matchmaking.md).
 
 ## Code Review Remediation
 

@@ -202,17 +202,20 @@ public class MatchmakingService {
         List<MatchmakingEntry> oldestFirst = queue.stream()
                 .map(QueuedEntry::entry)
                 .toList();
-        Optional<SkillMatchmaker.Pair> pair = skillMatchmaker.selectPair(oldestFirst, now);
-        if (pair.isEmpty()) {
+        Optional<SkillMatchmaker.Group> group = skillMatchmaker.selectGroup(oldestFirst, now);
+        if (group.isEmpty()) {
             return;
         }
 
-        QueuedEntry first = queue.get(pair.get().firstIndex());
-        QueuedEntry second = queue.get(pair.get().secondIndex());
-        removeEntry(queueKey, first.raw());
-        removeEntry(queueKey, second.raw());
+        List<QueuedEntry> matched = new ArrayList<>(group.get().indices().size());
+        for (int index : group.get().indices()) {
+            matched.add(queue.get(index));
+        }
+        for (QueuedEntry queued : matched) {
+            removeEntry(queueKey, queued.raw());
+        }
 
-        createMatchedRoom(textType, List.of(first.entry(), second.entry()));
+        createMatchedRoom(textType, matched.stream().map(QueuedEntry::entry).toList());
     }
 
     private void createMatchedRoom(TextType textType, List<MatchmakingEntry> entries) {
