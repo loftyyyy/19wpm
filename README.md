@@ -1,3 +1,5 @@
+NOT WORKING, MY AZURE CREDITS FOR DEPLOYING THE BACKEND EXPIRED. SORRY
+
 # 19wpm
 19wpm is a typing test app with solo practice modes and real-time multiplayer races. Guest sessions use localStorage; authenticated users sync results to the backend.
 
